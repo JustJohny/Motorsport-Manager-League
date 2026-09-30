@@ -1,0 +1,11 @@
+{
+  "description": "Visible test on the player's own team (Tatra Racing)",
+  "changes": [
+    { "op": "setBuilding", "team": "Tatra Racing", "building": "Wind Tunnel", "level": 1 },
+    { "op": "setBuilding", "team": "Tatra Racing", "building": "Scouting Facility", "level": 2 },
+    { "op": "setBudget", "team": "Tatra Racing", "amount": 50000000, "reason": "League test budget" },
+    { "op": "addPart", "team": "Tatra Racing", "type": "FrontWing", "name": "F-LEAGUE", "stat": 60, "performance": 5, "maxPerformance": 10, "reliability": 0.9, "fitToCar": 1 },
+    { "op": "hire", "team": "Tatra Racing", "person": "4de31eec-de83-440a-b58d-bc4b26d4359e", "replacing": "0f86de6b-9389-405e-aff5-30b08f0149fc", "yearlyWages": 300000 },
+    { "op": "hire", "team": "Tatra Racing", "person": "5f8a3a97-2a8a-4812-ac97-8906778b7681", "replacing": "da7e3b5f-19f1-4704-8b7b-649d89ae9895" }
+  ]
+}

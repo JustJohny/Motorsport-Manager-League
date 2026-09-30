@@ -1,0 +1,55 @@
+{
+  "description": "Round 6 - Munich: alice + bob decisions",
+  "changes": [
+    {
+      "op": "setBuilding",
+      "team": "Garuda Racing",
+      "building": "Wind Tunnel",
+      "level": 2
+    },
+    {
+      "op": "setBudget",
+      "team": "Garuda Racing",
+      "amount": 25000000,
+      "reason": "League prize money"
+    },
+    {
+      "op": "addPart",
+      "team": "Garuda Racing",
+      "type": "FrontWing",
+      "name": "F-ALICE",
+      "level": 1,
+      "stat": 30,
+      "performance": 5,
+      "maxPerformance": 10,
+      "reliability": 0.8,
+      "fitToCar": 0
+    },
+    {
+      "op": "hire",
+      "team": "Garuda Racing",
+      "person": "9b8a0cdd-5b13-4a6d-a4dc-6d985f0ea8e5",
+      "replacing": "fce48753-42a3-4436-8f03-b7cc37c86717",
+      "yearlyWages": 400000
+    },
+    {
+      "op": "hire",
+      "team": "Garuda Racing",
+      "person": "2ec6b854-8de7-4f41-8f02-f7d45b19e95f",
+      "replacing": "4344f830-5237-497b-a6c9-63efa2d6b1d5"
+    },
+    {
+      "op": "hire",
+      "team": "Garuda Racing",
+      "person": "1942b56d-6560-4e18-bb69-4a347160da50",
+      "replacing": "9c5460cf-71bd-4bce-a5cd-5bda9ddd4c7c",
+      "yearlyWages": 1500000
+    },
+    {
+      "op": "hire",
+      "team": "Garuda Racing",
+      "person": "8d709715-d653-4111-9efa-25d66f93577f",
+      "replacing": "5ba95404-8a30-44b2-948c-b8e96651c5b9"
+    }
+  ]
+}

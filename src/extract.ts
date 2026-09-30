@@ -1,0 +1,193 @@
+import type { Obj } from "./graph.ts";
+import { BUILDING_STATES, JOBS, PART_TYPES, Save, numOrNull, personKind, personName, type PartType } from "./model.ts";
+
+export interface LeagueConfig {
+  /** Championship the league runs in, by name ("European Racing Series") or championshipID. */
+  championship?: string | number;
+  members: { member: string; team: string | number }[];
+}
+
+// Part inventories used by each championship series (single seater, GT, endurance).
+const SERIES_PART_TYPES: Record<number, PartType[]> = {
+  0: ["Brakes", "Engine", "FrontWing", "Gearbox", "RearWing", "Suspension"],
+  1: ["BrakesGT", "EngineGT", "GearboxGT", "RearWingGT", "SuspensionGT"],
+  2: ["BrakesGET", "EngineGET", "FrontWingGET", "GearboxGET", "RearWingGET", "SuspensionGET"],
+};
+
+export function extractLeague(save: Save, cfg: LeagueConfig) {
+  const { g } = save;
+  const memberTeams = cfg.members.map((m) => ({ member: m.member, team: save.team(m.team) }));
+  const champ = cfg.championship !== undefined
+    ? g.list<Obj>(save.data.championshipManager.mEntities ?? []).find((c) =>
+        c.championshipID === cfg.championship || save.championshipName(c) === cfg.championship)
+      ?? save.championship(save.team(cfg.members[0].team))
+    : save.championship(memberTeams[0].team);
+
+  const teamsInChamp = save.teams().filter((t) => g.same(t.championship, champ));
+  const memberOf = new Map(memberTeams.map((m) => [m.team, m.member]));
+
+  return {
+    extractedAt: new Date().toISOString(),
+    gameDate: save.now,
+    championship: {
+      id: champ.championshipID,
+      name: save.championshipName(champ),
+      eventNumber: champ.mEventNumber,
+      calendar: calendar(save, champ),
+      standings: standings(save, champ),
+      lastRace: lastRace(save, champ),
+    },
+    teams: teamsInChamp.map((t) => team(save, t, champ, memberOf.get(t) ?? null)),
+    freeAgents: save.people().filter((p) => save.isFreeAgent(p)).map((p) => person(save, p)),
+  };
+}
+
+function team(save: Save, t: Obj, champ: Obj, member: string | null) {
+  const fin = save.finance(t);
+  const partTypes = SERIES_PART_TYPES[champ.series as number] ?? SERIES_PART_TYPES[0];
+  return {
+    member,
+    teamID: t.teamID,
+    guid: t.id,
+    name: t.name,
+    isPlayerTeam: save.g.same(save.data.player.mPlayerTeam, t),
+    budget: numOrNull(fin.currentBudget),
+    reputation: t.reputation,
+    marketability: numOrNull(t.marketability),
+    fanBase: numOrNull(t.fanBase),
+    hq: save.buildings(t).map((b) => building(save, b)),
+    parts: Object.fromEntries(partTypes.map((type) => [type, save.parts(t, type).map((p) => part(save, p))])),
+    staff: save.slots(t).map((s) => {
+      const p = s.personHired ? save.g.deref<Obj>(s.personHired) : null;
+      return { slotID: s.slotID, job: JOBS[s.jobType] ?? s.jobType, person: p ? person(save, p) : null };
+    }).filter((s) => ["Driver", "EngineerLead", "Mechanic"].includes(s.job as string)),
+  };
+}
+
+function building(save: Save, b: Obj) {
+  const info = save.buildingInfo(b);
+  const built = b.state !== 0;
+  return {
+    type: info.type,
+    name: info.name,
+    state: BUILDING_STATES[b.state] ?? b.state,
+    /** 0 = not built, otherwise the level shown in game (1..maxLevel+1). */
+    level: built ? b.currentLevel + 1 : 0,
+    maxLevel: info.maxLevel + 1,
+    progress: numOrNull(b.normalizedProgress),
+    progressEnd: b.mDateProgressEnd,
+    upgradeCosts: (info.upgradeCost ?? []).map(numOrNull),
+    initialCost: numOrNull(info.initialCost),
+    dependencies: (info.dependencies ?? []).map((d: Obj) => ({ buildingType: d.buildingType, requiredLevel: d.requiredLevel })),
+  };
+}
+
+function part(save: Save, p: Obj) {
+  const s = p.mStats;
+  const fittedCar = p.fittedCar ? save.g.deref<Obj>(p.fittedCar) : null;
+  return {
+    guid: p.id,
+    name: p.name,
+    type: p.$type,
+    level: s.level,
+    stat: numOrNull(s.mStat),
+    performance: numOrNull(s.mPerformance),
+    maxPerformance: numOrNull(s.maxPerformance),
+    reliability: numOrNull(s.mReliability),
+    maxReliability: numOrNull(s.maxReliability),
+    condition: numOrNull(s.partCondition?.mCondition),
+    rulesRisk: numOrNull(s.rulesRisk),
+    fittedToCar: fittedCar ? fittedCar.identifier : null,
+    buildDate: p.buildDate,
+    components: (p.components ?? []).length,
+  };
+}
+
+function person(save: Save, p: Obj) {
+  const c = save.contract(p);
+  const kind = personKind(p);
+  const stats = save.g.deref<Obj>(p.mStats ?? p.stats);
+  let s: Record<string, number | null> = {};
+  if (kind === "Driver") {
+    for (const k of ["braking", "cornering", "smoothness", "overtaking", "consistency", "adaptability", "fitness", "feedback", "focus"]) s[k] = numOrNull(stats[k]);
+  } else if (kind === "Mechanic") {
+    for (const k of ["reliability", "performance", "concentration", "speed", "pitStops", "leadership"]) s[k] = numOrNull(stats[k]);
+  } else if (kind === "Engineer") {
+    const pcs = save.g.deref<Obj>(stats.partContributionStats);
+    for (const k of ["topSpeed", "acceleration", "braking", "lowSpeedCorners", "mediumSpeedCorners", "highSpeedCorners"]) s[k] = numOrNull(pcs?.[k]);
+  }
+  const employer = save.employer(p);
+  return {
+    guid: p.id,
+    name: personName(p),
+    kind,
+    dateOfBirth: p.dateOfBirth,
+    nationality: save.g.deref<Obj>(p.nationality)?.mCountryKey,
+    stats: s,
+    potential: numOrNull(p.mPotential ?? null),
+    carID: p.mCarID ?? null,
+    contract: {
+      team: employer?.name ?? null,
+      job: JOBS[c.job] ?? c.job,
+      yearlyWages: c.yearlyWages,
+      start: c.startDate,
+      end: c.mEndDate,
+    },
+  };
+}
+
+function calendar(save: Save, ch: Obj) {
+  return save.g.list<Obj>(ch.calendar).map((ev, i) => {
+    const circuit = save.g.deref<Obj>(ev.circuit);
+    return { round: i + 1, date: ev.eventDate, circuit: circuit.locationName, layout: circuit.trackLayout, ended: !!ev.mHasEventEnded };
+  });
+}
+
+function standings(save: Save, ch: Obj) {
+  const st = save.g.deref<Obj>(ch.standings);
+  const row = (e: Obj, name: string) => ({
+    name,
+    position: e.mCurrentPosition,
+    points: numOrNull(e.mPoints?.[Math.max(0, (e.races ?? 1) - 1)]) ?? 0,
+    races: e.races, wins: e.wins, podiums: e.podiums, dnfs: e.DNFs,
+  });
+  const drivers = save.g.list<Obj>(st.mDrivers).map((e) => {
+    const d = save.g.deref<Obj>(e.mEntity);
+    return { ...row(e, personName(d)), guid: d.id, team: save.employer(d)?.name ?? null };
+  });
+  const teams = save.g.list<Obj>(st.mTeams).map((e) => {
+    const t = save.g.deref<Obj>(e.mEntity);
+    return { ...row(e, t.name), teamID: t.teamID };
+  });
+  const byPos = (a: { position: number }, b: { position: number }) => a.position - b.position;
+  return { drivers: drivers.sort(byPos), teams: teams.sort(byPos) };
+}
+
+function lastRace(save: Save, ch: Obj) {
+  const events = save.g.list<Obj>(ch.calendar);
+  const idx = events.map((e) => !!e.mHasEventEnded).lastIndexOf(true);
+  if (idx < 0) return null;
+  const ev = events[idx];
+  const results = save.g.deref<Obj>(ev.results);
+  const session = (key: string) => {
+    const s = results[key]?.[0] ? save.g.deref<Obj>(results[key][0]) : null;
+    return (s?.resultData ?? []).map((r: Obj) => {
+      r = save.g.deref<Obj>(r);
+      const d = save.g.deref<Obj>(r.driver);
+      return {
+        position: r.position,
+        driver: personName(d), driverGuid: d.id,
+        team: save.g.deref<Obj>(r.team)?.name,
+        grid: r.gridPosition, laps: r.laps, time: numOrNull(r.time), bestLap: numOrNull(r.bestLapTime),
+        stops: r.stops, points: r.points, carState: r.carState,
+      };
+    }).sort((a: Obj, b: Obj) => a.position - b.position);
+  };
+  return {
+    round: idx + 1,
+    circuit: save.g.deref<Obj>(ev.circuit).locationName,
+    date: ev.eventDate,
+    qualifying: session("qualifyingSessions"),
+    race: session("raceSessions"),
+  };
+}

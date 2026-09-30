@@ -1,0 +1,83 @@
+# Motorsport Manager 1.53 save format — research notes
+
+Findings from decoding real saves (game 1.53.16967). They're verified by the round-trip tests in `test/`.
+
+## Container
+| Offset | Type | Meaning |
+|---|---|---|
+| 0 | 4 bytes | magic `mm2s` |
+| 4 | int32 LE | format version (4) |
+| 8 | int32 | header block, compressed length |
+| 12 | int32 | header block, raw length |
+| 16 | int32 | data block, compressed length |
+| 20 | int32 | data block, raw length |
+| 24 | bytes | header: raw **LZ4 block** (no frame) → JSON (save info, team name/colours, ~9 KB) |
+| … | bytes | data: raw LZ4 block → JSON (whole game state, ~20–30 MB) |
+
+No checksum was seen. The game loads files whose compressed bytes differ from its own, as long as the JSON is the same.
+
+## JSON dialect (FullSerializer)
+- Compact, with no whitespace.
+- Floats always carry a decimal point (`1.0`) or exponent (`1E-05`).
+- Bare `NaN`, `Infinity` and `-Infinity` tokens appear.
+- String **values** escape every char outside ASCII 32–126 as `\uXXXX` (lowercase). Object **keys** are written raw (e.g. `"André Zoom":{…}` in relationship dictionaries).
+- `$id` marks an object's first appearance. Later appearances are `{"$ref":"<id>"}`. **A `$ref` must never come before its `$id` in document order.** 0 of 109k refs in real saves do, and FullSerializer resolves refs in one pass. `Graph.normalizeRefOrder()` restores this after edits.
+- Lists that are shared are wrapped: `{"$content":[…],"$id":"…"}`.
+- `$type` appears **only** when the runtime type differs from the declared type of the field it's written in (`EnginePart`, `Engineer`, `Mechanic`…). Drivers usually have none, because they're first written in `List<Driver>`.
+  - **Pitfall (this broke the first in-game test):** if an edit moves an object's definition into a field of a different declared type, the game builds the wrong class and fails with `ArgumentException: failed to convert parameters` from `fsIEnumerableConverter`.
+  - Example: moving a driver into `EmployeeSlot.personHired`, which is declared as `Person`.
+  - Fix: `schema/mm-1.53.json` lists the declared type of every serialized field. It's generated from `Assembly-CSharp.dll` with `tools/gen-schema.ts`, which needs `monodis`. On load, `Types.record()` notes each object's real type. Before writing, `Types.annotate()` adds `$type` wherever a moved definition needs it.
+  - The schema types all ~18k objects in every tested save, with no contradictions.
+
+## Where things live (data JSON)
+- `time.mNow` is the current game date.
+- `teamManager.mEntities[]`: 82 teams. Useful fields: `teamID`, `name`, `id` (GUID), `championship`, `player.mPlayerTeam` (the human team).
+  - `financeController.finance.currentBudget`, plus `transactionHistory.transactions[]`.
+  - `headquarters.hqBuildings[15]`: `currentLevel` (0-based), `state` (0 NotBuilt, 1 BuildingInProgress, 2 Constructed, 3 Upgrading), `normalizedProgress`, `mStaffNumber`, `mDateProgressStarted/End`. The `info` object holds `name`, `type`, `maxLevel` (0-based), `workerCapacity[]`, `upgradeCost[]` and `dependencies[{buildingType, requiredLevel}]`.
+  - `carManager.partInventory.<type>Inventory` holds the parts.
+    - Part fields: `$type`, `name`, `id`, `isFitted`, `fittedCar`, `components[]`, and `mStats{level, mStat, mPerformance, maxPerformance, mReliability, maxReliability, rulesRisk, partCondition{mCondition…}}`.
+    - Part-type index order: Brakes, Engine, FrontWing, Gearbox, RearWing, Suspension, then the GT and GET variants.
+  - `carManager.mCar[2]` holds the cars. `mCurrentPart[17]` is indexed by part type, and `mPartsFittedToCar[]` lists the fitted parts.
+  - `contractManager.mEmployeeSlots[13]` entries are `{jobType, personHired, slotID}`. Job types: 0 Driver, 3 EngineerLead, 4 Assistant, 5 TeamPrincipal, 6 Scout, 7 Mechanic, 8 Chairman. The team-level `mEmployeeSlots` are the same slot objects as the six driver slots.
+  - Caches that point at people: `contractManager.mCachedPeople`, `mMechanics`, `mSelectedSessionDrivers`, `mVehicleSessionDrivers`, `teamAIController.mDrivers`, and `carManager.partImprovement.mechanicOnPerformance/Reliability`.
+- `driverManager` / `engineerManager` / `mechanicManager.mEntities[]` hold everyone. Each person has a `contract`:
+  - Fields: `employeer`, `mEmployeerTeam`, `job`, `mContractStatus` (1 OnGoing, 3 Terminated), `yearlyWages`, `startDate`, `mEndDate`, `mCurrentStatus` (driver 1/2/reserve).
+  - **Free agent** = `employeer: null`, `job: 18`, `mContractStatus: 3`.
+- Championship (`team.championship`):
+  - `mName` (e.g. "European Racing Series") and `mEventNumber`.
+  - `calendar[]` events have `eventDate`, `circuit`, `mHasEventEnded`, and `results.{qualifyingSessions,raceSessions}[0].resultData[]` (position, driver, team, grid, time, points…).
+  - `standings.mDrivers/mTeams[]` rows have `mEntity`, `mCurrentPosition`, per-race arrays `mPoints[]` (cumulative), `mRacePositions[]`, and so on.
+
+## Hiring pitfalls found in game
+- **Mechanic–driver relationships:** each mechanic has `mDictDriversRelationships` and `mDictRelationshipModificationHistory`, keyed by the driver's `name`. Free agents have empty dicts.
+  - The game fills them on every hire (`Mechanic.SetDefaultDriverRelationship`: 0 weeks, 0 relationship, `relationshipAmountAfterDecay: -1`).
+  - If they're missing, the game crashes with a NullReferenceException in `Mechanic.GetModifiedRelationshipWithDriver` when practice starts.
+  - `hire` now creates them for every mechanic × driver pair on the affected teams.
+- **Career history:** `careerHistory.mCareer[]` must end with an open entry for the current team.
+  - The entry has `team`, `championship`, `year`, zeroed stats, `mIsFinished: false`, `mEndDate` = null date and `mStartDate`.
+  - Most free agents have an empty list. After each session the game calls `currentEntry.IncreaseStat` for non-driver, non-mechanic staff, so an empty list crashes in `Team.IncreaseStaffHistoryStat` when qualifying ends.
+  - `hire` closes the previous entry and opens a new one. `release` closes it.
+- **Contract end event:** every running contract has `contract.mCalendarEvent`. It sits in `calendar.mDelayedEvents`, which is sorted by `triggerDate`, and has `OnEventTrigger {targets: [contract], methodNames: ["ContractEndDateReached"]}`, a `ContractDisplayEffect` and localized "Contract ending with …" text.
+  - `hire` re-aims or clones one for the new person and inserts it in date order. `release` removes it.
+- **Objects without `$id`:** FullSerializer only gives an object an `$id` if something else references it (171 contracts have none). `Graph.ref()` assigns one on first reference.
+  - Some free agents keep a stale inline event with no `$id`. Putting that same object in a second place without an id would serialize it as two separate copies.
+- The game's own hire path is `ContractManagerTeam.HireNewPerson`/`HireNewDriver`. It also does `PartImprovement.AssignChiefMechanics`, `AIPitCrew.RegenerateTaskStats`, `Team.SelectMainDriversForSession` and `DriverManager.AddDriverToChampionship`. Check these first if another hire-related crash shows up.
+
+## Verified in game (2026-09-30, save "League Test 2", player team)
+- `setBuilding`: Wind Tunnel shown at level 1.
+- `setBudget`: new budget shown, with our transaction note in the finance history.
+- `addPart` + `fitPart`: a part with `mStat: 60` shows as a **60** front wing, fitted to the car. The part `name` (e.g. "F-LEAGUE") is **not shown anywhere in the UI**, so the site should identify parts by GUID and label them itself.
+- `hire`: the new lead engineer and mechanic are shown, and the replaced staff are gone.
+- Staff and driver changes on AI teams (Garuda/Octane) show in their team screens. The game doesn't show rival HQ, parts or budget.
+
+- **Full cycle (League Test 2 → 3 → 4):** practice, qualifying and race played, then time advanced to the next race weekend. The game's own saves kept the budget (plus race income), Wind Tunnel 1, Scouting Facility 2, the spec-60 wing on car 2, and the new engineer and mechanic.
+  - `mmsave diff` shows the game only changed normal gameplay state: standings, results, finances, and relationship growth of the new mechanic (0 → 9.6). None of our edits were reset.
+
+## Open questions (verify in game with `mmsave diff`)
+- Whether `mPerformance` (the improvement bonus) is shown separately from `mStat`, e.g. "60 +5".
+- What the game itself changes when a driver is hired mid-season, e.g. whether it moves the old driver's standings row to `mInactiveDrivers`.
+- How part `level` maps to design tiers.
+- Whether HQ upkeep and staff costs recalculate on load after a building level is set directly.
+
+Research recipe: copy a save, make one change in game, save again, then run
+`mmsave diff before.sav after.sav --team "Your Team"`.

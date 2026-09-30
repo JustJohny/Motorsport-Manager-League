@@ -1,0 +1,8 @@
+{
+  "championship": "European Racing Series",
+  "members": [
+    { "member": "organizer", "team": "Tatra Racing" },
+    { "member": "alice", "team": "Garuda Racing" },
+    { "member": "bob", "team": "Octane Racing" }
+  ]
+}
