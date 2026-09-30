@@ -91,4 +91,4 @@ npx tsx src/cli.ts validate "<save>"
 ## Working notes for the assistant
 - The user plays MM under Wine on Linux (CachyOS). They test in game and report back, so give them concrete things to check.
 - Never overwrite the user's own saves. Write new `SaveLeague Test N.sav` files.
-- Git repo initialized; everything is staged but **nothing is committed yet**. Commit only if the user asks.
+- Git: initial commit `dc4d371` on `master` (2026-09-30). Commit only when the user asks.
