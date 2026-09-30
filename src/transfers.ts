@@ -63,10 +63,10 @@ export function windowChanges(windowId: number, gameDate: string, auctions: Auct
   return { description: `Transfer window #${windowId}`, changes };
 }
 
-/** Fetch the open (or just closed) window and its results. */
+/** The open (or closed, not yet applied) window and its results, or null if there is none. */
 export async function fetchWindow(env: SupabaseEnv) {
   const [window] = await rest<WindowRow[]>(env, "GET", "transfer_windows?status=eq.open&select=*");
-  if (!window) throw new Error("no transfer window waiting to be applied");
+  if (!window) return null;
   const [snap] = await rest<{ game_date: string }[]>(env, "GET", `snapshots?id=eq.${window.snapshot_id}&select=game_date`);
   const [settings] = await rest<LeagueSettings[]>(env, "GET", "league_settings?select=*");
   const auctions = await rest<AuctionRow[]>(env, "GET", `auctions?window_id=eq.${window.id}&select=*&order=id`);

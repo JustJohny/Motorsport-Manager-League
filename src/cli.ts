@@ -9,7 +9,9 @@ import { extractLeague, type LeagueConfig } from "./extract.ts";
 import { Save } from "./model.ts";
 import { defaultSavesDir } from "./paths.ts";
 import { memberRows, publish, splitSnapshot } from "./publish.ts";
-import { supabaseEnv } from "./supabase.ts";
+import { cancelUnorderedChange, fetchHqContext, fetchQueuedOrders, hqChanges, markOrdersApplied } from "./hq-orders.ts";
+import type { LeagueSettings } from "./league-rules.ts";
+import { rest, supabaseEnv } from "./supabase.ts";
 import { fetchWindow, markApplied, windowChanges, winners } from "./transfers.ts";
 
 const USAGE = `mmsave - Motorsport Manager league save toolkit
@@ -20,7 +22,7 @@ const USAGE = `mmsave - Motorsport Manager league save toolkit
   mmsave teams    <save.sav>                          list teams by championship
   mmsave extract  <save.sav> --league league.json [-o state.json]
   mmsave publish  <save.sav> --league league.json [--dry-run]   upload to the league website
-  mmsave pull     [-o changes.json] [--mark-applied]           transfer window results as changes
+  mmsave pull     [-o changes.json] [--mark-applied] [--force] HQ orders + transfer results as changes
   mmsave apply    <save.sav> <changes.json> [-o out.sav] [--name "Shown name"]
   mmsave diff     <a.sav> <b.sav> [--team NAME] [--path teamManager] [--depth N]
 
@@ -130,22 +132,50 @@ switch (cmd) {
     break;
   }
   case "pull": {
+    // Everything members decided since the last apply: queued HQ orders and, once its deadline
+    // has passed, the transfer window's signings.
     const env = supabaseEnv();
-    const w = await fetchWindow(env);
-    const closes = new Date(w.window.closes_at);
-    if (closes > new Date() && !opt.force) fail(`window #${w.window.id} is open until ${closes.toLocaleString()} (--force to pull anyway)`);
-    const won = winners(w.auctions, w.bids, w.settings);
-    console.log(`Transfer window #${w.window.id}: ${w.auctions.length} auctions, ${won.length} signings`);
-    for (const s of won) {
-      console.log(`  ${s.team}: ${s.person.name}${s.fromTeam ? ` from ${s.fromTeam}` : ""} for $${s.wage.toLocaleString()}/yr x${s.years}, replacing ${s.replacingName}`
-        + ` (fee $${s.signOnFee.toLocaleString()}${s.buyout ? `, buyout $${s.buyout.toLocaleString()}` : ""})`);
+    const [w, orders, [settings]] = await Promise.all([
+      fetchWindow(env), fetchQueuedOrders(env), rest<LeagueSettings[]>(env, "GET", "league_settings?select=*"),
+    ]);
+    const changes: ChangeSet["changes"] = [];
+    const notes: string[] = [];
+
+    // First undo what the in-game AI did to member teams' HQ since the last apply.
+    const ctx = await fetchHqContext(env);
+    if (ctx.leagueStart && ctx.memberTeams.length) changes.push(cancelUnorderedChange(ctx.memberTeams, ctx.orders, ctx.leagueStart));
+
+    console.log(`HQ orders: ${orders.length}`);
+    for (const o of orders) {
+      console.log(`  ${o.team}: ${o.to_level === 1 ? "build" : "upgrade"} ${o.building_name}${o.to_level > 1 ? ` to level ${o.to_level}` : ""}`
+        + ` for $${Number(o.cost).toLocaleString()} (${Math.round(o.weeks * Number(settings.hq_speed))} weeks)`);
     }
-    const json = JSON.stringify(windowChanges(w.window.id, w.gameDate, w.auctions, w.bids, w.settings), null, 2);
+    changes.push(...hqChanges(orders, Number(settings.hq_speed)));
+
+    let windowDone = false;
+    if (!w) console.log("Transfer window: none waiting");
+    else if (new Date(w.window.closes_at) > new Date() && !opt.force) {
+      console.log(`Transfer window #${w.window.id}: still open until ${new Date(w.window.closes_at).toLocaleString()}, skipped (--force to include)`);
+    } else {
+      const won = winners(w.auctions, w.bids, w.settings);
+      console.log(`Transfer window #${w.window.id}: ${w.auctions.length} auctions, ${won.length} signings`);
+      for (const s of won) {
+        console.log(`  ${s.team}: ${s.person.name}${s.fromTeam ? ` from ${s.fromTeam}` : ""} for $${s.wage.toLocaleString()}/yr x${s.years}, replacing ${s.replacingName}`
+          + ` (fee $${s.signOnFee.toLocaleString()}${s.buyout ? `, buyout $${s.buyout.toLocaleString()}` : ""})`);
+      }
+      changes.push(...windowChanges(w.window.id, w.gameDate, w.auctions, w.bids, w.settings).changes);
+      notes.push(`transfer window #${w.window.id}`);
+      windowDone = true;
+    }
+    if (orders.length) notes.push(`${orders.length} HQ order${orders.length > 1 ? "s" : ""}`);
+
+    const json = JSON.stringify({ description: notes.join(" + ") || "nothing to apply", changes }, null, 2);
     if (opt.out) writeFileSync(opt.out, json), console.log(`wrote ${opt.out}`);
     else console.log(json);
     if (opt["mark-applied"]) {
-      await markApplied(env, w.window.id);
-      console.log(`window #${w.window.id} marked as applied; the organizer can open the next one`);
+      await markOrdersApplied(env, orders.map((o) => o.id));
+      if (windowDone && w) await markApplied(env, w.window.id);
+      console.log(`marked as applied: ${notes.join(" + ") || "nothing"}`);
     }
     break;
   }

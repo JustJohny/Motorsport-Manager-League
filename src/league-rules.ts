@@ -11,6 +11,8 @@ export interface LeagueSettings {
   min_wage_exponent: number;
   min_wage_floor: number;
   max_contract_years: number;
+  /** Multiplier on MM's HQ build times; 1 is the game's own duration. */
+  hq_speed: number;
 }
 
 export const DEFAULT_SETTINGS: LeagueSettings = {
@@ -20,6 +22,7 @@ export const DEFAULT_SETTINGS: LeagueSettings = {
   min_wage_exponent: 2,
   min_wage_floor: 50_000,
   max_contract_years: 3,
+  hq_speed: 1,
 };
 
 const DAY = 86_400_000;
@@ -75,4 +78,39 @@ export function bidCost(wage: number, buyoutValue: number, replacingWage: number
 /** C# date for a contract of `years` seasons signed in the game year of `gameDate`. */
 export function contractEnd(gameDate: string, years: number): string {
   return `${new Date(gameTime(gameDate)).getUTCFullYear() + years - 1}-12-31T00:00:00.0000000`;
+}
+
+type HqBuilding = {
+  type: number; level: number; state: string; maxLevel: number; initialCost: number | null; upgradeCosts: (number | null)[];
+  buildWeeks: number; upgradeWeeks: number[]; progressStart: string;
+}
+
+/** Level the team really has: a building under construction isn't built yet. */
+export const ownedLevel = (b: Pick<HqBuilding, "state" | "level">) => (b.state === "BuildingInProgress" ? 0 : b.level);
+
+/** Level a construction in progress is heading to. */
+export const targetLevel = (b: Pick<HqBuilding, "state" | "level">) => (b.state === "BuildingInProgress" ? 1 : b.level + 1);
+
+/**
+ * A construction on a member team that the league didn't order: the in-game AI started it
+ * after the league began. `pull` cancels and refunds these, so the member may order it anew.
+ */
+export function unorderedProject(b: HqBuilding, applied: { building_type: number; to_level: number }[], leagueStart: string | null) {
+  if (b.state !== "BuildingInProgress" && b.state !== "Upgrading") return false;
+  if (!leagueStart || b.progressStart <= leagueStart) return false;
+  return !applied.some((o) => o.building_type === b.type && o.to_level === targetLevel(b));
+}
+
+/**
+ * Cost and MM build time of a building's next step, or null at max level / not buildable /
+ * under construction. `unordered` treats an AI-started construction as not started.
+ */
+export function nextHqStep(b: Omit<HqBuilding, "type" | "progressStart">, unordered = false) {
+  if ((b.state === "BuildingInProgress" || b.state === "Upgrading") && !unordered) return null;
+  const level = ownedLevel(b);
+  if (level >= b.maxLevel) return null;
+  const cost = level === 0 ? b.initialCost : b.upgradeCosts[level - 1];
+  const weeks = level === 0 ? b.buildWeeks : b.upgradeWeeks[level - 1];
+  if (cost == null || !weeks) return null;
+  return { toLevel: level + 1, cost, weeks };
 }

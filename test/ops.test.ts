@@ -137,4 +137,81 @@ describe.skipIf(!existsSync(SAVE))("operations on a real save", () => {
     expect(() => applyChanges(save, { changes: [{ op: "setBuilding", team: "Garuda Racing", building: "Wind Tunnel", level: 99 }] }))
       .toThrow(/Change #1 \(setBuilding\)/);
   }, 60_000);
+
+  it("starts HQ construction the way the game does, with MM's week-based times", () => {
+    const save = Save.load(SAVE);
+    const before = extractLeague(save, league);
+    const hq = (st: typeof before, name: string) => st.teams.find((t) => t.name === "Garuda Racing")!.hq.find((b) => b.name === name)!;
+    const notBuilt = before.teams.find((t) => t.name === "Garuda Racing")!.hq.find((b) => b.state === "NotBuilt" && b.name !== "Road Car Factory")!;
+    const built = before.teams.find((t) => t.name === "Garuda Racing")!.hq.find((b) => b.state === "Constructed" && b.level < b.maxLevel)!;
+    const log = applyChanges(save, { changes: [
+      { op: "startBuilding", team: "Garuda Racing", building: notBuilt.name },
+      { op: "startBuilding", team: "Garuda Racing", building: built.name },
+    ] });
+    expect(log[0]).toMatch(/building .* to level 1/);
+    save.prepareForWrite();
+    expect(typeMismatches(save.types, save.data)).toEqual([]);
+    const reloaded = reload(save);
+    expect(reloaded.g.validate()).toEqual([]);
+    expect(typeProblems(reloaded)).toEqual([]);
+
+    const after = extractLeague(reloaded, league);
+    const days = (b: { progressEnd: string }) => (Date.parse(b.progressEnd.slice(0, 19) + "Z") - Date.parse(before.gameDate.slice(0, 19) + "Z")) / 86_400_000;
+    const t = reloaded.team("Garuda Racing");
+    const info = (name: string) => reloaded.buildingInfo(reloaded.buildings(t).find((b) => reloaded.buildingInfo(b).name === name)!);
+    expect(hq(after, notBuilt.name)).toMatchObject({ state: "BuildingInProgress", progress: 0 });
+    expect(days(hq(after, notBuilt.name))).toBe(info(notBuilt.name).buildTime * 7);
+    expect(hq(after, built.name)).toMatchObject({ state: "Upgrading", level: built.level });
+    expect(days(hq(after, built.name))).toBe(info(built.name).upgradeTime[built.level - 1] * 7);
+
+    // Each has MM's completion event, aimed at the building, in date order.
+    const events = reloaded.g.list<any>(reloaded.data.calendar.mDelayedEvents);
+    for (const name of [notBuilt.name, built.name]) {
+      const b = reloaded.buildings(t).find((x) => reloaded.buildingInfo(x).name === name)!;
+      const ev = events.find((e) => e.OnEventTrigger?.methodNames?.[0] === "UpdateProgress" && reloaded.g.deref(e.OnEventTrigger.targets[0]) === b);
+      expect(ev, `${name} event`).toBeTruthy();
+      expect(ev.triggerDate).toBe(b.mDateProgressEnd);
+      expect(reloaded.g.deref(ev.OnButtonClick.targets[0].focusEntity)).toBe(b);
+      expect(reloaded.g.deref(ev.displayEffect.team)).toBe(t);
+    }
+    const dates = events.map((e) => e.triggerDate as string);
+    expect(dates).toEqual([...dates].sort());
+
+    // Can't start what's already under construction.
+    expect(() => applyChanges(reloaded, { changes: [{ op: "startBuilding", team: "Garuda Racing", building: built.name }] }))
+      .toThrow(/already under construction/);
+  }, 120_000);
+
+  it("cancels and refunds HQ projects the league didn't order", () => {
+    const save = Save.load(SAVE);
+    const before = extractLeague(save, league);
+    const tatra = before.teams.find((t) => t.name === "Tatra Racing")!;
+    const upgrading = tatra.hq.find((b) => b.state === "Upgrading")!;
+    const building = tatra.hq.find((b) => b.state === "BuildingInProgress")!;
+    const events = (s: Save) => s.g.list<any>(s.data.calendar.mDelayedEvents).filter((e) => e.OnEventTrigger?.methodNames?.[0] === "UpdateProgress");
+    const eventFor = (s: Save, name: string) => events(s).filter((e) => s.buildingInfo(s.g.deref(e.OnEventTrigger.targets[0])).name === name
+      && s.g.same(s.g.deref<any>(e.OnEventTrigger.targets[0]).team, s.team("Tatra Racing")));
+    expect(eventFor(save, upgrading.name)).toHaveLength(1);
+
+    // Everything on Tatra started before the league (its first game date): nothing to cancel.
+    expect(applyChanges(save, { changes: [{ op: "cancelUnorderedHq", teams: ["Tatra Racing"], keep: [], since: before.gameDate }] }))
+      .toEqual(["No HQ projects to cancel on member teams"]);
+
+    // With an earlier league start, the unordered construction is cancelled; the ordered one kept.
+    const log = applyChanges(save, { changes: [{
+      op: "cancelUnorderedHq", teams: ["Tatra Racing"], since: "2016-01-01T00:00:00.0000000",
+      keep: [{ team: "Tatra Racing", building: building.type, toLevel: 1 }],
+    }] });
+    expect(log.join("\n")).toMatch(new RegExp(`cancelled upgrading ${upgrading.name}.*budget`));
+    save.prepareForWrite();
+    const reloaded = reload(save);
+    expect(reloaded.g.validate()).toEqual([]);
+    const after = extractLeague(reloaded, league).teams.find((t) => t.name === "Tatra Racing")!;
+    const up = after.hq.find((b) => b.name === upgrading.name)!;
+    expect(up).toMatchObject({ state: "Constructed", level: upgrading.level, progress: 0 });
+    expect(up.progressStart.startsWith("0001")).toBe(true);
+    expect(eventFor(reloaded, upgrading.name)).toHaveLength(0);
+    expect(after.hq.find((b) => b.name === building.name)!.state).toBe("BuildingInProgress");
+    expect(after.budget).toBe(tatra.budget! + upgrading.upgradeCosts[upgrading.level - 1]!);
+  }, 120_000);
 });

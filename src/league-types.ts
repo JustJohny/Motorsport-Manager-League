@@ -73,11 +73,17 @@ export interface Building {
   level: number;
   maxLevel: number;
   progress: number | null;
+  /** When the current construction started (who started it: see league-rules unorderedProject). */
+  progressStart: string;
   progressEnd: string;
   /** Cost to go from level n to n+1 is upgradeCosts[n-1]. */
   upgradeCosts: (number | null)[];
   /** Cost to build level 1. */
   initialCost: number | null;
+  /** MM's build time for level 1, in weeks. */
+  buildWeeks: number;
+  /** MM's time to go from level n to n+1 is upgradeWeeks[n-1], in weeks. */
+  upgradeWeeks: number[];
   dependencies: { buildingType: number; requiredLevel: number }[];
 }
 

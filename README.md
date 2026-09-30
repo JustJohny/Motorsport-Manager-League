@@ -18,7 +18,7 @@ Needs Node 22+. The CLI finds saves in `…/AppData/LocalLow/Playsport Games/Mot
 | `teams <save>` | List teams by championship, with IDs |
 | `extract <save> --league league.json -o state.json` | Site-ready JSON: every team in the league championship (budget, HQ, parts, staff), free-agent market, calendar, standings, last race results |
 | `publish <save> --league league.json [--dry-run]` | Extract and upload to the league website (Supabase). Needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in `.env` (see `.env.example`) |
-| `pull [-o changes.json] [--mark-applied]` | After a transfer window closes: the winning bids as `hire` + `adjustBudget` changes. `--mark-applied` lets the organizer open the next window |
+| `pull [-o changes.json] [--mark-applied] [--force]` | Members' decisions as changes: queued HQ orders (`startBuilding` + `adjustBudget`) and, once its deadline has passed, the transfer window's signings (`hire` + `adjustBudget`). `--mark-applied` marks them done |
 | `apply <save> changes.json -o out.sav` | Apply member decisions and write a **new** save (never overwrites the input) |
 | `diff <a.sav> <b.sav> --team NAME` | Structural diff, for reverse-engineering what the game changes |
 | `validate <save>` | Check the object graph (duplicate ids, dangling or forward refs) |
@@ -29,6 +29,9 @@ See `examples/changes.example.json`. Operations:
 - `setBuilding {team, building, level}`: 0 means not built. Otherwise it's the in-game level. It warns if prerequisites aren't met.
 - `setBudget {team, amount, reason?}`: also logs a transaction in the in-game finance screen.
 - `adjustBudget {team, delta, reason?}`: adds to or takes from the budget (e.g. `-250000`, "Sign-on fee: …"), logged the same way.
+- `startBuilding {team, building, speed?}`: starts building (level 0 → 1) or upgrading, like MM's own HQ screen. MM's build time is in **weeks** (`buildTime` / `upgradeTime[level]` × 7 days), times `speed` (default 1). The game finishes it by itself. It doesn't charge anything (use `adjustBudget`).
+- `cancelBuilding {team, building, refund?, reason?}`: stops a construction in progress and refunds the price MM charged when it started (the AI pays upfront too).
+- `cancelUnorderedHq {teams, keep, since}`: cancels and refunds every construction on the listed teams that started after `since` and isn't in `keep`. `pull` always emits this first: the in-game AI also runs member teams between races and starts HQ projects with their money.
 - `addPart {team, type, stat, reliability, performance?, maxPerformance?, level?, name?, fitToCar?}`
 - `fitPart {team, type, part, car}` and `removePart {team, type, part}`
 - `hire {team, person, replacing | slotID, yearlyWages?, endDate?}`: works for drivers, lead engineers and mechanics. A free agent replaces someone, who is then released. Someone at another team **swaps** with the person they replace.
@@ -51,6 +54,16 @@ The organizer opens a window with a deadline on the Organizer page. Members nomi
 - Winners pay a 25% sign-on fee. AI teams' staff also cost a buyout (the remaining contract value) and swap with the released person.
 - Everything a member's leading bids would cost (fees, buyouts, and the extra wages for the rest of this season) must fit in the budget.
 - Bid amounts are public; who a team would release is visible only to that team and the organizer.
+
+### HQ orders
+Members order a new building or an upgrade on their HQ tab at any time, at MM's price. Rules are enforced in `supabase/migrations/003_hq_orders.sql`:
+- The building can't already be under construction or have a queued order.
+- Prerequisites must be finished.
+- Queued orders plus leading bids must fit in the budget.
+
+Projects the in-game AI starts on member teams are shown on the HQ tab as "AI project". `pull` cancels and refunds them first (`cancelUnorderedHq`, migration 004), so members can order that building themselves. Projects older than the league's first published game date are kept.
+
+`pull` turns the queued orders into `startBuilding` + `adjustBudget`, so construction starts in game with MM's real build times (weeks; `league_settings.hq_speed` scales them) and MM completes it. There's no limit on parallel projects.
 
 After the deadline: `mmsave pull -o changes.json --mark-applied`, then `mmsave apply <save> changes.json …`, and publish again after the race.
 
@@ -75,4 +88,7 @@ npx tsx tools/gen-schema.ts "<game>/MM_Data/Managed/Assembly-CSharp.dll" schema/
 - ✅ League website v1 (read only) builds and renders real save data in demo mode. Supabase RLS was tested locally in PGlite.
 - ✅ Website deployed on GitHub Pages with Supabase and Discord login (verified by the user).
 - ✅ Staff auction built: database rules tested in PGlite (`test/db.test.ts`), including pull → apply on a real save. The UI was checked in demo mode.
-- Next: run migration 002 in Supabase and test a real window. Driver swaps still need an in-game race test.
+- ✅ Auction verified in game (a free-agent signing, and an AI driver bought out with a swap).
+- ✅ HQ orders built: `startBuilding` op + migration 003 + site HQ tab, covered by tests on the real save.
+- ✅ AI HQ projects on member teams are cancelled and refunded at apply (tested on the real save).
+- Next: run migrations 003 + 004, publish again (the snapshot needs the new `buildWeeks`/`upgradeWeeks`/`progressStart`), and check in game that a started building progresses and completes.

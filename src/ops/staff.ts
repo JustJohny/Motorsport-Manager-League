@@ -1,6 +1,7 @@
 import { float, type Json } from "../codec/sav.ts";
 import type { Obj } from "../graph.ts";
 import { CONTRACT_STATUS, JOB, NULL_DATE, personKind, personName, type Save } from "../model.ts";
+import { delayedEvents, insertByDate } from "./calendar.ts";
 
 export interface HireOp {
   op: "hire";
@@ -109,9 +110,6 @@ function release(save: Save, p: Obj) {
 // date (and shows as "Contract ending with …"). Free agents have none, and the game's own
 // termination code dereferences it, so hires get one and releases lose theirs.
 
-function delayedEvents(save: Save): Json[] {
-  return save.g.rawList(save.data.calendar.mDelayedEvents);
-}
 
 function findContractEvent(save: Save): Obj | null {
   for (const e of delayedEvents(save)) {
@@ -139,6 +137,9 @@ function setContractEvent(save: Save, p: Obj, template: Obj | null) {
   if (!ev) {
     if (!template) throw new Error("No contract calendar event in the save to copy");
     ev = g.clone({ ...template, OnEventTrigger: { ...template.OnEventTrigger, targets: [] }, displayEffect: { ...template.displayEffect, person: null } });
+    // Cloned from a spread copy, so carry the template's runtime type over for $type annotation.
+    const type = save.types.runtime.get(template);
+    if (type) save.types.runtime.set(ev, type);
   }
   // Aim the event at this person's contract and rename the calendar text.
   const shownPerson = ev.displayEffect?.person ? g.deref<Obj>(ev.displayEffect.person) : null;
@@ -161,11 +162,6 @@ function setContractEvent(save: Save, p: Obj, template: Obj | null) {
   insertByDate(save, ev, c.mEndDate);
 }
 
-function insertByDate(save: Save, ev: Obj, date: string) {
-  const list = delayedEvents(save);
-  const i = list.findIndex((e) => (save.g.deref<Obj>(e).triggerDate as string) > date);
-  list.splice(i < 0 ? list.length : i, 0, save.g.ref(ev));
-}
 
 /**
  * The game reads `careerHistory.currentEntry` (the last entry) for employed staff after every

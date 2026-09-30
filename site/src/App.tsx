@@ -14,6 +14,7 @@ import { StandingsPage } from "@/pages/standings"
 import { TeamsPage } from "@/pages/teams"
 import { TransfersPage } from "@/pages/transfers"
 import { TransfersProvider } from "@/lib/transfers"
+import { HqOrdersProvider } from "@/lib/hq"
 
 function Shell() {
   const { me, league } = useLeague()
@@ -54,7 +55,9 @@ export default function App() {
         <HashRouter>
           <Gate>
             <TransfersProvider>
-              <Shell />
+              <HqOrdersProvider>
+                <Shell />
+              </HqOrdersProvider>
             </TransfersProvider>
           </Gate>
         </HashRouter>

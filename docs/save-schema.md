@@ -66,6 +66,13 @@ No checksum was seen. The game loads files whose compressed bytes differ from it
 - **Swap cache update must stay inside the team.** After a swap, `hire` rewrites the team's cached person lists (`mCachedPeople`, `mMechanics`, session drivers, AI drivers, `partImprovement`). These reach other teams through references, e.g. `carManager.partImprovement.mTeam.rivalTeam`. Following those rewrote the *other* team's seat, which left a person in two seats and the released person in none. `replaceRefs` now never follows a reference into a team, or into a person employed elsewhere. `test/ops.test.ts` swaps with a rival team and checks that every person holds exactly one seat.
 - **Inline definitions in caches.** A person's `$id` definition can sit inline in another team's mechanic `mRelationshipDriversCache`. Replacing it with a `$ref` is safe, because `normalizeRefOrder` moves the definition to the first remaining reference on write.
 
+## HQ construction (from Assembly-CSharp)
+- **Times are in weeks.** `HQsBuilding_v1.BeginBuilding`: `mDateProgressEnd = now + info.buildTime × 7` days, `state = 1` (BuildingInProgress). `BeginUpgrade`: `now + info.upgradeTime[currentLevel] × 7`, `state = 3` (Upgrading). A save confirms it: Tatra's Factory upgrade, `upgradeTime[0] = 34`, runs 238 days. So builds take 10–116 weeks, 3–29 races.
+- **The game completes buildings itself.** `Team.Update → Team.UpdateHeadquarters → HQsBuilding.UpdateProgress` recomputes `normalizedProgress` from the start and end dates, then calls `Build` / `UpgradeBuilding` at 1.0. Setting the state and dates is enough; `currentLevel` stays until completion.
+- **Calendar event.** `GenerateCalendarEvent` adds a `CalendarEvent_v1` (category 2048, `OnEventTrigger` = the building's `UpdateProgress`, `OnButtonClick` = `ChangeScreenCommand` "HeadquartersScreen" with `focusEntity` = building, `TeamDisplayEffect.team`). `showOnCalendar` and `interruptGameTime` are true only for the player's team. The text IDs are `PSG_10009159` "Built X" and `PSG_10009160` "Upgraded X". Building display names are localized from `nameID` and aren't stored in the save, so `startBuilding` copies the text from an event for the same building type.
+- **The AI pays upfront.** AI teams get an expense transaction of the full price the day they start, e.g. "Test Track - Build" $8M or "Handling Development Centre Level 2 - Upgrade" $8M. `cancelBuilding` refunds that amount (`initialCost`, or `upgradeCost[currentLevel]`), reverts `state` (1 → 0 NotBuilt, 3 → 2 Constructed), resets the progress and dates, and removes the building's `UpdateProgress` calendar events.
+- **Cloning pitfall.** Cloning `{ ...template }` (a spread copy) loses the runtime type the schema tracker recorded for `template`, which fails `annotate` ("unknown runtime type") once the clone gets an `$id`. Copy the type over (`save.types.runtime.set(clone, runtime.get(template))`). Contract events in `hire` had the same latent bug; it's fixed now.
+
 ## Verified in game (2026-09-30, save "League Test 2", player team)
 - `setBuilding`: Wind Tunnel shown at level 1.
 - `setBudget`: new budget shown, with our transaction note in the finance history.
@@ -88,6 +95,7 @@ No checksum was seen. The game loads files whose compressed bytes differ from it
   - **Decision:** don't reproduce it. The league sets its own minimum bid (the site is the source of truth, and `hire` writes any `yearlyWages`).
 - **Qualifying results.** In `results.qualifyingSessions[0].resultData`, `position`, `time` and `bestLapTime` are 0 (seen after round 5 and round 6); only `gridPosition` is set. Lap times may be stored per session elsewhere. The website currently orders qualifying by grid slot.
 - Driver `mPotential` ranges 0–92 while current stats are 0–20, and it is 0 for all staff. Its exact meaning (and whether the UI shows it as stars) is unverified.
+- Whether an HQ construction started by the toolkit progresses and completes in game (the code says yes; not played yet).
 - Engine and gearbox parts of teams on a supplier deal have `level: -1` and stat 150.
 
 Research recipe: copy a save, make one change in game, save again, then run

@@ -4,7 +4,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { extractLeague } from "../src/extract.ts";
 import { applyChanges } from "../src/apply.ts";
 import type { LeagueState } from "../src/league-types.ts";
-import { bidCost, buyout, DEFAULT_SETTINGS, minWage, nextMinBid } from "../src/league-rules.ts";
+import { bidCost, buyout, DEFAULT_SETTINGS, minWage, nextHqStep, nextMinBid, unorderedProject } from "../src/league-rules.ts";
+import { cancelUnorderedChange, hqChanges, type HqOrderRow } from "../src/hq-orders.ts";
 import { Save } from "../src/model.ts";
 import { defaultSavesDir } from "../src/paths.ts";
 import { memberRows, splitSnapshot } from "../src/publish.ts";
@@ -157,6 +158,83 @@ describe.skipIf(!existsSync(SAVE))("database: snapshots and staff auction", () =
     expect(Number(row.cost)).toBe(cost(tooMuch - 1000));
   });
 
+  it("takes HQ orders at MM's price with prerequisites, one per building", async () => {
+    const tatra = state.teams.find((x) => x.name === "Tatra Racing")!;
+    const b = (name: string) => tatra.hq.find((x) => x.name === name)!;
+    const order = (who: ReturnType<typeof org>, type: number) => who.query<{ id: number }>("select public.order_hq($1) as id", [type]);
+    const wind = b("Wind Tunnel");
+    const { rows, error } = await order(org(), wind.type);
+    expect(error).toBeNull();
+    const row = (await org().query<{ cost: string; weeks: number; to_level: number }>("select cost, weeks, to_level from hq_orders where id = $1", [rows[0].id])).rows[0];
+    const step = nextHqStep(wind)!;
+    expect({ cost: Number(row.cost), weeks: row.weeks, to_level: row.to_level }).toEqual({ cost: step.cost, weeks: step.weeks, to_level: step.toLevel });
+
+    expect((await order(org(), wind.type)).error).toMatch(/already has a queued order/);
+    const busy = tatra.hq.find((x) => x.state === "Upgrading" || x.state === "BuildingInProgress")!;
+    expect((await order(org(), busy.type)).error).toMatch(/under construction/);
+    const blocked = tatra.hq.find((x) => x.state === "NotBuilt" && x.dependencies.some((d) => {
+      const req = tatra.hq.find((y) => y.type === d.buildingType)!;
+      return (req.state === "BuildingInProgress" ? 0 : req.level) < d.requiredLevel;
+    }))!;
+    expect((await order(org(), blocked.type)).error).toMatch(/needs .* level/);
+    expect((await order(eve(), wind.type)).error).toMatch(/not in the league/);
+  });
+
+  it("lets a member order over a project the AI started after the league began", async () => {
+    const tatra = state.teams.find((x) => x.name === "Tatra Racing")!;
+    const busy = tatra.hq.find((x) => x.state === "BuildingInProgress")!;
+    const order = () => org().query<{ id: number }>("select public.order_hq($1) as id", [busy.type]);
+    // Started before the league (the base save's own project): it blocks.
+    expect((await order()).error).toMatch(/under construction/);
+    // Pretend the AI started it after the league began.
+    const later = "2016-08-20T00:00:00.0000000";
+    await t.service(`update team_snapshots set private = jsonb_set(private, '{hq}',
+      (select jsonb_agg(case when (b ->> 'type')::int = ${busy.type} then jsonb_set(b, '{progressStart}', '"${later}"') else b end)
+       from jsonb_array_elements(private -> 'hq') b)) where team = 'Tatra Racing'`);
+    expect(unorderedProject({ ...busy, progressStart: later }, [], state.gameDate)).toBe(true);
+    const { rows, error } = await order();
+    expect(error).toBeNull();
+    const o = (await org().query<{ to_level: number; cost: string }>("select to_level, cost from hq_orders where id = $1", [rows[0].id])).rows[0];
+    expect({ to_level: o.to_level, cost: Number(o.cost) }).toEqual({ to_level: 1, cost: busy.initialCost });
+    // Keep the e2e below consistent with the real save: withdraw it and restore the snapshot.
+    expect((await org().query("select public.cancel_hq($1)", [rows[0].id])).error).toBeNull();
+    await t.service(`update team_snapshots set private = jsonb_set(private, '{hq}',
+      (select jsonb_agg(case when (b ->> 'type')::int = ${busy.type} then jsonb_set(b, '{progressStart}', to_jsonb($1::text)) else b end)
+       from jsonb_array_elements(private -> 'hq') b)) where team = 'Tatra Racing'`, [busy.progressStart]);
+  });
+
+  it("keeps HQ orders private, cancellable, and inside the budget together with bids", async () => {
+    const tatra = state.teams.find((x) => x.name === "Tatra Racing")!;
+    const order = (type: number) => org().query<{ id: number }>("select public.order_hq($1) as id", [type]);
+    const committed = async () => (await org().query<{ cost: string }>("select cost from hq_orders where status = 'queued'")).rows
+      .reduce((sum, r) => sum + Number(r.cost), 0);
+    // Affordable orders whose prerequisites are met, cheapest first, until one no longer fits.
+    const open = tatra.hq.filter((x) => x.state !== "Upgrading" && x.state !== "BuildingInProgress" && x.name !== "Wind Tunnel" && nextHqStep(x)
+      && x.dependencies.every((d) => { const r = tatra.hq.find((y) => y.type === d.buildingType)!; return (r.state === "BuildingInProgress" ? 0 : r.level) >= d.requiredLevel; }))
+      .sort((a, b) => nextHqStep(a)!.cost - nextHqStep(b)!.cost);
+    let refused: string | null = null;
+    for (const x of open) {
+      const fits = (await committed()) + nextHqStep(x)!.cost <= BUDGET;
+      const { error } = await order(x.type);
+      if (fits) expect(error).toBeNull();
+      else { refused = error; break; }
+    }
+    expect(refused).toMatch(/Not enough budget/);
+
+    const mine = (await org().query<{ id: number; cost: string }>("select id, cost from hq_orders where status = 'queued' order by cost desc")).rows;
+    expect((await alice().query("select * from hq_orders")).rows).toEqual([]);
+    expect((await alice().query("select public.cancel_hq($1)", [mine[0].id])).error).toMatch(/No queued order/);
+    expect((await org().query("select public.cancel_hq($1)", [mine[0].id])).error).toBeNull();
+
+    // A bid can't spend what queued HQ orders already commit.
+    const left = BUDGET - (await committed());
+    const p = state.freeAgents.filter((x) => x.kind === "Driver")[30];
+    const id = (await openAuction(org(), p.guid)).rows[0].id;
+    const [driver] = staffOf("Tatra Racing", "Driver");
+    const tooMuch = Math.ceil(left / DEFAULT_SETTINGS.sign_on_fee_pct / 1000) * 1000 + 1000;
+    expect((await bid(org(), id, tooMuch, 1, driver.guid)).error).toMatch(/HQ orders/);
+  });
+
   it("refuses bids after the deadline", async () => {
     const p = state.freeAgents.filter((x) => x.kind === "Mechanic")[5];
     const id = (await openAuction(alice(), p.guid)).rows[0].id;
@@ -171,7 +249,14 @@ describe.skipIf(!existsSync(SAVE))("database: snapshots and staff auction", () =
     const [w] = await q<WindowRow>("select * from transfer_windows where status = 'open'");
     const auctions = await q<AuctionRow>(`select * from auctions where window_id = ${w.id} order by id`);
     const bids = await q<BidRow>("select id, auction_id, team, yearly_wage, years, replacing_guid, replacing_name, created_at::text from bids order by id");
+    const orders = await q<HqOrderRow>("select * from hq_orders where status = 'queued' order by created_at");
+    expect(orders.length).toBeGreaterThan(0);
     const changes = windowChanges(w.id, state.gameDate, auctions, bids, DEFAULT_SETTINGS);
+    changes.changes.unshift(
+      // As pull does: first undo unordered HQ projects on member teams (none in the base save).
+      cancelUnorderedChange(["Tatra Racing", "Garuda Racing", "Octane Racing"], orders, state.gameDate),
+      ...hqChanges(orders, 1),
+    );
     const won = winners(auctions, bids, DEFAULT_SETTINGS);
     expect(won.map((x) => `${x.team}: ${x.person.name}`)).toHaveLength(4);
 
@@ -193,6 +278,12 @@ describe.skipIf(!existsSync(SAVE))("database: snapshots and staff auction", () =
         expect(has(x.fromTeam, released.guid)).toBe(true);
       }
     }
+    for (const o of orders) {
+      const b = team(o.team).hq.find((x) => x.type === o.building_type)!;
+      expect(b.state, o.building_name).toBe(o.to_level === 1 ? "BuildingInProgress" : "Upgrading");
+    }
+    const tatraBefore = state.teams.find((x) => x.name === "Tatra Racing")!.budget!;
+    expect(team("Tatra Racing").budget).toBeCloseTo(tatraBefore - orders.filter((o) => o.team === "Tatra Racing").reduce((sum, o) => sum + Number(o.cost), 0), 0);
     const paid = (name: string) => won.filter((x) => x.team === name).reduce((sum, x) => sum + x.signOnFee + x.buyout, 0);
     for (const name of ["Garuda Racing", "Octane Racing"]) {
       const before = state.teams.find((x) => x.name === name)!.budget!;

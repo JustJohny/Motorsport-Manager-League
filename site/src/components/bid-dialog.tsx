@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { fmtMoney, fmtNum, humanize, statAverage } from "@/lib/format"
+import { useHqOrders } from "@/lib/hq"
 import { useLeague } from "@/lib/league"
 import { bidCost, nextMinBid } from "@/lib/rules"
 import { useTransfers, type Auction } from "@/lib/transfers"
@@ -17,6 +18,7 @@ const JOB_FOR: Record<Auction["kind"], string> = { Driver: "Driver", Engineer: "
 export function BidDialog({ auction, trigger }: { auction: Auction; trigger: React.ReactNode }) {
   const { me, league } = useLeague()
   const t = useTransfers()
+  const hqCommitted = useHqOrders().committed(me.team)
   const minBid = nextMinBid(Number(auction.min_wage), auction.leading_wage == null ? null : Number(auction.leading_wage), t.settings)
   const [open, setOpen] = useState(false)
   const [wage, setWage] = useState(String(minBid))
@@ -33,10 +35,10 @@ export function BidDialog({ auction, trigger }: { auction: Auction; trigger: Rea
   const wageNum = Number(wage.replace(/[^\d]/g, "")) || 0
   const cost = bidCost(wageNum, Number(auction.buyout), replaced?.contract.yearlyWages ?? 0, league.snapshot.gameDate, t.settings)
   const budget = league.privateTeams[me.team]?.budget ?? 0
-  const left = budget - t.committed - cost.total
+  const left = budget - t.committed - hqCommitted - cost.total
   const problem = wageNum < minBid ? `The minimum bid is ${fmtMoney(minBid)}.`
     : !replaced ? `Choose who the new ${humanize(JOB_FOR[auction.kind]).toLowerCase()} replaces.`
-    : left < 0 ? "Not enough budget for this bid on top of the auctions you lead." : null
+    : left < 0 ? "Not enough budget for this bid on top of your leading bids and HQ orders." : null
 
   const submit = async () => {
     setBusy(true)
@@ -108,6 +110,7 @@ export function BidDialog({ auction, trigger }: { auction: Auction; trigger: Rea
             <span className="font-medium">This bid commits</span><span className="text-right font-medium">{fmtMoney(cost.total)}</span>
             <span className="mt-2 text-muted-foreground">Budget</span><span className="mt-2 text-right">{fmtMoney(budget)}</span>
             <span className="text-muted-foreground">Your other leading bids</span><span className="text-right">−{fmtMoney(t.committed)}</span>
+            {hqCommitted > 0 && <><span className="text-muted-foreground">Queued HQ orders</span><span className="text-right">−{fmtMoney(hqCommitted)}</span></>}
             <span className="font-medium">Left if you win everything</span>
             <span className={cn("text-right font-medium", left < 0 && "text-destructive")}>{fmtMoney(left)}</span>
           </div>

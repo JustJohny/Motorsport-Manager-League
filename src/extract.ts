@@ -74,9 +74,12 @@ function building(save: Save, b: Obj): Building {
     level: built ? b.currentLevel + 1 : 0,
     maxLevel: info.maxLevel + 1,
     progress: numOrNull(b.normalizedProgress),
+    progressStart: b.mDateProgressStarted,
     progressEnd: b.mDateProgressEnd,
     upgradeCosts: (info.upgradeCost ?? []).map(numOrNull),
     initialCost: numOrNull(info.initialCost),
+    buildWeeks: info.buildTime ?? 0,
+    upgradeWeeks: info.upgradeTime ?? [],
     dependencies: (info.dependencies ?? []).map((d: Obj) => ({ buildingType: d.buildingType, requiredLevel: d.requiredLevel })),
   };
 }
