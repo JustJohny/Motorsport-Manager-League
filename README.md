@@ -17,6 +17,7 @@ Needs Node 22+. The CLI finds saves in `…/AppData/LocalLow/Playsport Games/Mot
 |---|---|
 | `teams <save>` | List teams by championship, with IDs |
 | `extract <save> --league league.json -o state.json` | Site-ready JSON: every team in the league championship (budget, HQ, parts, staff), free-agent market, calendar, standings, last race results |
+| `publish <save> --league league.json [--dry-run]` | Extract and upload to the league website (Supabase). Needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in `.env` (see `.env.example`) |
 | `apply <save> changes.json -o out.sav` | Apply member decisions and write a **new** save (never overwrites the input) |
 | `diff <a.sav> <b.sav> --team NAME` | Structural diff, for reverse-engineering what the game changes |
 | `validate <save>` | Check the object graph (duplicate ids, dangling or forward refs) |
@@ -32,6 +33,14 @@ See `examples/changes.example.json`. Operations:
 - `syncTeam {team, hq, parts, fitted, staff, budget}`: **site is the source of truth.** It forces a member team to match the site and undoes whatever the in-game AI did for that team between races.
 
 People and parts are identified by the GUIDs in the `extract` output. Those GUIDs stay the same from one save to the next.
+
+## League website (`site/`)
+A Vite + React + shadcn/ui site on GitHub Pages, with Supabase for data and Discord login. v1 is read only: my team (staff, HQ, parts, budget), standings, calendar and results, all teams' line-ups, the staff market, and an organizer page.
+
+- `league.json` gives each member a `discord` username. The organizer gets `"organizer": true` and can see every team's private data.
+- `mmsave publish` splits the extract into public data (standings, results, line-ups) and per-team private data (budget, HQ, parts). Row-level security in `supabase/migrations/001_init.sql` lets members read only their own team's private data.
+- `src/league-types.ts` defines the data shapes. It has no imports, so the site uses it directly.
+- `npm run dev` in `site/` without Supabase settings runs a demo on a local extract. See `site/README.md`.
 
 ## Organizer workflow (proposed)
 1. The league runs in one championship. Each member owns an existing team (`league.json`), and the organizer's own career team can be any of them.
@@ -51,4 +60,5 @@ npx tsx tools/gen-schema.ts "<game>/MM_Data/Managed/Assembly-CSharp.dll" schema/
 - ✅ All operations apply, validate, and survive a write and reload (`test/ops.test.ts`).
 - ✅ Fixed the first in-game load failure (missing `$type` on moved objects). Every written save is now type-checked against the game schema.
 - ✅ **Verified in game:** an applied save plays a full race weekend and advances to the next one. HQ, budget, parts and hires all persist through the game's own saves. See `docs/save-schema.md`.
-- Next: the league website, using the `extract` JSON and producing `changes.json`.
+- ✅ League website v1 (read only) builds and renders real save data in demo mode. Supabase RLS was tested locally in PGlite.
+- Next: set up Supabase, Discord and Pages for real, then the staff auction.

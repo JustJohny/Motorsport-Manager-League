@@ -8,6 +8,7 @@ import { diffObjects } from "./diff.ts";
 import { extractLeague, type LeagueConfig } from "./extract.ts";
 import { Save } from "./model.ts";
 import { defaultSavesDir } from "./paths.ts";
+import { memberRows, publish, splitSnapshot } from "./publish.ts";
 
 const USAGE = `mmsave - Motorsport Manager league save toolkit
 
@@ -16,6 +17,7 @@ const USAGE = `mmsave - Motorsport Manager league save toolkit
   mmsave validate <save.sav>                          check the object graph
   mmsave teams    <save.sav>                          list teams by championship
   mmsave extract  <save.sav> --league league.json [-o state.json]
+  mmsave publish  <save.sav> --league league.json [--dry-run]   upload to the league website
   mmsave apply    <save.sav> <changes.json> [-o out.sav] [--name "Shown name"]
   mmsave diff     <a.sav> <b.sav> [--team NAME] [--path teamManager] [--depth N]
 
@@ -32,6 +34,7 @@ const { values: opt, positionals: [cmd, ...args] } = parseArgs({
     path: { type: "string" },
     depth: { type: "string" },
     limit: { type: "string" },
+    "dry-run": { type: "boolean" },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -104,6 +107,24 @@ switch (cmd) {
     const json = JSON.stringify(state, null, 2);
     if (opt.out) writeFileSync(opt.out, json), console.log(`wrote ${opt.out}`);
     else console.log(json);
+    break;
+  }
+  case "publish": {
+    const input = savePath(args[0]);
+    if (!opt.league) fail("publish needs --league league.json");
+    const cfg = JSON.parse(readFileSync(opt.league, "utf8")) as LeagueConfig;
+    const state = extractLeague(Save.load(input), cfg);
+    const split = splitSnapshot(state);
+    const members = memberRows(cfg, state);
+    const ch = state.championship;
+    console.log(`${ch.name}, after round ${ch.lastRace?.round ?? 0}: ${split.teams.length} teams, ${split.freeAgents.length} free agents`);
+    for (const m of members) console.log(`  ${m.discord_username} -> ${m.team}${m.role === "organizer" ? " (organizer)" : ""}`);
+    if (!members.length) console.log("  WARNING: no member has a \"discord\" username in the league file, so nobody can log in");
+    if (opt["dry-run"]) break;
+    if (existsSync(".env")) process.loadEnvFile(".env");
+    const url = process.env.SUPABASE_URL ?? fail("set SUPABASE_URL (e.g. in .env)");
+    const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? fail("set SUPABASE_SERVICE_ROLE_KEY (e.g. in .env)");
+    console.log(`published snapshot #${await publish(url, key, members, split)}`);
     break;
   }
   case "apply": {

@@ -1,8 +1,8 @@
 {
   "championship": "European Racing Series",
   "members": [
-    { "member": "organizer", "team": "Tatra Racing" },
-    { "member": "alice", "team": "Garuda Racing" },
-    { "member": "bob", "team": "Octane Racing" }
+    { "member": "organizer", "team": "Tatra Racing", "discord": "your_discord_username", "organizer": true },
+    { "member": "alice", "team": "Garuda Racing", "discord": "alice_discord" },
+    { "member": "bob", "team": "Octane Racing", "discord": "bob_discord" }
   ]
 }

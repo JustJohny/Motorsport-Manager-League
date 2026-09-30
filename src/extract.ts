@@ -1,11 +1,10 @@
 import type { Obj } from "./graph.ts";
+import type {
+  Building, CalendarEvent, Championship, LeagueConfig, LeagueState, Part, Person, RaceResults, SessionResult, TeamState,
+} from "./league-types.ts";
 import { BUILDING_STATES, JOBS, PART_TYPES, Save, numOrNull, personKind, personName, type PartType } from "./model.ts";
 
-export interface LeagueConfig {
-  /** Championship the league runs in, by name ("European Racing Series") or championshipID. */
-  championship?: string | number;
-  members: { member: string; team: string | number }[];
-}
+export type { LeagueConfig, LeagueState, TeamState } from "./league-types.ts";
 
 // Part inventories used by each championship series (single seater, GT, endurance).
 const SERIES_PART_TYPES: Record<number, PartType[]> = {
@@ -14,7 +13,7 @@ const SERIES_PART_TYPES: Record<number, PartType[]> = {
   2: ["BrakesGET", "EngineGET", "FrontWingGET", "GearboxGET", "RearWingGET", "SuspensionGET"],
 };
 
-export function extractLeague(save: Save, cfg: LeagueConfig) {
+export function extractLeague(save: Save, cfg: LeagueConfig): LeagueState {
   const { g } = save;
   const memberTeams = cfg.members.map((m) => ({ member: m.member, team: save.team(m.team) }));
   const champ = cfg.championship !== undefined
@@ -42,7 +41,7 @@ export function extractLeague(save: Save, cfg: LeagueConfig) {
   };
 }
 
-function team(save: Save, t: Obj, champ: Obj, member: string | null) {
+function team(save: Save, t: Obj, champ: Obj, member: string | null): TeamState {
   const fin = save.finance(t);
   const partTypes = SERIES_PART_TYPES[champ.series as number] ?? SERIES_PART_TYPES[0];
   return {
@@ -59,18 +58,18 @@ function team(save: Save, t: Obj, champ: Obj, member: string | null) {
     parts: Object.fromEntries(partTypes.map((type) => [type, save.parts(t, type).map((p) => part(save, p))])),
     staff: save.slots(t).map((s) => {
       const p = s.personHired ? save.g.deref<Obj>(s.personHired) : null;
-      return { slotID: s.slotID, job: JOBS[s.jobType] ?? s.jobType, person: p ? person(save, p) : null };
+      return { slotID: s.slotID, job: JOBS[s.jobType] ?? String(s.jobType), person: p ? person(save, p) : null };
     }).filter((s) => ["Driver", "EngineerLead", "Mechanic"].includes(s.job as string)),
   };
 }
 
-function building(save: Save, b: Obj) {
+function building(save: Save, b: Obj): Building {
   const info = save.buildingInfo(b);
   const built = b.state !== 0;
   return {
     type: info.type,
     name: info.name,
-    state: BUILDING_STATES[b.state] ?? b.state,
+    state: BUILDING_STATES[b.state],
     /** 0 = not built, otherwise the level shown in game (1..maxLevel+1). */
     level: built ? b.currentLevel + 1 : 0,
     maxLevel: info.maxLevel + 1,
@@ -82,7 +81,7 @@ function building(save: Save, b: Obj) {
   };
 }
 
-function part(save: Save, p: Obj) {
+function part(save: Save, p: Obj): Part {
   const s = p.mStats;
   const fittedCar = p.fittedCar ? save.g.deref<Obj>(p.fittedCar) : null;
   return {
@@ -103,7 +102,7 @@ function part(save: Save, p: Obj) {
   };
 }
 
-function person(save: Save, p: Obj) {
+function person(save: Save, p: Obj): Person {
   const c = save.contract(p);
   const kind = personKind(p);
   const stats = save.g.deref<Obj>(p.mStats ?? p.stats);
@@ -122,13 +121,13 @@ function person(save: Save, p: Obj) {
     name: personName(p),
     kind,
     dateOfBirth: p.dateOfBirth,
-    nationality: save.g.deref<Obj>(p.nationality)?.mCountryKey,
+    nationality: save.g.deref<Obj>(p.nationality)?.mCountryKey ?? null,
     stats: s,
     potential: numOrNull(p.mPotential ?? null),
     carID: p.mCarID ?? null,
     contract: {
       team: employer?.name ?? null,
-      job: JOBS[c.job] ?? c.job,
+      job: JOBS[c.job] ?? String(c.job),
       yearlyWages: c.yearlyWages,
       start: c.startDate,
       end: c.mEndDate,
@@ -136,14 +135,14 @@ function person(save: Save, p: Obj) {
   };
 }
 
-function calendar(save: Save, ch: Obj) {
+function calendar(save: Save, ch: Obj): CalendarEvent[] {
   return save.g.list<Obj>(ch.calendar).map((ev, i) => {
     const circuit = save.g.deref<Obj>(ev.circuit);
     return { round: i + 1, date: ev.eventDate, circuit: circuit.locationName, layout: circuit.trackLayout, ended: !!ev.mHasEventEnded };
   });
 }
 
-function standings(save: Save, ch: Obj) {
+function standings(save: Save, ch: Obj): Championship["standings"] {
   const st = save.g.deref<Obj>(ch.standings);
   const row = (e: Obj, name: string) => ({
     name,
@@ -163,13 +162,13 @@ function standings(save: Save, ch: Obj) {
   return { drivers: drivers.sort(byPos), teams: teams.sort(byPos) };
 }
 
-function lastRace(save: Save, ch: Obj) {
+function lastRace(save: Save, ch: Obj): RaceResults | null {
   const events = save.g.list<Obj>(ch.calendar);
   const idx = events.map((e) => !!e.mHasEventEnded).lastIndexOf(true);
   if (idx < 0) return null;
   const ev = events[idx];
   const results = save.g.deref<Obj>(ev.results);
-  const session = (key: string) => {
+  const session = (key: string): SessionResult[] => {
     const s = results[key]?.[0] ? save.g.deref<Obj>(results[key][0]) : null;
     return (s?.resultData ?? []).map((r: Obj) => {
       r = save.g.deref<Obj>(r);

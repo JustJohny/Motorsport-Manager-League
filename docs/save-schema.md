@@ -78,6 +78,14 @@ No checksum was seen. The game loads files whose compressed bytes differ from it
 - What the game itself changes when a driver is hired mid-season, e.g. whether it moves the old driver's standings row to `mInactiveDrivers`.
 - How part `level` maps to design tiers.
 - Whether HQ upkeep and staff costs recalculate on load after a building level is set directly.
+- **Free-agent wage demands.** An unemployed person's contract is a placeholder: `yearlyWages` is mostly 100000 (0 for many young drivers), and `mEndDate` is unset. The real demand isn't stored either: `contractManager.desiredContractValues` (`mDesiredWages`, `mDesiredSignOnFee`, …) is all zeros in saves, because the game only fills it in during a negotiation. From `ContractDesiredValuesHelper::CalculateDesiredWage` in the DLL, the formula is:
+  - `base` = `ContractVariablesContainer.GetBaseDesiredWageForPerson`, a wage-range curve by `PersonStats.GetAbility()` from game-database tables that aren't in the save;
+  - plus, for drivers only, `desiredEarnings / (1e6 · seriesModifier)`;
+  - then `base · (1 + lerp(-m, m, negotiationWeight)) + base · abilityPotential/5 · k`. The negotiation weight depends on the offering team.
+  - **Decision:** don't reproduce it. The league sets its own minimum bid (the site is the source of truth, and `hire` writes any `yearlyWages`).
+- **Qualifying results.** In `results.qualifyingSessions[0].resultData`, `position`, `time` and `bestLapTime` are 0 (seen after round 5 and round 6); only `gridPosition` is set. Lap times may be stored per session elsewhere. The website currently orders qualifying by grid slot.
+- Driver `mPotential` ranges 0–92 while current stats are 0–20, and it is 0 for all staff. Its exact meaning (and whether the UI shows it as stars) is unverified.
+- Engine and gearbox parts of teams on a supplier deal have `level: -1` and stat 150.
 
 Research recipe: copy a save, make one change in game, save again, then run
 `mmsave diff before.sav after.sav --team "Your Team"`.
