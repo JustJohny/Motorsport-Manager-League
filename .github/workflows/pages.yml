@@ -6,7 +6,7 @@ name: Deploy site
 on:
   push:
     branches: [master, main]
-    paths: ["site/**", "src/league-types.ts", ".github/workflows/pages.yml"]
+    paths: ["site/**", "src/league-types.ts", "src/league-rules.ts", ".github/workflows/pages.yml"]
   workflow_dispatch:
 
 permissions:

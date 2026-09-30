@@ -18,6 +18,7 @@ Needs Node 22+. The CLI finds saves in `…/AppData/LocalLow/Playsport Games/Mot
 | `teams <save>` | List teams by championship, with IDs |
 | `extract <save> --league league.json -o state.json` | Site-ready JSON: every team in the league championship (budget, HQ, parts, staff), free-agent market, calendar, standings, last race results |
 | `publish <save> --league league.json [--dry-run]` | Extract and upload to the league website (Supabase). Needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in `.env` (see `.env.example`) |
+| `pull [-o changes.json] [--mark-applied]` | After a transfer window closes: the winning bids as `hire` + `adjustBudget` changes. `--mark-applied` lets the organizer open the next window |
 | `apply <save> changes.json -o out.sav` | Apply member decisions and write a **new** save (never overwrites the input) |
 | `diff <a.sav> <b.sav> --team NAME` | Structural diff, for reverse-engineering what the game changes |
 | `validate <save>` | Check the object graph (duplicate ids, dangling or forward refs) |
@@ -27,6 +28,7 @@ Needs Node 22+. The CLI finds saves in `…/AppData/LocalLow/Playsport Games/Mot
 See `examples/changes.example.json`. Operations:
 - `setBuilding {team, building, level}`: 0 means not built. Otherwise it's the in-game level. It warns if prerequisites aren't met.
 - `setBudget {team, amount, reason?}`: also logs a transaction in the in-game finance screen.
+- `adjustBudget {team, delta, reason?}`: adds to or takes from the budget (e.g. `-250000`, "Sign-on fee: …"), logged the same way.
 - `addPart {team, type, stat, reliability, performance?, maxPerformance?, level?, name?, fitToCar?}`
 - `fitPart {team, type, part, car}` and `removePart {team, type, part}`
 - `hire {team, person, replacing | slotID, yearlyWages?, endDate?}`: works for drivers, lead engineers and mechanics. A free agent replaces someone, who is then released. Someone at another team **swaps** with the person they replace.
@@ -40,7 +42,17 @@ A Vite + React + shadcn/ui site on GitHub Pages, with Supabase for data and Disc
 - `league.json` gives each member a `discord` username. The organizer gets `"organizer": true` and can see every team's private data.
 - `mmsave publish` splits the extract into public data (standings, results, line-ups) and per-team private data (budget, HQ, parts). Row-level security in `supabase/migrations/001_init.sql` lets members read only their own team's private data.
 - `src/league-types.ts` defines the data shapes. It has no imports, so the site uses it directly.
-- `npm run dev` in `site/` without Supabase settings runs a demo on a local extract. See `site/README.md`.
+- `npm run dev` in `site/` without Supabase settings runs a demo on a local extract, including a local auction simulation. See `site/README.md`.
+
+### Staff auction (transfer windows)
+The organizer opens a window with a deadline on the Organizer page. Members nominate free agents or AI teams' staff from the Staff market and bid live on the Transfer window page. Rules (enforced in `supabase/migrations/002_auctions.sql`, mirrored for display in `src/league-rules.ts`, tunable in the `league_settings` table):
+- A bid is a yearly wage for 1–3 seasons and names who in the bidder's team it replaces. Bids beat the leader by 5%, and nobody can raise their own leading bid.
+- Opening price = base per role × (stat average / 10)², at least $50K.
+- Winners pay a 25% sign-on fee. AI teams' staff also cost a buyout (the remaining contract value) and swap with the released person.
+- Everything a member's leading bids would cost (fees, buyouts, and the extra wages for the rest of this season) must fit in the budget.
+- Bid amounts are public; who a team would release is visible only to that team and the organizer.
+
+After the deadline: `mmsave pull -o changes.json --mark-applied`, then `mmsave apply <save> changes.json …`, and publish again after the race.
 
 ## Organizer workflow (proposed)
 1. The league runs in one championship. Each member owns an existing team (`league.json`), and the organizer's own career team can be any of them.
@@ -61,4 +73,6 @@ npx tsx tools/gen-schema.ts "<game>/MM_Data/Managed/Assembly-CSharp.dll" schema/
 - ✅ Fixed the first in-game load failure (missing `$type` on moved objects). Every written save is now type-checked against the game schema.
 - ✅ **Verified in game:** an applied save plays a full race weekend and advances to the next one. HQ, budget, parts and hires all persist through the game's own saves. See `docs/save-schema.md`.
 - ✅ League website v1 (read only) builds and renders real save data in demo mode. Supabase RLS was tested locally in PGlite.
-- Next: set up Supabase, Discord and Pages for real, then the staff auction.
+- ✅ Website deployed on GitHub Pages with Supabase and Discord login (verified by the user).
+- ✅ Staff auction built: database rules tested in PGlite (`test/db.test.ts`), including pull → apply on a real save. The UI was checked in demo mode.
+- Next: run migration 002 in Supabase and test a real window. Driver swaps still need an in-game race test.

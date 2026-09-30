@@ -9,6 +9,20 @@ export interface SetBudgetOp {
   reason?: string;
 }
 
+export interface AdjustBudgetOp {
+  op: "adjustBudget";
+  team: string | number;
+  /** Added to the budget; negative for a cost. */
+  delta: number;
+  reason?: string;
+}
+
+/** Add to or take from a team's budget, e.g. a sign-on fee. Logged like setBudget. */
+export function adjustBudget(save: Save, op: AdjustBudgetOp): string {
+  const before = Number(save.finance(save.team(op.team)).currentBudget);
+  return setBudget(save, { op: "setBudget", team: op.team, amount: before + op.delta, reason: op.reason });
+}
+
 /** Set a team's budget and record the difference as a transaction, so it shows in game. */
 export function setBudget(save: Save, op: SetBudgetOp): string {
   const team = save.team(op.team);

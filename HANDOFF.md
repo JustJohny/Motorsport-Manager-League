@@ -1,6 +1,6 @@
 # Handoff: MM League Toolkit
 
-_Last updated 2026-09-30 (website v1 built). Read this first in a new session, then `README.md` and `docs/save-schema.md`._
+_Last updated 2026-09-30 (website v1 live; staff auction built, not yet deployed). Read this first in a new session, then `README.md` and `docs/save-schema.md`._
 
 ## The goal
 Run a **Motorsport Manager 1 (v1.53)** online league the way F1 Manager 24 community leagues run:
@@ -56,7 +56,9 @@ Verified by the user in MM on 2026-09-30:
 - `src/publish.ts` + `mmsave publish`: split into public and private data, then upload through the `publish_snapshot` RPC with the service key from `.env`.
 - `supabase/migrations/001_init.sql`: tables, RLS and functions.
   - RLS was checked in PGlite with stubbed `auth` (scratch script, not in the repo). Only the service role can publish, members see only their own team's private data, the organizer sees all, and non-members see nothing.
-  - **Unverified against real Supabase:** which JWT claim holds the Discord username. `current_discord_username()` uses `user_metadata.name` minus `#discriminator`, then falls back to `user_name` and `full_name`. The Organizer page lists logins that match no team, which shows the real value.
+  - **Verified with real Supabase and Discord (2026-09-30):** `current_discord_username()` gets the **@ handle** from `user_metadata.name` (the user's handle is `codecoffe`; their display name `JustJohny` is in `custom_claims.global_name`). `league.json` needs the handle, not the display name.
+- The real league config is `league.json` in the repo root. It is **gitignored** because the repo is public and it holds Discord handles. `examples/league.json` holds placeholders.
+- `publish` uploads over HTTP/1.1 (`node:https`). Node 26's `fetch` used HTTP/2, and large uploads to Supabase failed intermittently on the user's connection with "bad record mac" or `ERR_HTTP2_INVALID_SESSION`.
 - **Demo mode:** without `VITE_SUPABASE_*` the site loads `site/public/demo-state.json` (a gitignored extract). It was verified by screenshots of every page, with no console errors.
 - `.github/workflows/pages.yml`: builds `site/` on push to master/main, with `BASE_PATH=/<repo>/`.
 
@@ -65,7 +67,39 @@ Verified by the user in MM on 2026-09-30:
 2. **Discord:** create an app at discord.com/developers → OAuth2. Add the redirect `https://<project>.supabase.co/auth/v1/callback`. In Supabase → Authentication → Providers → Discord, paste the client ID and secret.
 3. **Supabase Auth URL config:** Site URL `https://<user>.github.io/<repo>/`. Also add `http://localhost:5173/` to the redirect URLs for dev.
 4. **GitHub:** create the repo and push. It must be public for free Pages. Set Pages source to "GitHub Actions". Add secrets `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
-5. **Locally:** copy `.env.example` to `.env` with the secret key. Add `discord` usernames to the league file, then run `mmsave publish "<save>" --league league.json`.
+5. **Locally:** copy `.env.example` to `.env` with the secret key. Add `discord` @handles to `league.json`, then run `mmsave publish "<save>" --league league.json`.
+
+Steps 1–5 are done: Supabase is set up, Pages is deployed, and snapshots are published. Remaining: confirm the user's login lands on Tatra Racing, and test with a second Discord account.
+
+## Phase 2: staff auction, built and tested but not yet live
+**Rules agreed with the user:**
+- A bid is a yearly wage plus a 25% sign-on fee.
+- The opening price comes from a stats formula.
+- Members can bid on free agents and on AI teams' staff. AI staff cost a buyout (remaining contract value) and swap with the released person.
+- The bidder names who is replaced.
+- Each bid beats the leader by at least 5%.
+- Contracts run 1–3 seasons, chosen by the bidder.
+- The budget must cover fees, buyouts and the rest of this season's extra wages.
+- There is one fixed-deadline window at a time.
+
+**Where it lives:**
+- `supabase/migrations/002_auctions.sql`: `league_settings` (tunable), `transfer_windows`, `auctions` (the leader is stored on the row, so realtime works under RLS), and `bids`. The latter is private: only the own team and the organizer see it. The public `bid_history` view leaves out who is replaced. RPCs: `open_window`, `set_window_deadline`, `open_auction`, `place_bid`.
+- `src/league-rules.ts`: the same price and cost formulas for the site. `test/db.test.ts` checks that both agree.
+- `src/transfers.ts` + `mmsave pull`: winners → `hire` (with `yearlyWages` and `endDate`) + `adjustBudget` (fee, buyout).
+- Site: `/transfers` page, market nominate button, AI-staff tab, bid dialog with a cost breakdown, organizer window controls. Demo mode simulates auctions in memory (`site/src/lib/demo-transfers.ts`).
+- Tests: `test/db.ts` runs every migration in PGlite with a stubbed Supabase `auth` schema. `test/db.test.ts` covers the RLS and every auction rule, then pull → apply on the real base save.
+
+**A toolkit bug found and fixed along the way:** a `hire` swap with a rival team corrupted the other team's seats. See docs/save-schema.md, hiring pitfalls. It never happened in game, because swaps hadn't been played yet.
+
+**To go live:** run `002_auctions.sql` in the Supabase SQL editor, then commit and push (Pages redeploys). Open a window on the Organizer page.
+
+**Organizer loop:**
+1. `mmsave publish` (between races).
+2. Open a window; members bid.
+3. After the deadline, `mmsave pull -o changes.json --mark-applied`, then `mmsave apply "<save>" changes.json -o "<saves>/SaveLeague Test N.sav" --name …`.
+4. Play the race, then publish again.
+
+**Not verified in game yet:** signings with an explicit `endDate` and `yearlyWages` from `pull`, and driver swaps with AI teams, through a race.
 
 ## How to work with it
 ```sh
@@ -113,15 +147,13 @@ npx tsx src/cli.ts validate "<save>"
 - HQ upgrades are applied instantly, bypassing build time and cost. The site should model time and cost itself. `setBuilding` warns on unmet prerequisites.
 
 ## Next steps
-1. Walk the user through the one-time setup above and test a real Discord login. Fix the username claim if needed.
-2. **Phase 2: staff auction** (fixed window).
-   - `auctions` and `bids` tables, a `place_bid()` function (open window, minimum bid, budget check), realtime bids, and `mmsave pull` producing `hire` ops.
-   - The game's wage demand can't be read from the save (see docs/save-schema.md), so the league defines its own minimum bid. Agree on that formula, plus rules for which slot a signing replaces, releases, and ties.
-3. Phase 3: HQ queue (N race weekends; `BuildingInProgress` counts as level 0). Phase 4: part development formula. Both feed `syncTeam` through `pull`.
-4. Optionally, play "League Test" through a race to verify driver hires and swaps on AI teams.
-5. An organizer workflow document (between-race checklist).
+1. **Phase 2 (built):** the user runs migration 002 and deploys. Then run a real test window, and apply the result through a race in game (especially an AI driver swap).
+   - Tuning to discuss: opening prices can be below an AI driver's current wage, and buyouts of long contracts are large ($11M for a 20-year-old on a deal to 2018).
+2. Phase 3: HQ queue (N race weekends; `BuildingInProgress` counts as level 0). Phase 4: part development formula. Both feed `syncTeam` through `pull`.
+3. Optionally, play "League Test" through a race to verify driver hires and swaps on AI teams.
+4. An organizer workflow document (between-race checklist).
 
 ## Working notes for the assistant
 - The user plays MM under Wine on Linux (CachyOS). They test in game and report back, so give them concrete things to check.
 - Never overwrite the user's own saves. Write new `SaveLeague Test N.sav` files.
-- Git: initial commit `dc4d371` on `master` (2026-09-30). Commit only when the user asks.
+- Git: branch `main`, remote `origin` = github.com/JustJohny/Motorsport-Manager-League (public, Apache-2.0 LICENSE from GitHub). Pages URL: https://justjohny.github.io/Motorsport-Manager-League/. Commit and push only when the user asks.

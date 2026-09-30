@@ -12,6 +12,8 @@ import { OrganizerPage } from "@/pages/organizer"
 import { ResultsPage } from "@/pages/results"
 import { StandingsPage } from "@/pages/standings"
 import { TeamsPage } from "@/pages/teams"
+import { TransfersPage } from "@/pages/transfers"
+import { TransfersProvider } from "@/lib/transfers"
 
 function Shell() {
   const { me, league } = useLeague()
@@ -35,6 +37,7 @@ function Shell() {
             <Route path="/results" element={<ResultsPage />} />
             <Route path="/teams" element={<TeamsPage />} />
             <Route path="/market" element={<MarketPage />} />
+            <Route path="/transfers" element={<TransfersPage />} />
             {me.role === "organizer" && <Route path="/organizer" element={<OrganizerPage />} />}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
@@ -50,7 +53,9 @@ export default function App() {
       <TooltipProvider>
         <HashRouter>
           <Gate>
-            <Shell />
+            <TransfersProvider>
+              <Shell />
+            </TransfersProvider>
           </Gate>
         </HashRouter>
       </TooltipProvider>

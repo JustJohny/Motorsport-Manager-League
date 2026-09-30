@@ -1,11 +1,11 @@
 import type { Save } from "./model.ts";
-import { setBudget, type SetBudgetOp } from "./ops/finance.ts";
+import { adjustBudget, setBudget, type AdjustBudgetOp, type SetBudgetOp } from "./ops/finance.ts";
 import { setBuilding, type SetBuildingOp } from "./ops/hq.ts";
 import { addPart, fitPart, removePart, type AddPartOp, type FitPartOp, type RemovePartOp } from "./ops/parts.ts";
 import { hire, type HireOp } from "./ops/staff.ts";
 import { syncTeam, type SyncTeamOp } from "./ops/sync.ts";
 
-export type Change = SetBuildingOp | SetBudgetOp | AddPartOp | RemovePartOp | FitPartOp | HireOp | SyncTeamOp;
+export type Change = SetBuildingOp | SetBudgetOp | AdjustBudgetOp | AddPartOp | RemovePartOp | FitPartOp | HireOp | SyncTeamOp;
 
 export interface ChangeSet {
   /** Optional note, e.g. "Before round 6 - Munich". */
@@ -31,6 +31,7 @@ function run(save: Save, c: Change): string | string[] {
   switch (c.op) {
     case "setBuilding": return setBuilding(save, c);
     case "setBudget": return setBudget(save, c);
+    case "adjustBudget": return adjustBudget(save, c);
     case "addPart": return addPart(save, c);
     case "removePart": return removePart(save, c);
     case "fitPart": return fitPart(save, c);

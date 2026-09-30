@@ -214,10 +214,15 @@ function replaceInTeamCaches(save: Save, team: Obj, from: Obj, to: Obj) {
   for (const s of save.g.list<Obj>(cm.mNextYearEmployeeSlots)) {
     if (s.personHired && save.g.deref(s.personHired) === from) s.personHired = save.g.ref(to);
   }
-  for (const t of targets) replaceRefs(save, t, from, to, 4);
+  // The caches reference teams (partImprovement.mTeam, and from there rivalTeam) and people of
+  // other teams; following those would rewrite another team's slots. Stay inside this team.
+  const teams = new Set(save.teams());
+  const people = new Set(save.people());
+  const outside = (o: Obj) => teams.has(o) || (people.has(o) && save.employer(o) !== team);
+  for (const t of targets) replaceRefs(save, t, from, to, 4, outside);
 }
 
-function replaceRefs(save: Save, v: Json, from: Obj, to: Obj, depth: number): void {
+function replaceRefs(save: Save, v: Json, from: Obj, to: Obj, depth: number, outside: (o: Obj) => boolean): void {
   if (depth < 0 || v == null || typeof v !== "object") return;
   const container = save.g.deref<Json>(v);
   const entries: [Json, string | number][] = Array.isArray(container)
@@ -228,9 +233,10 @@ function replaceRefs(save: Save, v: Json, from: Obj, to: Obj, depth: number): vo
     if (x && typeof x === "object" && (x === from || (x.$ref !== undefined && save.g.deref(x) === from))) {
       parent[key] = save.g.ref(to);
     } else if (x && typeof x === "object" && x.$id === undefined) {
-      replaceRefs(save, x, from, to, depth - 1);
+      if (x.$ref !== undefined && outside(save.g.deref<Obj>(x))) continue;
+      replaceRefs(save, x, from, to, depth - 1, outside);
     } else if (Array.isArray(x) || (x && typeof x === "object" && "$content" in x)) {
-      replaceRefs(save, x, from, to, depth - 1);
+      replaceRefs(save, x, from, to, depth - 1, outside);
     }
   }
 }

@@ -9,6 +9,8 @@ import { extractLeague, type LeagueConfig } from "./extract.ts";
 import { Save } from "./model.ts";
 import { defaultSavesDir } from "./paths.ts";
 import { memberRows, publish, splitSnapshot } from "./publish.ts";
+import { supabaseEnv } from "./supabase.ts";
+import { fetchWindow, markApplied, windowChanges, winners } from "./transfers.ts";
 
 const USAGE = `mmsave - Motorsport Manager league save toolkit
 
@@ -18,6 +20,7 @@ const USAGE = `mmsave - Motorsport Manager league save toolkit
   mmsave teams    <save.sav>                          list teams by championship
   mmsave extract  <save.sav> --league league.json [-o state.json]
   mmsave publish  <save.sav> --league league.json [--dry-run]   upload to the league website
+  mmsave pull     [-o changes.json] [--mark-applied]           transfer window results as changes
   mmsave apply    <save.sav> <changes.json> [-o out.sav] [--name "Shown name"]
   mmsave diff     <a.sav> <b.sav> [--team NAME] [--path teamManager] [--depth N]
 
@@ -35,6 +38,8 @@ const { values: opt, positionals: [cmd, ...args] } = parseArgs({
     depth: { type: "string" },
     limit: { type: "string" },
     "dry-run": { type: "boolean" },
+    "mark-applied": { type: "boolean" },
+    force: { type: "boolean" },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -121,10 +126,27 @@ switch (cmd) {
     for (const m of members) console.log(`  ${m.discord_username} -> ${m.team}${m.role === "organizer" ? " (organizer)" : ""}`);
     if (!members.length) console.log("  WARNING: no member has a \"discord\" username in the league file, so nobody can log in");
     if (opt["dry-run"]) break;
-    if (existsSync(".env")) process.loadEnvFile(".env");
-    const url = process.env.SUPABASE_URL ?? fail("set SUPABASE_URL (e.g. in .env)");
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? fail("set SUPABASE_SERVICE_ROLE_KEY (e.g. in .env)");
-    console.log(`published snapshot #${await publish(url, key, members, split)}`);
+    console.log(`published snapshot #${await publish(supabaseEnv(), members, split)}`);
+    break;
+  }
+  case "pull": {
+    const env = supabaseEnv();
+    const w = await fetchWindow(env);
+    const closes = new Date(w.window.closes_at);
+    if (closes > new Date() && !opt.force) fail(`window #${w.window.id} is open until ${closes.toLocaleString()} (--force to pull anyway)`);
+    const won = winners(w.auctions, w.bids, w.settings);
+    console.log(`Transfer window #${w.window.id}: ${w.auctions.length} auctions, ${won.length} signings`);
+    for (const s of won) {
+      console.log(`  ${s.team}: ${s.person.name}${s.fromTeam ? ` from ${s.fromTeam}` : ""} for $${s.wage.toLocaleString()}/yr x${s.years}, replacing ${s.replacingName}`
+        + ` (fee $${s.signOnFee.toLocaleString()}${s.buyout ? `, buyout $${s.buyout.toLocaleString()}` : ""})`);
+    }
+    const json = JSON.stringify(windowChanges(w.window.id, w.gameDate, w.auctions, w.bids, w.settings), null, 2);
+    if (opt.out) writeFileSync(opt.out, json), console.log(`wrote ${opt.out}`);
+    else console.log(json);
+    if (opt["mark-applied"]) {
+      await markApplied(env, w.window.id);
+      console.log(`window #${w.window.id} marked as applied; the organizer can open the next one`);
+    }
     break;
   }
   case "apply": {

@@ -1,15 +1,16 @@
-import { CalendarDays, Flag, Moon, Shield, ShoppingBag, Sun, Trophy, Users, Wrench } from "lucide-react"
+import { CalendarDays, Flag, Gavel, Moon, Shield, ShoppingBag, Sun, Trophy, Users, Wrench } from "lucide-react"
 import { NavLink, useLocation } from "react-router"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader,
-  SidebarMenu, SidebarMenuButton, SidebarMenuItem,
+  SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { useLeague, useLeagueContext } from "@/lib/league"
 import { demoMode } from "@/lib/supabase"
 import { useTheme } from "@/lib/theme"
+import { useTransfers } from "@/lib/transfers"
 
 const NAV = [
   { to: "/", label: "My team", icon: Wrench },
@@ -17,6 +18,7 @@ const NAV = [
   { to: "/results", label: "Calendar & results", icon: CalendarDays },
   { to: "/teams", label: "Teams", icon: Users },
   { to: "/market", label: "Staff market", icon: ShoppingBag },
+  { to: "/transfers", label: "Transfer window", icon: Gavel },
 ]
 
 export function AppSidebar() {
@@ -24,6 +26,7 @@ export function AppSidebar() {
   const { session, signOut } = useLeagueContext()
   const { theme, toggle } = useTheme()
   const { pathname } = useLocation()
+  const transfers = useTransfers()
   const ch = league.snapshot.championship
   const meta = session?.user.user_metadata ?? {}
   const displayName = (meta.custom_claims?.global_name as string | undefined) ?? me.discord_username
@@ -57,6 +60,7 @@ export function AppSidebar() {
                       <span>{n.label}</span>
                     </NavLink>
                   </SidebarMenuButton>
+                  {n.to === "/transfers" && transfers.isOpen && <SidebarMenuBadge className="text-primary">Open</SidebarMenuBadge>}
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>

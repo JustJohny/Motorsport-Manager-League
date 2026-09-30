@@ -2,6 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { PageHeader } from "@/components/page-header"
+import { WindowControls } from "@/components/window-controls"
 import { fmtDate } from "@/lib/format"
 import { useLeague } from "@/lib/league"
 
@@ -13,8 +14,9 @@ export function OrganizerPage() {
 
   return (
     <>
-      <PageHeader title="Organizer" description="League members and the data currently on the site." />
-      <div className="grid gap-4 lg:grid-cols-2">
+      <PageHeader title="Organizer" description="League members, the transfer window and the data currently on the site." />
+      <div className="grid gap-4 lg:grid-cols-3">
+        <WindowControls />
         <Card size="sm">
           <CardHeader>
             <CardTitle>Published snapshot #{league.snapshotId}</CardTitle>

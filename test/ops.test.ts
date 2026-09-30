@@ -45,6 +45,9 @@ describe.skipIf(!existsSync(SAVE))("operations on a real save", () => {
     const freeDriver = before.freeAgents.find((p) => p.kind === "Driver")!;
     const octaneDriver = staff(octane, "Driver")[0];
     const [gDriver0, gDriver1] = staff(garuda, "Driver");
+    // Eastwood is Octane's rival team, which the cache update used to reach and corrupt.
+    const eastwoodDriver = staff(before.teams.find((t) => t.name === "Eastwood Motorsport")!, "Driver")[0];
+    const octaneSecond = staff(octane, "Driver")[1];
 
     applyChanges(save, {
       changes: [
@@ -55,6 +58,7 @@ describe.skipIf(!existsSync(SAVE))("operations on a real save", () => {
         { op: "hire", team: "Garuda Racing", person: freeMechanic.guid, replacing: staff(garuda, "Mechanic")[0].guid },
         { op: "hire", team: "Garuda Racing", person: freeDriver.guid, replacing: gDriver1.guid },
         { op: "hire", team: "Garuda Racing", person: octaneDriver.guid, replacing: gDriver0.guid },
+        { op: "hire", team: "Octane Racing", person: eastwoodDriver.guid, replacing: octaneSecond.guid },
       ],
     });
     save.prepareForWrite();
@@ -73,9 +77,22 @@ describe.skipIf(!existsSync(SAVE))("operations on a real save", () => {
     expect(g2.parts.FrontWing.filter((p) => p.fittedToCar === 1)).toHaveLength(1);
     expect(staff(g2, "EngineerLead")[0].guid).toBe(freeEngineer.guid);
     expect(staff(g2, "Driver").map((p) => p.guid)).toEqual(expect.arrayContaining([freeDriver.guid, octaneDriver.guid]));
-    expect(staff(o2, "Driver").map((p) => p.guid)).toContain(gDriver0.guid);
+    expect(staff(o2, "Driver").map((p) => p.guid)).toEqual(expect.arrayContaining([gDriver0.guid, eastwoodDriver.guid]));
+    expect(staff(after.teams.find((t) => t.name === "Eastwood Motorsport")!, "Driver").map((p) => p.guid)).toContain(octaneSecond.guid);
     expect(after.freeAgents.map((p) => p.guid)).toContain(gDriver1.guid);
     expect(after.championship.standings.drivers.map((d) => d.guid)).toContain(freeDriver.guid);
+
+    // Nobody sits in two seats, and every seat holder's contract names that team. (A swap once
+    // rewrote the other team's seat through partImprovement.mTeam.rivalTeam.)
+    const seats = new Map<string, string>();
+    for (const t of reloaded.teams()) {
+      for (const slot of reloaded.slots(t).filter((s) => s.personHired)) {
+        const p = reloaded.g.deref<any>(slot.personHired);
+        expect(seats.get(p.id), `${p.mFirstName} ${p.mLastName} in two seats`).toBeUndefined();
+        seats.set(p.id, t.name);
+        expect(reloaded.employer(p), `${p.mFirstName} ${p.mLastName} contract team`).toBe(t);
+      }
+    }
 
     // Every employed person needs an open career entry at their current team.
     for (const name of ["Garuda Racing", "Octane Racing"]) {

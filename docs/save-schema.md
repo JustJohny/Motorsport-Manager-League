@@ -63,6 +63,9 @@ No checksum was seen. The game loads files whose compressed bytes differ from it
   - Some free agents keep a stale inline event with no `$id`. Putting that same object in a second place without an id would serialize it as two separate copies.
 - The game's own hire path is `ContractManagerTeam.HireNewPerson`/`HireNewDriver`. It also does `PartImprovement.AssignChiefMechanics`, `AIPitCrew.RegenerateTaskStats`, `Team.SelectMainDriversForSession` and `DriverManager.AddDriverToChampionship`. Check these first if another hire-related crash shows up.
 
+- **Swap cache update must stay inside the team.** After a swap, `hire` rewrites the team's cached person lists (`mCachedPeople`, `mMechanics`, session drivers, AI drivers, `partImprovement`). These reach other teams through references, e.g. `carManager.partImprovement.mTeam.rivalTeam`. Following those rewrote the *other* team's seat, which left a person in two seats and the released person in none. `replaceRefs` now never follows a reference into a team, or into a person employed elsewhere. `test/ops.test.ts` swaps with a rival team and checks that every person holds exactly one seat.
+- **Inline definitions in caches.** A person's `$id` definition can sit inline in another team's mechanic `mRelationshipDriversCache`. Replacing it with a `$ref` is safe, because `normalizeRefOrder` moves the definition to the first remaining reference on write.
+
 ## Verified in game (2026-09-30, save "League Test 2", player team)
 - `setBuilding`: Wind Tunnel shown at level 1.
 - `setBudget`: new budget shown, with our transaction note in the finance history.

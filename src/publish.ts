@@ -1,5 +1,7 @@
 import type { LeagueConfig, LeagueMemberRow, LeagueState, SplitSnapshot, TeamState } from "./league-types.ts";
 
+import { rest, type SupabaseEnv } from "./supabase.ts";
+
 export type { PublicSnapshot, SplitSnapshot, TeamPrivate, TeamPublic } from "./league-types.ts";
 
 /** Split an extract into the rows the website stores, so row-level security can hide private data. */
@@ -44,19 +46,9 @@ export function memberRows(cfg: LeagueConfig, state: LeagueState): LeagueMemberR
 
 /**
  * Upload a snapshot through the `publish_snapshot` database function, which replaces the
- * member list and inserts the snapshot in one transaction. Needs the service-role key.
+ * member list and inserts the snapshot in one transaction. If a network error hides the reply
+ * after the insert, the retry adds a duplicate snapshot, which is harmless: the site reads the newest.
  */
-export async function publish(url: string, serviceKey: string, members: LeagueMemberRow[], split: SplitSnapshot): Promise<number> {
-  const res = await fetch(`${url.replace(/\/$/, "")}/rest/v1/rpc/publish_snapshot`, {
-    method: "POST",
-    headers: {
-      apikey: serviceKey,
-      // Legacy service_role keys are JWTs and also go in Authorization; new sb_secret_ keys must not.
-      ...(serviceKey.startsWith("sb_") ? {} : { authorization: `Bearer ${serviceKey}` }),
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({ members, snapshot: split }),
-  });
-  if (!res.ok) throw new Error(`publish failed: ${res.status} ${await res.text()}`);
-  return Number(await res.json());
+export async function publish(env: SupabaseEnv, members: LeagueMemberRow[], split: SplitSnapshot): Promise<number> {
+  return Number(await rest<number>(env, "POST", "rpc/publish_snapshot", { members, snapshot: split }));
 }
