@@ -3,3 +3,4 @@ out/
 *.sav
 .env
 league.json
+changes.json

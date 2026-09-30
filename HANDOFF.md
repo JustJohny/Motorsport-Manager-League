@@ -1,6 +1,6 @@
 # Handoff: MM League Toolkit
 
-_Last updated 2026-09-30 (website v1 live; staff auction built, not yet deployed). Read this first in a new session, then `README.md` and `docs/save-schema.md`._
+_Last updated 2026-09-30 (website + staff auction live; first auction signing played in game). Read this first in a new session, then `README.md` and `docs/save-schema.md`._
 
 ## The goal
 Run a **Motorsport Manager 1 (v1.53)** online league the way F1 Manager 24 community leagues run:
@@ -71,7 +71,7 @@ Verified by the user in MM on 2026-09-30:
 
 Steps 1–5 are done: Supabase is set up, Pages is deployed, and snapshots are published. Remaining: confirm the user's login lands on Tatra Racing, and test with a second Discord account.
 
-## Phase 2: staff auction, built and tested but not yet live
+## Phase 2: staff auction, live and verified in game
 **Rules agreed with the user:**
 - A bid is a yearly wage plus a 25% sign-on fee.
 - The opening price comes from a stats formula.
@@ -99,7 +99,9 @@ Steps 1–5 are done: Supabase is set up, Pages is deployed, and snapshots are p
 3. After the deadline, `mmsave pull -o changes.json --mark-applied`, then `mmsave apply "<save>" changes.json -o "<saves>/SaveLeague Test N.sav" --name …`.
 4. Play the race, then publish again.
 
-**Not verified in game yet:** signings with an explicit `endDate` and `yearlyWages` from `pull`, and driver swaps with AI teams, through a race.
+**Verified in game (2026-09-30, "League Test 5"):** window #1 was pulled and applied. Tatra signed Björn Daouadji (free-agent engineer) and Sergio Arbeloa, bought out from Eastwood, with André Zoom swapped to Eastwood. The user reports it all works in game.
+
+**Transfer window page:** it shows auctions only while bidding runs. After the deadline it's cleared, and the results move to the History tab (every window, "Awaiting organizer" until `pull --mark-applied`). Bidding closes on a timer set to the exact deadline, not on a polling clock.
 
 ## How to work with it
 ```sh
@@ -147,11 +149,10 @@ npx tsx src/cli.ts validate "<save>"
 - HQ upgrades are applied instantly, bypassing build time and cost. The site should model time and cost itself. `setBuilding` warns on unmet prerequisites.
 
 ## Next steps
-1. **Phase 2 (built):** the user runs migration 002 and deploys. Then run a real test window, and apply the result through a race in game (especially an AI driver swap).
+1. **Phase 2 (done):** mark window #1 applied (`mmsave pull --mark-applied`). Test with a second real member.
    - Tuning to discuss: opening prices can be below an AI driver's current wage, and buyouts of long contracts are large ($11M for a 20-year-old on a deal to 2018).
 2. Phase 3: HQ queue (N race weekends; `BuildingInProgress` counts as level 0). Phase 4: part development formula. Both feed `syncTeam` through `pull`.
-3. Optionally, play "League Test" through a race to verify driver hires and swaps on AI teams.
-4. An organizer workflow document (between-race checklist).
+3. An organizer workflow document (between-race checklist).
 
 ## Working notes for the assistant
 - The user plays MM under Wine on Linux (CachyOS). They test in game and report back, so give them concrete things to check.

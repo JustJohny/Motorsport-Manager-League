@@ -29,7 +29,7 @@ function Shell() {
           </span>
           {demoMode && <span className="ml-auto rounded bg-primary/15 px-2 py-0.5 text-xs text-primary">Demo data</span>}
         </header>
-        <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">
           <Routes>
             <Route path="/" element={<MyTeamPage />} />
             <Route path="/team/:name" element={<MyTeamPage />} />
@@ -41,7 +41,7 @@ function Shell() {
             {me.role === "organizer" && <Route path="/organizer" element={<OrganizerPage />} />}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
-        </main>
+        </div>
       </SidebarInset>
     </SidebarProvider>
   )

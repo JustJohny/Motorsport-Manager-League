@@ -9,9 +9,11 @@ const JOB_FOR: Record<string, string> = { Driver: "Driver", Engineer: "EngineerL
 export function createDemoStore(league: League) {
   const s = DEFAULT_SETTINGS
   const date = league.snapshot.gameDate
-  let window: TransferWindow | null = {
-    id: 1, snapshot_id: 0, opens_at: new Date().toISOString(), closes_at: new Date(Date.now() + 2 * 86400_000).toISOString(), status: "open",
-  }
+  // Newest first, like the database query. An earlier, applied window gives the history something to show.
+  const windows: TransferWindow[] = [
+    { id: 2, snapshot_id: 0, opens_at: new Date().toISOString(), closes_at: new Date(Date.now() + 2 * 86400_000).toISOString(), status: "open" },
+    { id: 1, snapshot_id: 0, opens_at: new Date(Date.now() - 30 * 86400_000).toISOString(), closes_at: new Date(Date.now() - 27 * 86400_000).toISOString(), status: "applied" },
+  ]
   const auctions: Auction[] = []
   const bids: OwnBid[] = []
   let ids = 1
@@ -22,21 +24,25 @@ export function createDemoStore(league: League) {
     league.freeAgents.find((p) => p.guid === guid) ?? league.snapshot.teams.flatMap((t) => t.staff).find((s) => s.person?.guid === guid)?.person ?? undefined
 
   const store = {
-    get window() { return window },
-    auctions: () => auctions.map((a) => ({ ...a })),
+    windows: () => windows.map((w) => ({ ...w })),
+    auctions: (windowId = windows[0]?.id) => auctions.filter((a) => a.window_id === windowId).map((a) => ({ ...a })),
     bidsOf: (team: string) => bids.filter((b) => b.team === team),
     history: (auctionId: number): PublicBid[] => bids.filter((b) => b.auction_id === auctionId).reverse(),
-    openWindow(closesAt: Date) { window = { ...window!, id: (window?.id ?? 0) + 1, closes_at: closesAt.toISOString(), status: "open" } },
-    setDeadline(closesAt: Date) { if (window) window = { ...window, closes_at: closesAt.toISOString() } },
-    openAuction(me: LeagueMemberRow, guid: string) {
-      const existing = auctions.find((a) => a.person_guid === guid)
+    // No `mmsave pull` in demo mode: opening a window marks the previous one applied.
+    openWindow(closesAt: Date) {
+      for (const w of windows) w.status = "applied"
+      windows.unshift({ id: windows[0].id + 1, snapshot_id: 0, opens_at: new Date().toISOString(), closes_at: closesAt.toISOString(), status: "open" })
+    },
+    setDeadline(closesAt: Date) { if (windows[0]?.status === "open") windows[0].closes_at = closesAt.toISOString() },
+    openAuction(me: LeagueMemberRow, guid: string, windowId?: number) {
+      const existing = auctions.find((a) => a.person_guid === guid && a.window_id === windows[0].id)
       if (existing) return existing.id
       const person = findPerson(guid)
       if (!person) throw new Error("Unknown person")
       const from = aiTeamOf(guid)
       if (!from && !league.freeAgents.includes(person)) throw new Error(`${person.name} is under contract at a member team`)
       const a: Auction = {
-        id: ids++, window_id: window!.id, person_guid: guid, person, kind: person.kind as Auction["kind"], from_team: from,
+        id: ids++, window_id: windowId ?? windows[0].id, person_guid: guid, person, kind: person.kind as Auction["kind"], from_team: from,
         min_wage: minWage(person, s), buyout: from ? buyout(person, date) : 0, opened_by: me.team,
         leading_team: null, leading_wage: null, leading_years: null, bid_count: 0, updated_at: new Date().toISOString(),
       }
@@ -62,7 +68,7 @@ export function createDemoStore(league: League) {
     },
   }
 
-  // Seed: rivals have opened a few auctions and bid on them.
+  // Seed: rivals have opened a few auctions and bid on them, in the running and the past window.
   const rival = league.snapshot.teams.find((t) => t.member && t.name !== league.members.find((m) => m.role === "organizer")?.team)
   if (rival) {
     const rivalMe: LeagueMemberRow = { discord_username: "rival", member: rival.member!, team: rival.name, role: "member" }
@@ -74,6 +80,14 @@ export function createDemoStore(league: League) {
       try { store.placeBid(rivalMe, id, minWage(p, s), 2, drivers[i].guid) } catch { /* budget: leave unbid */ }
     })
     if (mech) store.openAuction(rivalMe, mech.guid)
+    // Window #1 (applied): one signing and one auction nobody bid on.
+    const past = league.freeAgents.filter((p) => p.kind === "Engineer").slice(0, 2)
+    const eng = staffOf(rival.name).find((x) => x.job === "EngineerLead")?.person
+    past.forEach((p, i) => {
+      const id = store.openAuction(rivalMe, p.guid, 1)
+      const a = auctions.find((x) => x.id === id)!
+      if (i === 0 && eng) Object.assign(a, { leading_team: rival.name, leading_wage: a.min_wage + 20_000, leading_years: 2, bid_count: 3 })
+    })
   }
   return store
 }

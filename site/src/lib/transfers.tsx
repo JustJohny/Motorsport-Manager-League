@@ -54,9 +54,13 @@ export interface PublicBid {
 
 interface Transfers {
   settings: LeagueSettings
+  /** The latest window (running, closed awaiting the organizer, or applied). */
   transferWindow: TransferWindow | null
+  /** Every window, newest first. */
+  windows: TransferWindow[]
   /** Bidding is possible right now. */
   isOpen: boolean
+  /** Auctions of the running window; empty once bidding has closed (see windowAuctions). */
   auctions: Auction[]
   myBids: OwnBid[]
   /** My leading bid per auction id. */
@@ -67,6 +71,8 @@ interface Transfers {
   openAuction: (personGuid: string) => Promise<number>
   placeBid: (auctionId: number, wage: number, years: number, replacing: string) => Promise<void>
   bidHistory: (auctionId: number) => Promise<PublicBid[]>
+  /** All auctions of a window, for the history. */
+  windowAuctions: (windowId: number) => Promise<Auction[]>
   openWindow: (closesAt: Date) => Promise<void>
   setDeadline: (closesAt: Date) => Promise<void>
 }
@@ -100,30 +106,37 @@ async function bidHistory(auctionId: number) {
   return (await check(supabase!.from("bid_history").select("*").eq("auction_id", auctionId).order("created_at", { ascending: false }))) as PublicBid[]
 }
 
+async function windowAuctions(windowId: number) {
+  return (await check(supabase!.from("auctions").select("*").eq("window_id", windowId).order("created_at"))) as Auction[]
+}
+
 export function TransfersProvider({ children }: { children: ReactNode }) {
   const { me, league } = useLeague()
   const [demo] = useState(() => (demoMode ? createDemoStore(league) : null))
   const [settings, setSettings] = useState<LeagueSettings>(DEFAULT_SETTINGS)
-  const [transferWindow, setTransferWindow] = useState<TransferWindow | null>(null)
+  const [windows, setWindows] = useState<TransferWindow[]>([])
+  const transferWindow = windows[0] ?? null
   const [auctions, setAuctions] = useState<Auction[]>([])
   const [myBids, setMyBids] = useState<OwnBid[]>([])
-  const now = useNow(5000)
+  // Re-render exactly when the deadline passes, so bidding closes on time without a ticking clock.
+  const [, setDeadlineTick] = useState(0)
 
   const reload = useCallback(async () => {
     if (demo) {
-      setTransferWindow(demo.window && { ...demo.window })
+      setWindows(demo.windows())
       setAuctions(demo.auctions())
       setMyBids(demo.bidsOf(me.team))
       return
     }
     const sb = supabase!
-    const [s, windows] = await Promise.all([
+    const [s, ws] = await Promise.all([
       check(sb.from("league_settings").select("*").maybeSingle()),
-      check(sb.from("transfer_windows").select("*").order("id", { ascending: false }).limit(1)),
+      check(sb.from("transfer_windows").select("*").order("id", { ascending: false })),
     ])
     if (s) setSettings(s as LeagueSettings)
-    const w = ((windows ?? [])[0] as TransferWindow | undefined) ?? null
-    setTransferWindow(w)
+    const all = (ws ?? []) as TransferWindow[]
+    setWindows(all)
+    const w = all[0]
     if (!w) return setAuctions([]), setMyBids([])
     const list = (await check(sb.from("auctions").select("*").eq("window_id", w.id).order("created_at"))) as Auction[]
     setAuctions(list)
@@ -156,11 +169,22 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
   }, [auctions, myBids, me.team])
   const committed = [...myLeading.values()].reduce((s, b) => s + Number(b.cost), 0)
 
+  const closesAt = transferWindow?.status === "open" ? Date.parse(transferWindow.closes_at) : null
+  useEffect(() => {
+    if (closesAt == null) return
+    const ms = closesAt - Date.now()
+    if (ms <= 0) return
+    // setTimeout overflows past ~24.8 days; re-check daily until then.
+    const id = setTimeout(() => setDeadlineTick((n) => n + 1), Math.min(ms + 50, 86_400_000))
+    return () => clearTimeout(id)
+  })
+  const isOpen = closesAt != null && closesAt > Date.now()
   const value: Transfers = {
     settings,
     transferWindow,
-    isOpen: !!transferWindow && transferWindow.status === "open" && Date.parse(transferWindow.closes_at) > now,
-    auctions,
+    windows,
+    isOpen,
+    auctions: isOpen ? auctions : [],
     myBids,
     myLeading,
     committed,
@@ -177,6 +201,7 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
       await reload()
     },
     bidHistory: demo ? async (id) => demo.history(id) : bidHistory,
+    windowAuctions: demo ? async (id) => demo.auctions(id) : windowAuctions,
     openWindow: async (closesAt) => {
       if (demo) return demo.openWindow(closesAt), reload()
       await check(supabase!.rpc("open_window", { closes_at: closesAt.toISOString() }))
