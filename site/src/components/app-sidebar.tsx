@@ -1,4 +1,4 @@
-import { CalendarDays, Flag, Gavel, Scale, Moon, Shield, ShoppingBag, Sun, Trophy, Users, Wrench } from "lucide-react"
+import { CalendarDays, Flag, Fan, Gavel, Scale, Moon, Shield, ShoppingBag, Sun, Trophy, Users, Wrench } from "lucide-react"
 import { NavLink, useLocation } from "react-router"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -20,6 +20,7 @@ const NAV = [
   { to: "/market", label: "Staff market", icon: ShoppingBag },
   { to: "/transfers", label: "Transfer window", icon: Gavel },
   { to: "/regulations", label: "Regulations", icon: Scale },
+  { to: "/engine", label: "Engine programme", icon: Fan },
 ]
 
 export function AppSidebar() {

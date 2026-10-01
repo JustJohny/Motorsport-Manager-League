@@ -10,6 +10,7 @@ import { MarketPage } from "@/pages/market"
 import { MyTeamPage } from "@/pages/my-team"
 import { OrganizerPage } from "@/pages/organizer"
 import { RegulationsPage } from "@/pages/regulations"
+import { EnginePage } from "@/pages/engine"
 import { ResultsPage } from "@/pages/results"
 import { StandingsPage } from "@/pages/standings"
 import { TeamsPage } from "@/pages/teams"
@@ -42,6 +43,7 @@ function Shell() {
             <Route path="/market" element={<MarketPage />} />
             <Route path="/transfers" element={<TransfersPage />} />
             <Route path="/regulations" element={<RegulationsPage />} />
+            <Route path="/engine" element={<EnginePage />} />
             {me.role === "organizer" && <Route path="/organizer" element={<OrganizerPage />} />}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>

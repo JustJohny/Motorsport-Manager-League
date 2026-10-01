@@ -322,7 +322,7 @@ Members see the current and the confirmed next-season regulations, vote on the s
   - how to set or undo `nextYearsRules` safely (AddRule replaces the rule of the same group?)
   - how the vote results are stored, so the toolkit can overwrite MM's outcome
 
-## Phase 5 idea: works engine programmes (rules agreed 2026-10-01, not built)
+## Phase 5: works engine programmes (site + database built 2026-10-01; season-change step not built)
 A member invests in their own engine programme, becomes an engine supplier, and sells engines to other members.
 
 **Rules (the user's choices):**
@@ -347,6 +347,19 @@ A member invests in their own engine programme, becomes an engine supplier, and 
 - To research before building:
   - removing one race's points from the save's championship standings (`mPoints` per race, positions, and results' `points`)
   - whether a supplier's stats can be changed mid-season and take effect
+
+**Build progress:**
+- ✅ `src/engine-rules.ts` (pure, shared): concepts, rising point cost, `developEngine`, `projectChance`, `buildEngine` (seeded projects + ±5 % roll, legal vs works engine), `carryOver`, `customerEngine`, `illegalDetection`. Tests: `test/engine.test.ts`.
+- ✅ Migration `009_engine_programmes.sql` (**not yet run on Supabase**).
+  - `engine_programmes` is public. `engine_plans`, `engine_builds` and `engine_spend` are private. There are also `engine_projects` (the cost list, checked against `PROJECTS`) and `engine_customers`.
+  - RPCs: `found_engine_programme`, `set_engine_concept`, `buy_engine_points`, `choose_engine_project`, `set_engine_offer`, `buy_engine`. All spending is reserved through `engine_reserve` (budget check), and `hq_committed` counts it.
+  - Tests: `test/db-engine.test.ts`.
+- ✅ `pull` charges reserved engine spending (`src/engine-orders.ts`) and pays the owner for engine sales.
+- ✅ Site page "Engine programme" (`site/src/pages/engine.tsx`): found, concept, buy points, projected engine, research projects (illegal ones marked with the detection odds), customer offer, the member engine market, and a spec-engine banner. Live only; demo mode shows a note.
+- ⏭ **Season-change step (toolkit), to build and test at pre-season (2016-12-13):**
+  1. After AI teams have started next year's design (`nextYearCarDesign.state` = Designing), the toolkit runs `buildEngine` for each programme (engineer skill = the lead engineer's stat average, DC level from HQ) and stores `engine_builds`.
+  2. It creates league `Supplier` objects (works and customer spec) and sets them on the owner's and customers' pending `mChassisStats` (stat shift + `mEngineModifier`), refunding the AI's engine payment.
+  3. Illegal tech: after each race with a works engine carrying a successful illegal project, roll `illegalDetection` (seeded, public log). If caught: strip the gain (set the legal supplier), remove that race's points (research the standings edit), fine.
 
 **Economics (the user's choices, 2026-10-01):**
 - Founding a programme costs **$30M** (one-off).
