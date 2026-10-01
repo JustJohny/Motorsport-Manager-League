@@ -207,7 +207,7 @@ npx tsx src/cli.ts validate "<save>"
        - improvement (lists, split, Factory slots, mechanics)
      - Parts carry `componentIds`. That's about 14 KB per team, private only.
      - **Component names:** MM has none. A component's text ID is its stats summary (`Modding`-less game: localisation CSVs live in `resources.assets`, and the component DB rows are `PSG_2000xxxx,"<b>Performance:</b> +15",...`). The site shows the summary, as MM does.
-   - **Step 3 (database + pull) built 2026-10-01. Migration `005_parts.sql` is NOT yet run on Supabase.** Until it is, `pull` fails, because it reads the new tables.
+   - **Step 3 (database + pull) built 2026-10-01. Migration `005_parts.sql` was run on Supabase by the user the same day.**
      - `design_orders`: one queued per team.
        - `order_design` checks the team's own components and MM's slot rules, and prices it in SQL (`design_cost`, the same formula as `planDesign`; a test checks they agree).
        - It refuses while the team's design runs (unless the AI started it after the league began, see `unordered_design`) or was applied after the latest publish.
