@@ -276,7 +276,7 @@ The user's idea: members may run parts that are faster but risk getting caught a
   - The "Stewards' decisions" card on the Calendar & results page is the public log (a siren marks rounds with busts).
 - Helpers: `bustChance` / `carBustChance` / `nextBustPenalty` in `src/part-design.ts`. Tests check them, and check that "League Test 10" yields Bernhauss' real bust at Munich.
 
-## Season regulations and politics (built 2026-10-01; migration 008 must be run, then publish)
+## Season regulations and politics (built 2026-10-01; migration 008 run and published by the user the same day)
 Members see the current and the confirmed next-season regulations, vote on the site with MM's voting system, and **the site's result always overwrites the in-game vote**.
 
 **Build progress (2026-10-01):**
