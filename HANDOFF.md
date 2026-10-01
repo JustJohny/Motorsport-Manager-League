@@ -348,6 +348,34 @@ A member invests in their own engine programme, becomes an engine supplier, and 
   - removing one race's points from the save's championship standings (`mPoints` per race, positions, and results' `points`)
   - whether a supplier's stats can be changed mid-season and take effect
 
+**Economics (the user's choices, 2026-10-01):**
+- Founding a programme costs **$30M** (one-off).
+- Development costs **$1M per point, rising within a season** (the 1st point $1M, the 2nd $2M, …; n points cost n(n+1)/2 $M).
+- **No ceiling:** a top programme can beat MM's best supplier (MM's range in the ERS save: engine level 1–2 up to 26–129, fuel −7…+17, improvability −4…+17, price $5–16M).
+
+**Proposed model (starting numbers, keep them tunable in `league_settings`):**
+- Engine stats = a supplier's output: engine level L (added to engine parts at the season change in non-spec series), FuelEfficiency (key 2), Improvability (key 3), TyreWear (key 0), TyreHeating (key 1).
+- **Concept each season** sets the caps and point yields:
+  - *Power*: +6 L per power point, fuel and improvability capped at +5.
+  - *Efficient*: +3 L per point, fuel/improvability up to +20, +1.5 per point.
+  - *Balanced*: +4.5 L per point, fuel/improvability up to +12.
+- **Trade-off:** every 3 power points cost −1 fuel and every 4 cost −1 tyre wear (more power = thirstier, harder on tyres).
+- **Carry-over:** next season starts from 80 % of this season's legal engine, so long programmes pay off. A new programme starts at L 10, everything else 0.
+- **Research projects** (rolled at the season change, seeded): e.g. a $5M project with 55 % success (+ lead engineer and HQ bonus) gives +20 L, and a failure costs −8 L.
+- **Illegal projects:** a bigger gain (e.g. +35 L) with a detection chance of 4 % per race, +3 %/race while it runs. Works only, as agreed.
+- **Customer spec:** full or detuned (85 % of L). The owner sets the price; it's paid at the season change.
+- The final stats get a small seeded roll (±5 %).
+
+**Save side (research done 2026-10-01):**
+- `NextYearCarDesign`: an AI team (members' teams too) runs `TeamAIController.HandleCarNewChassis` when its state is WaitingForDesign (1). It picks suppliers (`FindSuppliersForNewChassis`), pays their prices, and runs `StartDesign(chassis)`, which stores `mChassisStats` and `mEngineModifier = supplierEngine.randomEngineLevelModifier`.
+- At `DesignCompleted` (pre-season) → `CarManager.ApplyNewCarDesigns`, the cars get the chassis. In non-spec series the engine parts' stat += `mEngineModifier`.
+- Chassis stat values = the championship base + each supplier's `supplierStats` (`ApplyChampionshipBaseStat` + `ApplySupplierStats`).
+- **So the toolkit, between the AI's StartDesign and DesignCompleted:**
+  - creates a league `Supplier`: a clone of an engine supplier with a new id and name, min = max engine level, and the stats. It is not added to `championshipSuppliers`, so the AI never buys it.
+  - sets it as the pending chassis's `supplierEngine`, shifts the chassis stat values by the stat difference, and sets `mEngineModifier`
+  - refunds the AI's engine payment and charges the league price (customer → owner)
+- In "League Test 10" (6 Oct 2016) no team has started next year's design yet (state 1). Pre-season starts 2016-12-13. **The save side can only be checked in game at pre-season.**
+
 **What MM has (from Assembly-CSharp):**
 - `supplierManager.engineSuppliers`: `Supplier` objects with:
   - `name`, `mBasePrice`, `mTier`
