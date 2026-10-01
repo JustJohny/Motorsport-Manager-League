@@ -124,7 +124,9 @@ Steps 1–5 are done: Supabase is set up, Pages is deployed, and snapshots are p
 - The site marks such projects "AI project · cancelled at next apply".
 - Projects older than the league are kept.
 
-**Not verified in game:** that a toolkit-started build shows progress and completes, and that a cancelled project really disappears in MM.
+**Verified in game (2026-10-01, "League Test 6"):** a Design Centre ordered on the site was pulled and applied, the save loads, and MM shows it as just begun construction.
+
+**Not verified in game yet:** that the build progresses over days and completes, and that a cancelled AI project really disappears in MM.
 
 ## How to work with it
 ```sh
