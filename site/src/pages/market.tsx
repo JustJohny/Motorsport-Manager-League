@@ -1,7 +1,6 @@
-import { Gavel, Loader2, Search } from "lucide-react"
+import { Gavel, Search } from "lucide-react"
 import { useMemo, useState } from "react"
 import { useNavigate } from "react-router"
-import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -9,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/page-header"
+import { BidDialog } from "@/components/bid-dialog"
 import { PersonCard } from "@/components/person-card"
 import { ageAt, fmtCountry, fmtMoneyShort, fmtNum, statAverage } from "@/lib/format"
 import { useLeague } from "@/lib/league"
@@ -34,8 +34,6 @@ export function MarketPage() {
   const navigate = useNavigate()
   const date = league.snapshot.gameDate
   const [source, setSource] = useState<Source>("free")
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   // AI teams' staff can be bought out; member teams' staff can't be bid on.
   const aiStaff = useMemo(
     () => league.snapshot.teams.filter((tm) => !tm.member)
@@ -62,7 +60,7 @@ export function MarketPage() {
     <>
       <PageHeader
         title="Staff market"
-        description={t.isOpen ? "The transfer window is open: nominate someone to start an auction." : "Free agents and AI teams' staff. Auctions run during transfer windows."}
+        description={t.isOpen ? "The transfer window is open: nominate someone with your opening bid to start an auction." : "Free agents and AI teams' staff. Auctions run during transfer windows."}
       />
       <div className="flex flex-wrap items-center gap-3">
         <Tabs value={source} onValueChange={(v) => { setSource(v as Source); setSelected(null) }}>
@@ -143,15 +141,13 @@ export function MarketPage() {
             auctionFor(current.guid)
               ? <Button variant="outline" onClick={() => navigate("/transfers")}><Gavel /> In auction: go to transfer window</Button>
               : t.isOpen && (
-                <Button disabled={busy} onClick={async () => {
-                  setBusy(true); setError(null)
-                  try { await t.openAuction(current.guid); navigate("/transfers") } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
-                }}>
-                  {busy ? <Loader2 className="animate-spin" /> : <Gavel />} Nominate for auction from {fmtMoneyShort(minWage(current, t.settings))}
-                </Button>
+                <BidDialog
+                  person={current}
+                  fromTeam={source === "ai" ? current.contract.team : null}
+                  trigger={<Button><Gavel /> Nominate with an opening bid from {fmtMoneyShort(minWage(current, t.settings))}</Button>}
+                />
               )
           )}
-          {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
         </div>
       </div>
     </>

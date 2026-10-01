@@ -101,6 +101,11 @@ Steps 1–5 are done: Supabase is set up, Pages is deployed, and snapshots are p
 
 **Verified in game (2026-09-30, "League Test 5"):** window #1 was pulled and applied. Tatra signed Björn Daouadji (free-agent engineer) and Sergio Arbeloa, bought out from Eastwood, with André Zoom swapped to Eastwood. The user reports it all works in game.
 
+**Nominating = the opening bid (user's UX request, 2026-10-01):**
+- The market's "Nominate with an opening bid" button opens the same `BidDialog` (with `person` instead of `auction`).
+- It calls the `nominate` RPC (`supabase/migrations/006_nominate.sql`), which runs `open_auction` + `place_bid` in one transaction, so a refused bid leaves no empty auction. Nominating someone already in auction becomes a normal bid.
+- Test: `test/db-nominate.test.ts`. **Migration 006 must be run in the Supabase SQL editor before deploying.**
+
 **Transfer window page:** it shows auctions only while bidding runs. After the deadline it's cleared, and the results move to the History tab (every window, "Awaiting organizer" until `pull --mark-applied`). Bidding closes on a timer set to the exact deadline, not on a polling clock.
 
 ## Phase 3: HQ orders, live and verified in game

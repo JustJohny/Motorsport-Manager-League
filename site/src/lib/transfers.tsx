@@ -69,6 +69,8 @@ interface Transfers {
   committed: number
   reload: () => Promise<void>
   openAuction: (personGuid: string) => Promise<number>
+  /** Start an auction with the nominator's opening bid, all or nothing. */
+  nominate: (personGuid: string, wage: number, years: number, replacing: string) => Promise<void>
   placeBid: (auctionId: number, wage: number, years: number, replacing: string) => Promise<void>
   bidHistory: (auctionId: number) => Promise<PublicBid[]>
   /** All auctions of a window, for the history. */
@@ -194,6 +196,11 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
       const id = (await check(supabase!.rpc("open_auction", { person_guid: guid }))) as number
       await reload()
       return id
+    },
+    nominate: async (guid, wage, years, replacing) => {
+      if (demo) return demo.nominate(me, guid, wage, years, replacing), reload()
+      await check(supabase!.rpc("nominate", { person_guid: guid, yearly_wage: wage, years, replacing_guid: replacing }))
+      await reload()
     },
     placeBid: async (auctionId, wage, years, replacing) => {
       if (demo) return demo.placeBid(me, auctionId, wage, years, replacing), reload()

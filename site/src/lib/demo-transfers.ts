@@ -49,6 +49,12 @@ export function createDemoStore(league: League) {
       auctions.push(a)
       return a.id
     },
+    /** Like the nominate RPC: a refused opening bid leaves no auction behind. */
+    nominate(me: LeagueMemberRow, guid: string, wage: number, years: number, replacing: string) {
+      const before = auctions.length
+      const id = store.openAuction(me, guid)
+      try { store.placeBid(me, id, wage, years, replacing) } catch (e) { auctions.length = before; throw e }
+    },
     placeBid(me: LeagueMemberRow, auctionId: number, wage: number, years: number, replacing: string) {
       const a = auctions.find((x) => x.id === auctionId)!
       if (a.leading_team === me.team) throw new Error("You are already the highest bidder")

@@ -10,18 +10,36 @@ import { fmtMoney, fmtNum, humanize, statAverage } from "@/lib/format"
 import { useHqOrders } from "@/lib/hq"
 import { useParts } from "@/lib/parts"
 import { useLeague } from "@/lib/league"
-import { bidCost, nextMinBid } from "@/lib/rules"
+import { bidCost, buyout, minWage, nextMinBid } from "@/lib/rules"
 import { useTransfers, type Auction } from "@/lib/transfers"
 import { cn } from "@/lib/utils"
+import type { Person } from "@/lib/types"
 
 const JOB_FOR: Record<Auction["kind"], string> = { Driver: "Driver", Engineer: "EngineerLead", Mechanic: "Mechanic" }
 
-export function BidDialog({ auction, trigger }: { auction: Auction; trigger: React.ReactNode }) {
+/**
+ * A bid on a running auction, or (with `person`) a nomination: the nominator's opening bid,
+ * which starts the auction. Both use the same rules and budget check.
+ */
+export function BidDialog({ auction, person, fromTeam = null, trigger }: {
+  auction?: Auction
+  /** Nominate this person instead of bidding on `auction`. */
+  person?: Person
+  /** The AI team a nominated person is under contract at (null for a free agent). */
+  fromTeam?: string | null
+  trigger: React.ReactNode
+}) {
   const { me, league } = useLeague()
   const t = useTransfers()
   // Queued HQ orders and the queued part design commit budget too (hq_committed in the database).
   const hqCommitted = useHqOrders().committed(me.team) + useParts().committed(me.team)
-  const minBid = nextMinBid(Number(auction.min_wage), auction.leading_wage == null ? null : Number(auction.leading_wage), t.settings)
+  const target = auction?.person ?? person!
+  const kind = (auction?.kind ?? target.kind) as Auction["kind"]
+  const from = auction ? auction.from_team : fromTeam
+  const buyoutAmount = auction ? Number(auction.buyout) : from ? buyout(target, league.snapshot.gameDate) : 0
+  const minBid = auction
+    ? nextMinBid(Number(auction.min_wage), auction.leading_wage == null ? null : Number(auction.leading_wage), t.settings)
+    : minWage(target, t.settings)
   const [open, setOpen] = useState(false)
   const [wage, setWage] = useState(String(minBid))
   const [years, setYears] = useState("2")
@@ -30,23 +48,24 @@ export function BidDialog({ auction, trigger }: { auction: Auction; trigger: Rea
   const [busy, setBusy] = useState(false)
 
   const team = league.snapshot.teams.find((x) => x.name === me.team)
-  const candidates = (team?.staff ?? []).filter((s) => s.job === JOB_FOR[auction.kind] && s.person).map((s) => s.person!)
+  const candidates = (team?.staff ?? []).filter((s) => s.job === JOB_FOR[kind] && s.person).map((s) => s.person!)
   // People already being replaced by another auction I lead.
-  const taken = new Map([...t.myLeading.entries()].filter(([id]) => id !== auction.id).map(([, b]) => [b.replacing_guid, b]))
+  const taken = new Map([...t.myLeading.entries()].filter(([id]) => id !== auction?.id).map(([, b]) => [b.replacing_guid, b]))
   const replaced = candidates.find((p) => p.guid === replacing)
   const wageNum = Number(wage.replace(/[^\d]/g, "")) || 0
-  const cost = bidCost(wageNum, Number(auction.buyout), replaced?.contract.yearlyWages ?? 0, league.snapshot.gameDate, t.settings)
+  const cost = bidCost(wageNum, buyoutAmount, replaced?.contract.yearlyWages ?? 0, league.snapshot.gameDate, t.settings)
   const budget = league.privateTeams[me.team]?.budget ?? 0
   const left = budget - t.committed - hqCommitted - cost.total
   const problem = wageNum < minBid ? `The minimum bid is ${fmtMoney(minBid)}.`
-    : !replaced ? `Choose who the new ${humanize(JOB_FOR[auction.kind]).toLowerCase()} replaces.`
+    : !replaced ? `Choose who the new ${humanize(JOB_FOR[kind]).toLowerCase()} replaces.`
     : left < 0 ? "Not enough budget for this bid on top of your leading bids and HQ orders." : null
 
   const submit = async () => {
     setBusy(true)
     setError(null)
     try {
-      await t.placeBid(auction.id, wageNum, Number(years), replacing)
+      if (auction) await t.placeBid(auction.id, wageNum, Number(years), replacing)
+      else await t.nominate(target.guid, wageNum, Number(years), replacing)
       setOpen(false)
     } catch (e) {
       setError((e as Error).message)
@@ -60,12 +79,17 @@ export function BidDialog({ auction, trigger }: { auction: Auction; trigger: Rea
       <DialogTrigger asChild>{trigger}</DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Bid for {auction.person.name}</DialogTitle>
+          <DialogTitle>{auction ? `Bid for ${target.name}` : `Nominate ${target.name}`}</DialogTitle>
           <DialogDescription>
-            {humanize(auction.kind)} · {fmtNum(statAverage(auction.person.stats))} avg ·{" "}
-            {auction.from_team ? `under contract at ${auction.from_team}` : "free agent"}
-            {auction.leading_team && <> · leader {auction.leading_team} at {fmtMoney(Number(auction.leading_wage))}/yr</>}
+            {humanize(kind)} · {fmtNum(statAverage(target.stats))} avg ·{" "}
+            {from ? `under contract at ${from}` : "free agent"}
+            {auction?.leading_team && <> · leader {auction.leading_team} at {fmtMoney(Number(auction.leading_wage))}/yr</>}
           </DialogDescription>
+          {!auction && (
+            <p className="text-xs text-muted-foreground">
+              Your opening bid starts the auction. Other teams can outbid you until the transfer window closes.
+            </p>
+          )}
         </DialogHeader>
 
         <div className="grid gap-4">
@@ -100,14 +124,14 @@ export function BidDialog({ auction, trigger }: { auction: Auction; trigger: Rea
               </Select>
             </div>
           </div>
-          {auction.from_team && replaced && (
-            <p className="text-xs text-muted-foreground">{replaced.name} moves to {auction.from_team} in a swap.</p>
+          {from && replaced && (
+            <p className="text-xs text-muted-foreground">{replaced.name} moves to {from} in a swap.</p>
           )}
-          {!auction.from_team && replaced && <p className="text-xs text-muted-foreground">{replaced.name} is released to the market.</p>}
+          {!from && replaced && <p className="text-xs text-muted-foreground">{replaced.name} is released to the market.</p>}
 
           <div className="grid grid-cols-[1fr_auto] gap-y-1 rounded-lg bg-muted/50 p-3 text-sm tabular-nums">
             <span className="text-muted-foreground">Sign-on fee ({Math.round(t.settings.sign_on_fee_pct * 100)}%)</span><span className="text-right">{fmtMoney(cost.signOnFee)}</span>
-            {cost.buyout > 0 && <><span className="text-muted-foreground">Buyout to {auction.from_team}</span><span className="text-right">{fmtMoney(cost.buyout)}</span></>}
+            {cost.buyout > 0 && <><span className="text-muted-foreground">Buyout to {from}</span><span className="text-right">{fmtMoney(cost.buyout)}</span></>}
             <span className="text-muted-foreground">Extra wages this season</span><span className="text-right">{fmtMoney(cost.seasonWages)}</span>
             <span className="font-medium">This bid commits</span><span className="text-right font-medium">{fmtMoney(cost.total)}</span>
             <span className="mt-2 text-muted-foreground">Budget</span><span className="mt-2 text-right">{fmtMoney(budget)}</span>
@@ -125,7 +149,7 @@ export function BidDialog({ auction, trigger }: { auction: Auction; trigger: Rea
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
           <Button onClick={() => void submit()} disabled={busy || !!problem} title={problem ?? undefined}>
-            {busy && <Loader2 className="animate-spin" />} Bid {fmtMoney(wageNum)}/yr
+            {busy && <Loader2 className="animate-spin" />} {auction ? "Bid" : "Nominate with"} {fmtMoney(wageNum)}/yr
           </Button>
         </DialogFooter>
         {problem && !error && <p className="-mt-2 text-right text-xs text-muted-foreground">{problem}</p>}

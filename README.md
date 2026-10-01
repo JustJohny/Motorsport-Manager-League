@@ -54,7 +54,7 @@ A Vite + React + shadcn/ui site on GitHub Pages, with Supabase for data and Disc
 - `npm run dev` in `site/` without Supabase settings runs a demo on a local extract, including a local auction simulation. See `site/README.md`.
 
 ### Staff auction (transfer windows)
-The organizer opens a window with a deadline on the Organizer page. Members nominate free agents or AI teams' staff from the Staff market and bid live on the Transfer window page. Rules (enforced in `supabase/migrations/002_auctions.sql`, mirrored for display in `src/league-rules.ts`, tunable in the `league_settings` table):
+The organizer opens a window with a deadline on the Organizer page. Members nominate free agents or AI teams' staff from the Staff market. Nominating places the nominator's opening bid in the same dialog, all or nothing (`nominate`, migration 006). Everyone then bids live on the Transfer window page. Rules (enforced in `supabase/migrations/002_auctions.sql`, mirrored for display in `src/league-rules.ts`, tunable in the `league_settings` table):
 - A bid is a yearly wage for 1–3 seasons and names who in the bidder's team it replaces. Bids beat the leader by 5%, and nobody can raise their own leading bid.
 - Opening price = base per role × (stat average / 10)², at least $50K.
 - Winners pay a 25% sign-on fee. AI teams' staff also cost a buyout (the remaining contract value) and swap with the released person.
