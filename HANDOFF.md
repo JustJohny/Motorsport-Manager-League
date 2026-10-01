@@ -254,6 +254,30 @@ npx tsx src/cli.ts validate "<save>"
    - It also shows what's waiting for the next pull (queued designs, HQ orders, transfer window) and has collapsible rules and troubleshooting.
 5. Before the league starts for real: remove the placeholder members (`alice_discord`, `bob_discord`) from `league.json`, test with a second real Discord account, and settle the auction tuning (item 2).
 
+## Phase 5 idea: works engine programmes (rules agreed 2026-10-01, not built)
+A member invests in their own engine programme, becomes an engine supplier, and sells engines to other members.
+
+**Rules (the user's choices):**
+- **It only pays off where the engine isn't spec.** A programme can be built up while the league is in the ERS (engine and gearbox are spec there), but its engine only counts in a series without a spec engine, e.g. the WMC (`rules.specParts` = []).
+- **Seasonal R&D investment:** members put money into areas (power/engine level, fuel efficiency, reliability, …) over the season. At the season change it becomes next year's supplier stats.
+- **Customers: members only, at a price the owner sets.** AI teams keep MM's suppliers.
+- **Switching supplier: between seasons only**, as in MM.
+
+**What MM has (from Assembly-CSharp):**
+- `supplierManager.engineSuppliers`: `Supplier` objects with:
+  - `name`, `mBasePrice`, `mTier`
+  - `teamDiscounts`, `mTeamsThatCannotBuy`
+  - `min/maxEngineLevelModifier` → `mRandomEngineLevelModifier` (rolled by `RollRandomBaseStatModifier`; set min = max to make it deterministic)
+  - `supplierStats` (CarChassisStats.Stats → value; Tatra's "Hammer": FuelEfficiency +2, Improvability −5)
+- `GetPriceNoDiscount` = base + engine level modifier × mPriceMultiplier × mScalar.
+- A car holds its suppliers in `car.chassisStats.supplierEngine` (also brakes, fuel, materials, battery, ERS).
+- `NextYearCarDesign` takes the chosen supplier at the season change. In non-spec series it adds `randomEngineLevelModifier` to every engine part's stat; the price is charged as a "Next year car" transaction.
+
+**Plan sketch:**
+- The toolkit creates a league `Supplier` in `engineSuppliers` (and in `championshipSuppliers` for the championship), with stats from the programme, and sets it on the owner's and customers' next-year car.
+- Money moves customer → owner at the season change.
+- Before building, test a season change in game with the toolkit: how suppliers are chosen for member (AI-run) teams at the season end, and when chassis stats pick up supplier effects.
+
 ## Working notes for the assistant
 - The user plays MM under Wine on Linux (CachyOS). They test in game and report back, so give them concrete things to check.
 - Never overwrite the user's own saves. Write new `SaveLeague Test N.sav` files.
