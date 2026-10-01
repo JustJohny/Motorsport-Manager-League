@@ -2,6 +2,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { PageHeader } from "@/components/page-header"
+import { RaceCycle } from "@/components/race-cycle"
 import { WindowControls } from "@/components/window-controls"
 import { fmtDate } from "@/lib/format"
 import { useLeague } from "@/lib/league"
@@ -14,13 +15,14 @@ export function OrganizerPage() {
 
   return (
     <>
-      <PageHeader title="Organizer" description="League members, the transfer window and the data currently on the site." />
+      <PageHeader title="Organizer" description="The race cycle step by step, the transfer window, league members and the data currently on the site." />
+      <RaceCycle />
       <div className="grid gap-4 lg:grid-cols-3">
         <WindowControls />
         <Card size="sm">
           <CardHeader>
             <CardTitle>Published snapshot #{league.snapshotId}</CardTitle>
-            <CardDescription>Run <code>mmsave publish &lt;save&gt; --league league.json</code> after each race.</CardDescription>
+            <CardDescription>What members see now. Publish again at each checkpoint (see the race cycle above).</CardDescription>
           </CardHeader>
           <CardContent className="grid grid-cols-2 gap-y-1 text-sm">
             <span className="text-muted-foreground">Published</span><span>{new Date(league.publishedAt).toLocaleString()}</span>

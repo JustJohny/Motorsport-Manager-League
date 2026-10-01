@@ -74,7 +74,7 @@ Projects the in-game AI starts on member teams are shown on the HQ tab as "AI pr
 After the deadline: `mmsave pull -o changes.json --mark-applied`, then `mmsave apply <save> changes.json …`, and publish again after the race.
 
 ## Organizer workflow
-Each race has two checkpoints (after the race, and just before the next one). The step-by-step commands are in [docs/organizer-checklist.md](docs/organizer-checklist.md).
+Each race has two checkpoints (after the race, and just before the next one). The site's **Organizer page** walks through them step by step: it detects the current checkpoint from the published game date, fills in the save names, and has copyable commands, the rules that keep the cycle working, and what to do when something fails.
 
 ## Game schema
 `schema/mm-1.53.json` holds the declared C# type of every serialized field, generated from the game's `Assembly-CSharp.dll`. The toolkit uses it to add the `$type` hints the game needs when edits move objects around (see `docs/save-schema.md`). To regenerate it for another game version:
