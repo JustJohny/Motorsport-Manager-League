@@ -1,6 +1,6 @@
 # Handoff: MM League Toolkit
 
-_Last updated 2026-10-01 (auction and HQ orders live and verified in game; next: phase 4, part development). Read this first in a new session, then `README.md` and `docs/save-schema.md`._
+_Last updated 2026-10-01 (auction, HQ orders and part development all live and verified in game). Read this first in a new session, then `README.md` and `docs/save-schema.md`._
 
 ## The goal
 Run a **Motorsport Manager 1 (v1.53)** online league the way F1 Manager 24 community leagues run:
@@ -177,13 +177,13 @@ npx tsx src/cli.ts validate "<save>"
 1. **Phase 3 (done):** only left to see a toolkit-started build complete in game, which happens naturally as the league plays on.
 2. **Phase 2 (done):** test with a second real member.
    - Tuning to discuss: opening prices can be below an AI driver's current wage, and buyouts of long contracts are large ($11M for a 20-year-old on a deal to 2018).
-3. **Phase 4: part development.** Rules agreed with the user (2026-10-01), replacing the earlier "formula from team assets" idea:
+3. **Phase 4: part development (done, verified by the user 2026-10-01: the site works and the applied save reflects the changes in game).** Rules agreed with the user (2026-10-01), replacing the earlier "formula from team assets" idea:
    - **The game builds it**, like HQ: the site sends the design, the toolkit starts it in MM, and MM finishes it with its own stats and time.
    - **Components from MM's real list**, per part type, with MM's unlock rules (Design Centre level, designer).
    - **Parts the AI designs on member teams are cancelled and refunded**, as with HQ projects.
    - **Members choose fitting** (which part goes on car 1 and car 2).
    - **One design at a time per team, as in MM.** MM has a single design slot per team, so the earlier "one per part type" choice was dropped (2026-10-01).
-   - **Both cars in one order**, at MM's price for the second build. It counts as one design.
+   - **Two cars: like MM.** One part per design; a second copy only comes from a lead-engineer component with `BonusCreateTwoParts`. This replaces the earlier "both cars in one order" choice, which MM doesn't support.
    - **Paid upfront at the player price** (full `materialsCost` + components, not the AI's 10 %), with money reserved on order and paid at apply, as with HQ.
    - **Two checkpoints per race cycle** (the user's plan, as in vanilla MM, where you fit new parts before the next race):
      1. After the race: publish, members act, then pull + apply. The organizer advances in MM to just before the next race, and parts get built.
@@ -234,10 +234,12 @@ npx tsx src/cli.ts validate "<save>"
        - The designer shows the starting point (MM's `SetBaseStats`) next to the estimated new part (`predictPart`). Performance and max performance match MM's own design parts exactly; max reliability is within MM's ±10 % roll.
        - The Parts tab is split into the sub-tabs "Design a new part" and "Your parts: fitting & improvement", so the mechanics slider can't be mistaken for part of the design.
        - Lucide icons throughout (the user wants game-like icons, never emoji): part types, stats, tier stars in rarity colours (Basic to Legendary), component summary lines, slots, cost and time.
-     - Next: the user publishes ("League Test 10" or newer) and tries the Parts tab live. Then a real cycle: order, pull, apply, play, publish, fit, pull, apply, race.
+     - **Live and verified (2026-10-01):** the user published, used the Parts tab, then pulled and applied. The save reflects the changes in game.
+     - Still to see in a real league cycle: the two-checkpoint rhythm (order, pull, apply, advance, publish, fit, pull, apply, race), and AI-built parts being removed on a member team.
      - **AI-finished parts on member teams: remove and refund** (user's decision). `removeUnorderedParts` does this: parts built after the league start whose components don't match an ordered design. A fitted one is replaced by the best spare first, and one refund is made per design.
-   - MM internals: see docs/save-schema.md, "Part design and improvement". Component display names are localised (`mNameID`) and not in the save. Use `mCustomComponentName`, or find the localisation file in the game data.
-4. An organizer workflow document (between-race checklist).
+   - MM internals: see docs/save-schema.md, "Part design and improvement". MM components have no names; the site shows MM's summary text, as the game does.
+4. **An organizer workflow document (between-race checklist)** for the two-checkpoint cycle: publish, pull, apply, advance, publish, pull, apply, race. All four phases are in place, so this is the natural next step.
+5. Before the league starts for real: remove the placeholder members (`alice_discord`, `bob_discord`) from `league.json`, test with a second real Discord account, and settle the auction tuning (item 2).
 
 ## Working notes for the assistant
 - The user plays MM under Wine on Linux (CachyOS). They test in game and report back, so give them concrete things to check.
