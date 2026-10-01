@@ -181,7 +181,7 @@ npx tsx src/cli.ts validate "<save>"
 ## Next steps
 1. **Phase 3 (done):** only left to see a toolkit-started build complete in game, which happens naturally as the league plays on.
 2. **Phase 2 (done):** test with a second real member.
-   - **Auction tuning, agreed 2026-10-01 (migration `007_auction_tuning.sql`):**
+   - **Auction tuning, agreed 2026-10-01 (migration `007_auction_tuning.sql`, run on Supabase and checked by the user the same day):**
      - The buyout is MM's `ContractPerson.GetContractTerminationCost`: the months of wage left, clamped to 1..6. It was the whole rest of the contract (Tanvir Jha: $18.2M → $4.1M).
      - AI staff open at no less than their current wage.
      - The formula's bases are recalibrated to the median AI wage per skill in the ERS: Driver $2.24M, Engineer $0.74M, Mechanic $0.37M (were 1.5M / 0.25M / 0.3M).
