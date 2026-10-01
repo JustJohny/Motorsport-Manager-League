@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react"
 import { useLeague } from "./league"
 import { nextHqStep, unorderedProject } from "./rules"
-import { demoMode, supabase } from "./supabase"
+import { demoMode, supabase, watchTable } from "./supabase"
 
 export interface HqOrder {
   id: number
@@ -62,10 +62,7 @@ export function HqOrdersProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (demoMode) return
     void reload()
-    const channel = supabase!
-      .channel("hq_orders")
-      .on("postgres_changes", { event: "*", schema: "public", table: "hq_orders" }, () => void reload())
-      .subscribe()
+    const channel = watchTable(supabase!.channel("hq_orders"), "hq_orders", () => void reload()).subscribe()
     return () => void supabase!.removeChannel(channel)
   }, [reload])
 

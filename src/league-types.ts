@@ -2,6 +2,11 @@
 // This file must not import anything: the website (site/) imports it directly.
 
 export interface LeagueConfig {
+  /**
+   * The series on the website this league file publishes to and pulls from: one per MM save.
+   * `id` is a short slug (lower case, digits, dashes), `name` what the site shows.
+   */
+  series?: { id: string; name?: string };
   /** Championship the league runs in, by name ("European Racing Series") or championshipID. */
   championship?: string | number;
   /**

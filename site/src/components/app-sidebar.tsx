@@ -1,4 +1,4 @@
-import { CalendarDays, Flag, Fan, Gavel, Scale, Moon, Shield, ShoppingBag, Sun, Trophy, Users, Wrench } from "lucide-react"
+import { CalendarDays, Check, ChevronsUpDown, Flag, Fan, Gavel, Scale, Moon, Shield, ShoppingBag, Sun, Trophy, Users, Wrench } from "lucide-react"
 import { NavLink, useLocation } from "react-router"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -24,8 +24,8 @@ const NAV = [
 ]
 
 export function AppSidebar() {
-  const { me, league } = useLeague()
-  const { session, signOut } = useLeagueContext()
+  const { me, league, series, current } = useLeague()
+  const { session, signOut, switchSeries } = useLeagueContext()
   const { theme, toggle } = useTheme()
   const { pathname } = useLocation()
   const transfers = useTransfers()
@@ -37,17 +37,40 @@ export function AppSidebar() {
   return (
     <Sidebar>
       <SidebarHeader>
-        <div className="flex items-center gap-2 px-2 py-1.5">
-          <div className="flex size-8 items-center justify-center rounded-md bg-primary text-primary-foreground">
-            <Flag className="size-4" />
-          </div>
-          <div className="min-w-0 leading-tight">
-            <div className="truncate text-sm font-semibold">{ch.name}</div>
-            <div className="truncate text-xs text-muted-foreground">
-              {ch.lastRace ? `After round ${ch.lastRace.round} · ${ch.lastRace.circuit}` : "Pre-season"}
-            </div>
-          </div>
-        </div>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild disabled={series.length < 2}>
+                <SidebarMenuButton size="lg" className="disabled:opacity-100" title={series.length > 1 ? "Switch series" : undefined}>
+                  <div className="flex size-8 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground">
+                    <Flag className="size-4" />
+                  </div>
+                  <div className="min-w-0 flex-1 text-left leading-tight">
+                    <div className="truncate text-sm font-semibold">{current.name}</div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {current.name !== ch.name && `${ch.name} · `}
+                      {ch.lastRace ? `After round ${ch.lastRace.round} · ${ch.lastRace.circuit}` : "Pre-season"}
+                    </div>
+                  </div>
+                  {series.length > 1 && <ChevronsUpDown className="size-4 text-muted-foreground" />}
+                </SidebarMenuButton>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-(--radix-dropdown-menu-trigger-width) min-w-56">
+                <DropdownMenuLabel>Your series</DropdownMenuLabel>
+                {series.map((s) => (
+                  <DropdownMenuItem key={s.id} onSelect={() => s.id !== current.id && switchSeries(s.id)}>
+                    <Flag />
+                    <div className="min-w-0 flex-1 leading-tight">
+                      <div className="truncate">{s.name}</div>
+                      <div className="truncate text-xs text-muted-foreground">{s.team}{s.role === "organizer" ? " · organizer" : ""}</div>
+                    </div>
+                    {s.id === current.id && <Check />}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </SidebarMenuItem>
+        </SidebarMenu>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>

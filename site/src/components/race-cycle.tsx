@@ -16,6 +16,19 @@ import { cn } from "@/lib/utils"
 
 type Checkpoint = "after" | "before"
 
+/**
+ * The organizer's files for a series: its league file, its changes file, and the prefix of its MM
+ * save names, so two series never share a save or a changes.json. The league from before series
+ * existed ("main") keeps its "League …" save names.
+ */
+export function seriesFiles(series: { id: string; name: string }) {
+  return {
+    league: `league-${series.id}.json`,
+    changes: `changes-${series.id}.json`,
+    prefix: series.id === "main" ? "League" : series.name.replace(/[^\w .-]/g, "").trim() || series.id,
+  }
+}
+
 const CRASH_LOG = "~/Downloads/Motorsport.Manager.v1.53.ALL.DLCs/Motorsport Manager v1.53/MM_Data/output_log.txt"
 const day = 86_400_000
 const time = (d: string) => Date.parse(d.slice(0, 19) + "Z")
@@ -35,7 +48,7 @@ function useCycle() {
   return { last, next, current }
 }
 
-function CopyCommand({ command }: { command: string }) {
+export function CopyCommand({ command }: { command: string }) {
   const [copied, setCopied] = useState(false)
   const copy = async () => {
     await navigator.clipboard.writeText(command)
@@ -76,7 +89,7 @@ function Step({ n, icon: Icon, title, done, children }: { n: number; icon: Lucid
 const Save = ({ children }: { children: ReactNode }) => <strong className="font-medium text-foreground">{children}</strong>
 
 export function RaceCycle() {
-  const { league } = useLeague()
+  const { league, current: series } = useLeague()
   const { last, next, current } = useCycle()
   const [tab, setTab] = useState<Checkpoint>(current)
   const hq = useHqOrders().orders
@@ -86,12 +99,14 @@ export function RaceCycle() {
 
   const lastRound = last?.round ?? 0
   const nextRound = next?.round ?? lastRound + 1
-  const post = `League R${lastRound} Post`
-  const pre = `League R${nextRound} Pre`
+  const files = seriesFiles(series)
+  const post = `${files.prefix} R${lastRound} Post`
+  const pre = `${files.prefix} R${nextRound} Pre`
   const cmd = {
-    publish: (save: string) => `npx tsx src/cli.ts publish "Save${save}" --league league.json`,
-    pull: "npx tsx src/cli.ts pull -o changes.json --mark-applied",
-    apply: (save: string) => `npx tsx src/cli.ts apply "Save${save}" changes.json --name "${save} (league)"`,
+    publish: (save: string) => `npx tsx src/cli.ts publish "Save${save}" --league ${files.league}`,
+    pull: `npx tsx src/cli.ts pull --league ${files.league} -o ${files.changes} --mark-applied`,
+    suppliers: (save: string) => `npx tsx src/cli.ts suppliers "Save${save}" --league ${files.league}`,
+    apply: (save: string) => `npx tsx src/cli.ts apply "Save${save}" ${files.changes} --name "${save} (league)"`,
   }
   const published = `Published ${new Date(league.publishedAt).toLocaleString()} with game date ${fmtDate(league.snapshot.gameDate)}.`
   const windowNote = !w ? "No transfer window." : w.status === "applied" ? `Transfer window #${w.id} is applied.`
@@ -193,13 +208,13 @@ export function RaceCycle() {
                 <CopyCommand command={cmd.apply(pre)} />
               </Step>
               <Step n={5} icon={Flag} title={<>In MM, load <Save>{pre} (league)</Save> and race</>}>
-                <p>Practice, qualifying and race {nextRound}. Then save as <Save>League R{nextRound} Post</Save> and start again at A.</p>
+                <p>Practice, qualifying and race {nextRound}. Then save as <Save>{files.prefix} R{nextRound} Post</Save> and start again at A.</p>
               </Step>
             </ol>
           </TabsContent>
         </Tabs>
 
-        {league.snapshot.championship.calendar.filter((e) => !e.ended).length <= 1 && <PreSeason cmd={cmd} />}
+        {league.snapshot.championship.calendar.filter((e) => !e.ended).length <= 1 && <PreSeason cmd={cmd} prefix={files.prefix} />}
 
         <Details icon={ShieldAlert} title="Rules that keep it working">
           <li><b>Always apply to the save you just published.</b> Design options, parts and prices come from it; with a different save, apply stops with an error rather than guess.</li>
@@ -212,6 +227,10 @@ export function RaceCycle() {
           <li><b>The game crashes or a save won't load:</b> the cause is at the end of <code className="break-all">{CRASH_LOG}</code>.</li>
           <li><b>Apply stops with an error:</b> nothing was written. The message names the change, e.g. <code>Change #4 (startDesign): …</code>.</li>
           <li><b>Members say their page is out of date:</b> publish the latest save. The header shows the game date and publish time.</li>
+          <li>
+            <b>Members see no next season's suppliers:</b> MM only offers them after the final race. Check what a save would publish
+            with <code className="break-all">npx tsx src/cli.ts suppliers "Save&lt;name&gt;" --league {files.league}</code>.
+          </li>
         </Details>
       </CardContent>
     </Card>
@@ -219,8 +238,8 @@ export function RaceCycle() {
 }
 
 /** Shown from the final race weekend: next season's suppliers need two extra stops in MM. */
-function PreSeason({ cmd }: { cmd: { pull: string; publish: (s: string) => string; apply: (s: string) => string } }) {
-  const end = "League Season End", pre = "League Pre-season"
+function PreSeason({ cmd, prefix }: { cmd: { pull: string; publish: (s: string) => string; apply: (s: string) => string; suppliers: (s: string) => string }; prefix: string }) {
+  const end = `${prefix} Season End`, pre = `${prefix} Pre-season`
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2">
       <span className="flex items-center gap-2 text-sm font-medium"><Settings2 className="size-4" /> Season end: next season's suppliers</span>
@@ -230,6 +249,9 @@ function PreSeason({ cmd }: { cmd: { pull: string; publish: (s: string) => strin
       </span>
       <ol>
         <Step n={1} icon={Gamepad2} title={<>After the final race, advance past the season's end (before pre-season) and save as <Save>{end}</Save></>}>
+          Check that MM has drawn next season's deals: it should list each member team with about 4 engine, 6 brakes,
+          5 fuel and 4 materials deals. If it says the draw isn't made yet, advance a few more days and save again.
+          <CopyCommand command={cmd.suppliers(end)} />
           Then publish it, so members see MM's offers and can choose.
           <CopyCommand command={cmd.publish(end)} />
         </Step>
@@ -237,6 +259,8 @@ function PreSeason({ cmd }: { cmd: { pull: string; publish: (s: string) => strin
           A few days in, so every team has started next year's car.
         </Step>
         <Step n={3} icon={Upload} title="Publish, pull and apply">
+          <CopyCommand command={cmd.suppliers(pre)} />
+          Each member team should now say "MM designing". Then:
           <CopyCommand command={cmd.publish(pre)} />
           <CopyCommand command={cmd.pull} />
           <CopyCommand command={cmd.apply(pre)} />

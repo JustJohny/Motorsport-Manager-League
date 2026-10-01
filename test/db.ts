@@ -6,7 +6,7 @@ import { join } from "node:path";
  * An in-memory Postgres with a stand-in for Supabase's auth schema, roles and realtime
  * publication, and every migration in supabase/migrations applied.
  */
-export async function leagueDb() {
+export async function leagueDb(opts: { before?: string } = {}) {
   const db = new PGlite();
   await db.exec(`
     create role anon; create role authenticated; create role service_role bypassrls;
@@ -21,13 +21,22 @@ export async function leagueDb() {
     alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
   `);
   const dir = join(import.meta.dirname, "..", "supabase", "migrations");
-  for (const f of readdirSync(dir).filter((f) => f.endsWith(".sql")).sort()) await db.exec(readFileSync(join(dir, f), "utf8"));
+  const files = readdirSync(dir).filter((f) => f.endsWith(".sql")).sort();
+  // `before`: stop before that migration, to test it on existing data (`migrate` runs the rest).
+  const stop = opts.before ? files.findIndex((f) => f.startsWith(opts.before!)) : files.length;
+  for (const f of files.slice(0, stop)) await db.exec(readFileSync(join(dir, f), "utf8"));
+  const migrate = async () => { for (const f of files.slice(stop)) await db.exec(readFileSync(join(dir, f), "utf8")); };
 
   let users = 0;
+  // The series every request is for, as the site and toolkit send it in the x-series header.
+  let series = "test";
+  const setHeaders = (s: string | null) => db.query(`select set_config('request.headers', $1, false)`, [JSON.stringify(s ? { "x-series": s } : {})]);
+  await setHeaders(series);
   /** Run SQL as a role; `discord` makes it a logged-in Discord user. Errors come back as { error }. */
-  async function as<T = Record<string, unknown>>(role: "anon" | "authenticated" | "service_role", discord: string | null, sql: string, params: unknown[] = []) {
+  async function as<T = Record<string, unknown>>(role: "anon" | "authenticated" | "service_role", discord: string | null, sql: string, params: unknown[] = [], inSeries: string | null = series) {
     const claims = discord ? { sub: await userId(discord), user_metadata: { name: `${discord}#0` } } : {};
     await db.query(`select set_config('request.jwt.claims', $1, false)`, [JSON.stringify(claims)]);
+    await setHeaders(inSeries);
     await db.exec(`set role ${role}`);
     try {
       return { rows: (await db.query<T>(sql, params)).rows, error: null as string | null };
@@ -46,8 +55,14 @@ export async function leagueDb() {
     }
     return ids.get(discord)!;
   }
-  const member = (discord: string) => ({
-    query: <T = Record<string, unknown>>(sql: string, params: unknown[] = []) => as<T>("authenticated", discord, sql, params),
+  const member = (discord: string, inSeries?: string | null) => ({
+    query: <T = Record<string, unknown>>(sql: string, params: unknown[] = []) => as<T>("authenticated", discord, sql, params, inSeries === undefined ? series : inSeries),
   });
-  return { db, as, member, service: <T = Record<string, unknown>>(sql: string, params: unknown[] = []) => as<T>("service_role", null, sql, params) };
+  return {
+    db, as, member, migrate,
+    service: <T = Record<string, unknown>>(sql: string, params: unknown[] = [], inSeries?: string | null) =>
+      as<T>("service_role", null, sql, params, inSeries === undefined ? series : inSeries),
+    /** Switch the default series (direct `db.query` calls use it too). */
+    useSeries: async (s: string) => { series = s; await setHeaders(s); },
+  };
 }

@@ -49,6 +49,6 @@ export function memberRows(cfg: LeagueConfig, state: LeagueState): LeagueMemberR
  * member list and inserts the snapshot in one transaction. If a network error hides the reply
  * after the insert, the retry adds a duplicate snapshot, which is harmless: the site reads the newest.
  */
-export async function publish(env: SupabaseEnv, members: LeagueMemberRow[], split: SplitSnapshot): Promise<number> {
-  return Number(await rest<number>(env, "POST", "rpc/publish_snapshot", { members, snapshot: split }));
+export async function publish(env: SupabaseEnv, members: LeagueMemberRow[], split: SplitSnapshot, seriesName?: string): Promise<number> {
+  return Number(await rest<number>(env, "POST", "rpc/publish_snapshot", { members, snapshot: split, series_name: seriesName ?? null }));
 }

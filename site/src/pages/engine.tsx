@@ -12,7 +12,7 @@ import { Input } from "@/components/ui/input"
 import { PageHeader } from "@/components/page-header"
 import { fmtMoney, fmtMoneyShort, fmtPct, statAverage } from "@/lib/format"
 import { useLeague } from "@/lib/league"
-import { demoMode, supabase } from "@/lib/supabase"
+import { demoMode, supabase, watchTable } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
 
 interface Programme { team: string; name: string; founded_season: number; offering: boolean; customer_price: number; customer_detuned: boolean }
@@ -42,7 +42,7 @@ function useEngineData() {
     if (demoMode) return
     void reload()
     const ch = supabase!.channel("engines")
-    for (const table of ["engine_programmes", "engine_plans", "engine_spend", "engine_customers"]) ch.on("postgres_changes", { event: "*", schema: "public", table }, () => void reload())
+    for (const table of ["engine_programmes", "engine_plans", "engine_spend", "engine_customers"]) watchTable(ch, table, () => void reload())
     ch.subscribe()
     return () => void supabase!.removeChannel(ch)
   }, [reload])

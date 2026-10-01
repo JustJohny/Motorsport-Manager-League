@@ -1,4 +1,5 @@
 {
+  "series": { "id": "ers", "name": "ERS league" },
   "championship": "European Racing Series",
   "members": [
     { "member": "organizer", "team": "Tatra Racing", "discord": "your_discord_username", "organizer": true }

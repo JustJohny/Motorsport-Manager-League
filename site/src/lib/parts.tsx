@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react"
 import { planDesign } from "../../../src/part-design.ts"
 import { useLeague } from "./league"
-import { demoMode, supabase } from "./supabase"
+import { demoMode, supabase, watchTable } from "./supabase"
 import type { Part, TeamDesign, TeamPrivate } from "./types"
 
 export interface DesignOrder {
@@ -96,7 +96,7 @@ export function PartsProvider({ children }: { children: ReactNode }) {
     void reload()
     const channel = supabase!.channel("parts")
     for (const table of ["design_orders", "part_fitting", "part_improvement"]) {
-      channel.on("postgres_changes", { event: "*", schema: "public", table }, () => void reload())
+      watchTable(channel, table, () => void reload())
     }
     channel.subscribe()
     return () => void supabase!.removeChannel(channel)

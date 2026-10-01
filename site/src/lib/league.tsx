@@ -1,12 +1,20 @@
 import type { Session } from "@supabase/supabase-js"
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react"
-import { demoMode, supabase } from "./supabase"
+import { demoMode, setSeries, supabase } from "./supabase"
 import type { LeagueMemberRow, LeagueState, Person, PublicSnapshot, TeamPrivate } from "./types"
 
 export interface LoginRow {
   discord_username: string
   display_name: string | null
   last_seen: string
+}
+
+/** A series (one MM save each) the user is in, and their team there. */
+export interface SeriesRow {
+  id: string
+  name: string
+  team: string
+  role: "member" | "organizer"
 }
 
 export interface League {
@@ -24,15 +32,17 @@ type Status =
   | { kind: "loading" }
   | { kind: "signedOut" }
   | { kind: "notMember"; username: string }
-  | { kind: "noSnapshot"; me: LeagueMemberRow }
+  | { kind: "noSnapshot"; me: LeagueMemberRow; series: SeriesRow[]; current: SeriesRow }
   | { kind: "error"; message: string }
-  | { kind: "ready"; me: LeagueMemberRow; league: League }
+  | { kind: "ready"; me: LeagueMemberRow; league: League; series: SeriesRow[]; current: SeriesRow }
 
 interface Ctx {
   status: Status
   session: Session | null
   signIn: () => Promise<void>
   signOut: () => Promise<void>
+  /** Load another series the user is in. */
+  switchSeries: (id: string) => void
 }
 
 const LeagueContext = createContext<Ctx | null>(null)
@@ -47,8 +57,12 @@ export function useLeagueContext() {
 export function useLeague() {
   const { status } = useLeagueContext()
   if (status.kind !== "ready") throw new Error("league not loaded")
-  return { me: status.me, league: status.league }
+  return { me: status.me, league: status.league, series: status.series, current: status.current }
 }
+
+const SERIES_KEY = "mm-league-series"
+const savedSeries = () => { try { return localStorage.getItem(SERIES_KEY) } catch { return null } }
+const saveSeries = (id: string) => { try { localStorage.setItem(SERIES_KEY, id) } catch { /* private window */ } }
 
 async function loadDemo(): Promise<Status> {
   const res = await fetch(`${import.meta.env.BASE_URL}demo-state.json`)
@@ -59,9 +73,12 @@ async function loadDemo(): Promise<Status> {
   const members = state.teams.filter((t) => t.member).map((t): LeagueMemberRow => ({
     discord_username: t.member!, member: t.member!, team: t.name, role: t.name === me.team ? "organizer" : "member",
   }))
+  const current: SeriesRow = { id: "demo", name: state.championship.name, team: me.team, role: "organizer" }
   return {
     kind: "ready",
     me,
+    series: [current],
+    current,
     league: {
       snapshotId: 0,
       publishedAt: state.extractedAt,
@@ -80,9 +97,22 @@ async function loadDemo(): Promise<Status> {
   }
 }
 
-async function loadLeague(): Promise<Status> {
+async function loadLeague(preferred: string | null): Promise<Status> {
   const sb = supabase!
   await sb.rpc("touch_login")
+  // The series this Discord account is in; the last one used, else the first.
+  const seriesRes = await sb.rpc("my_series")
+  if (seriesRes.error) return { kind: "error", message: seriesRes.error.message }
+  const series = (seriesRes.data ?? []) as SeriesRow[]
+  const current = series.find((x) => x.id === preferred) ?? series[0]
+  if (!current) {
+    const { data } = await sb.auth.getUser()
+    const name = String(data.user?.user_metadata?.name ?? "").split("#")[0] || "(unknown)"
+    return { kind: "notMember", username: name.toLowerCase() }
+  }
+  setSeries(current.id)
+  saveSeries(current.id)
+
   const meRes = await sb.rpc("my_member")
   if (meRes.error) return { kind: "error", message: meRes.error.message }
   const me = meRes.data as LeagueMemberRow | null
@@ -94,7 +124,7 @@ async function loadLeague(): Promise<Status> {
 
   const snap = await sb.from("snapshots").select("id, created_at, public").order("id", { ascending: false }).limit(1).maybeSingle()
   if (snap.error) return { kind: "error", message: snap.error.message }
-  if (!snap.data) return { kind: "noSnapshot", me }
+  if (!snap.data) return { kind: "noSnapshot", me, series, current }
 
   const id = snap.data.id as number
   const [teams, market, members, logins] = await Promise.all([
@@ -109,6 +139,8 @@ async function loadLeague(): Promise<Status> {
   return {
     kind: "ready",
     me,
+    series,
+    current,
     league: {
       snapshotId: id,
       publishedAt: snap.data.created_at as string,
@@ -139,7 +171,7 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
       if (!s) return setStatus({ kind: "signedOut" })
       setStatus({ kind: "loading" })
       // Defer: supabase-js must not be called from inside its own auth callback.
-      setTimeout(() => loadLeague().then(setStatus, (e: Error) => setStatus({ kind: "error", message: e.message })))
+      setTimeout(() => loadLeague(savedSeries()).then(setStatus, (e: Error) => setStatus({ kind: "error", message: e.message })))
     })
     return () => data.subscription.unsubscribe()
   }, [])
@@ -154,5 +186,11 @@ export function LeagueProvider({ children }: { children: ReactNode }) {
     await supabase?.auth.signOut()
   }, [])
 
-  return <LeagueContext.Provider value={{ status, session, signIn, signOut }}>{children}</LeagueContext.Provider>
+  const switchSeries = useCallback((id: string) => {
+    if (demoMode) return
+    setStatus({ kind: "loading" })
+    loadLeague(id).then(setStatus, (e: Error) => setStatus({ kind: "error", message: e.message }))
+  }, [])
+
+  return <LeagueContext.Provider value={{ status, session, signIn, signOut, switchSeries }}>{children}</LeagueContext.Provider>
 }

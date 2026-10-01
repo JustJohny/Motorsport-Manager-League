@@ -27,7 +27,7 @@ function Message({ title, children, action }: { title: string; children: ReactNo
 
 /** Renders children only when the league is loaded; otherwise login, loading and error screens. */
 export function Gate({ children }: { children: ReactNode }) {
-  const { status, signIn, signOut } = useLeagueContext()
+  const { status, signIn, signOut, switchSeries } = useLeagueContext()
   const signOutButton = <Button variant="outline" className="w-full" onClick={() => void signOut()}>Sign out</Button>
 
   switch (status.kind) {
@@ -48,8 +48,18 @@ export function Gate({ children }: { children: ReactNode }) {
       )
     case "noSnapshot":
       return (
-        <Message title="Nothing published yet" action={signOutButton}>
-          You drive for {status.me.team}. The organizer hasn't published the league data yet.
+        <Message
+          title="Nothing published yet"
+          action={
+            <div className="flex flex-col gap-2">
+              {status.series.filter((s) => s.id !== status.current.id).map((s) => (
+                <Button key={s.id} variant="secondary" className="w-full" onClick={() => switchSeries(s.id)}>Go to {s.name}</Button>
+              ))}
+              {signOutButton}
+            </div>
+          }
+        >
+          You drive for {status.me.team} in {status.current.name}. The organizer hasn't published this series' data yet.
         </Message>
       )
     case "error":

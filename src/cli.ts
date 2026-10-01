@@ -1,7 +1,7 @@
 #!/usr/bin/env -S npx tsx
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
-import { parseArgs } from "node:util";
+import { parseArgs, type ParseArgsConfig } from "node:util";
 import { applyChanges, type ChangeSet } from "./apply.ts";
 import { pack, parseLossless, stringifyLossless, unpack } from "./codec/sav.ts";
 import { diffObjects } from "./diff.ts";
@@ -14,7 +14,7 @@ import type { LeagueSettings } from "./league-rules.ts";
 import { choiceChanges, designChanges, fetchPartsContext, markDesignsApplied, undoAiParts } from "./part-orders.ts";
 import { engineSpendChanges, fetchEngineSpend, fetchSupplierContext, markEngineSpendApplied, supplierChanges } from "./engine-orders.ts";
 import { fetchRegulationContext, recordVoteResults, regulationChanges } from "./rule-votes.ts";
-import { rest, supabaseEnv } from "./supabase.ts";
+import { rest, supabaseEnv, type SupabaseEnv } from "./supabase.ts";
 import { fetchWindow, markApplied, windowChanges, winners } from "./transfers.ts";
 
 const USAGE = `mmsave - Motorsport Manager league save toolkit
@@ -24,15 +24,18 @@ const USAGE = `mmsave - Motorsport Manager league save toolkit
   mmsave validate <save.sav>                          check the object graph
   mmsave teams    <save.sav>                          list teams by championship
   mmsave extract  <save.sav> --league league.json [-o state.json]
+  mmsave suppliers <save.sav> --league league.json   next season's supplier offers per member team, as publish would show them
   mmsave publish  <save.sav> --league league.json [--dry-run]   upload to the league website
-  mmsave pull     [-o changes.json] [--mark-applied] [--force] HQ orders, part designs, fitting, improvement + transfer results as changes
+  mmsave pull     --league league.json [-o changes.json] [--mark-applied] [--force]   members' decisions as changes
+  mmsave archive  --league league.json [-o backup.json] [--end]   back up the league's series; --end then deletes it from the site
+  mmsave restore  <backup.json> [--as <series id>]               put an archived series back on the site
   mmsave apply    <save.sav> <changes.json> [-o out.sav] [--name "Shown name"]
   mmsave diff     <a.sav> <b.sav> [--team NAME] [--path teamManager] [--depth N]
 
 Saves default to ${defaultSavesDir()}
 A save name without a path is looked up there. Output never overwrites the input.`;
 
-const { values: opt, positionals: [cmd, ...args] } = parseArgs({
+const { values: opt, positionals: [cmd, ...args] } = parseArgsOrExit({
   allowPositionals: true,
   options: {
     out: { type: "string", short: "o" },
@@ -45,9 +48,23 @@ const { values: opt, positionals: [cmd, ...args] } = parseArgs({
     "dry-run": { type: "boolean" },
     "mark-applied": { type: "boolean" },
     force: { type: "boolean" },
+    end: { type: "boolean" },
+    as: { type: "string" },
     help: { type: "boolean", short: "h" },
   },
 });
+
+/** parseArgs, but a mistyped option prints one line instead of a stack trace. */
+function parseArgsOrExit<const T extends ParseArgsConfig>(config: T): ReturnType<typeof parseArgs<T>> {
+  try {
+    return parseArgs(config);
+  } catch (e) {
+    // e.g. "Option '--league <value>' argument missing" when the file name is left out.
+    console.error(`error: ${(e as Error).message.replace(/<value>' argument missing/, "<value>' needs a value, e.g. --league league-main.json")}`);
+    console.error("Run without arguments for usage.");
+    process.exit(1);
+  }
+}
 
 function savePath(p: string | undefined): string {
   if (!p) fail("missing save file");
@@ -55,6 +72,20 @@ function savePath(p: string | undefined): string {
   const inDir = join(defaultSavesDir(), p.endsWith(".sav") ? p : `${p}.sav`);
   if (existsSync(inDir)) return inDir;
   fail(`no such save: ${p}`);
+}
+
+/** The league file, which names the series it belongs to on the website. */
+function leagueConfig(command: string): LeagueConfig {
+  if (!opt.league) fail(`${command} needs --league league.json`);
+  return JSON.parse(readFileSync(opt.league, "utf8")) as LeagueConfig;
+}
+
+/** Supabase settings for the league file's series. */
+function seriesEnv(cfg: LeagueConfig): SupabaseEnv {
+  const id = cfg.series?.id;
+  if (!id) fail(`${opt.league} has no series: add "series": { "id": "main", "name": "…" } (main is the league from before series existed)`);
+  if (!/^[a-z0-9][a-z0-9-]*$/.test(id)) fail(`series id "${id}": use lower case letters, digits and dashes`);
+  return { ...supabaseEnv(), series: id };
 }
 
 function fail(msg: string): never {
@@ -119,6 +150,27 @@ switch (cmd) {
     else console.log(json);
     break;
   }
+  case "suppliers": {
+    // What members will see on Parts -> Next season's car if this save is published.
+    const input = savePath(args[0]);
+    if (!opt.league) fail("suppliers needs --league league.json");
+    const cfg = JSON.parse(readFileSync(opt.league, "utf8")) as LeagueConfig;
+    const save = Save.load(input);
+    const state = extractLeague(save, cfg);
+    const drawn = JSON.stringify(save.data.supplierManager.championshipSuppliers ?? {});
+    const ended = state.championship.calendar.filter((e) => e.ended).length;
+    console.log(`${state.championship.name}, game date ${state.gameDate.slice(0, 10)}, ${ended}/${state.championship.calendar.length} races done`);
+    console.log(`MM's draw for next season: ${drawn === "{}" || drawn === "[]" ? "not made yet (MM draws it when the season ends, after the final race)" : "present"}`);
+    for (const t of state.teams.filter((x) => x.member)) {
+      const car = t.design?.nextYearCar;
+      if (!car) { console.log(`  ${t.name}: no next-year car data`); continue; }
+      const types = Object.entries(car.options);
+      const counts = types.map(([k, v]) => `${k} ${v.length}`).join(", ");
+      console.log(`  ${t.name} (${car.season} car, MM ${car.state}): ${counts || "no offers"}`);
+      for (const [k, v] of types) console.log(`    ${k}: ${v.map((o) => `${o.name} $${(o.price / 1e6).toFixed(1)}M`).join(", ")}`);
+    }
+    break;
+  }
   case "publish": {
     const input = savePath(args[0]);
     if (!opt.league) fail("publish needs --league league.json");
@@ -131,13 +183,15 @@ switch (cmd) {
     for (const m of members) console.log(`  ${m.discord_username} -> ${m.team}${m.role === "organizer" ? " (organizer)" : ""}`);
     if (!members.length) console.log("  WARNING: no member has a \"discord\" username in the league file, so nobody can log in");
     if (opt["dry-run"]) break;
-    console.log(`published snapshot #${await publish(supabaseEnv(), members, split)}`);
+    const env = seriesEnv(cfg);
+    console.log(`published snapshot #${await publish(env, members, split, cfg.series?.name)} to series "${env.series}"`);
     break;
   }
   case "pull": {
     // Everything members decided since the last apply: queued HQ orders and, once its deadline
     // has passed, the transfer window's signings.
-    const env = supabaseEnv();
+    const env = seriesEnv(leagueConfig("pull"));
+    console.log(`Series "${env.series}"`);
     const [w, orders, [settings]] = await Promise.all([
       fetchWindow(env), fetchQueuedOrders(env), rest<LeagueSettings[]>(env, "GET", "league_settings?select=*"),
     ]);
@@ -226,6 +280,34 @@ switch (cmd) {
       if (windowDone && w) await markApplied(env, w.window.id);
       console.log(`marked as applied: ${notes.join(" + ") || "nothing"}`);
     }
+    break;
+  }
+  case "archive": {
+    // A full JSON backup of the series; with --end, the series is then deleted from the site.
+    const cfg = leagueConfig("archive");
+    const env = seriesEnv(cfg);
+    const backup = await rest<{ series: { name: string }; tables: Record<string, unknown[]> }>(env, "POST", "rpc/export_series", {});
+    const out = opt.out ?? `backup-${env.series}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.json`;
+    writeFileSync(out, JSON.stringify(backup));
+    const counts = Object.entries(backup.tables).filter(([, rows]) => rows.length).map(([t, rows]) => `${t} ${rows.length}`);
+    console.log(`wrote ${out}: series "${env.series}" (${backup.series.name}), ${counts.join(", ")}`);
+    if (!opt.end) {
+      console.log("Nothing deleted. Add --end to delete the series from the site after the backup.");
+      break;
+    }
+    // Check the file before deleting anything.
+    const check = JSON.parse(readFileSync(out, "utf8")) as typeof backup;
+    if (JSON.stringify(check.tables) !== JSON.stringify(backup.tables)) fail(`${out} doesn't read back the same; nothing deleted`);
+    await rest(env, "POST", "rpc/end_series", { series_id: env.series });
+    console.log(`series "${env.series}" deleted from the site. Restore it with: mmsave restore ${out}`);
+    break;
+  }
+  case "restore": {
+    const file = args[0] ?? fail("missing backup.json");
+    const backup = JSON.parse(readFileSync(file, "utf8")) as { series: { id: string; name: string } };
+    const env = supabaseEnv();
+    await rest(env, "POST", "rpc/import_series", { backup, as_id: opt.as ?? null });
+    console.log(`restored series "${opt.as ?? backup.series.id}" (${backup.series.name}) from ${file}`);
     break;
   }
   case "apply": {

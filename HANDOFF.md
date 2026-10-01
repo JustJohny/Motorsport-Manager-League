@@ -256,8 +256,52 @@ npx tsx src/cli.ts validate "<save>"
 6. **Backlog of designed features, in the suggested build order** (the user's idea list is complete as of 2026-10-01):
    1. **Season regulations and politics.** It's useful every season, including the ERS one.
    2. **Works engine programmes.** Site and database built. The season-change step waits for a pre-season save.
-   2b. **Next season's suppliers on the site.** Built (toolkit, DB, site, organizer guide). Left: run migration 012, publish, and test at season end / pre-season in game; member engines as options come with the engine season step.
+   2b. **Next season's suppliers on the site.** Built (toolkit, DB, site, organizer guide). Left: publish, and test at season end / pre-season in game; member engines as options come with the engine season step.
    3. **Illegal engine tech.** Builds on 2.
+
+## Series: several saves on one site, and ending a league (built 2026-10-01; migration 013 not yet run)
+**The user's decisions (2026-10-01):**
+- Switching or ending a league = **archive, then wipe**: a full JSON backup, then everything of that league deleted from the site.
+- Several series at once (e.g. open-wheel + endurance, one save each) = **one site with a series switcher**; one Discord account can run a team in each.
+- Series are **fully independent**: only member accounts are shared.
+
+**How it works:**
+- Migration `013_series.sql`:
+  - The 21 league tables move to the schema `league` and get a `series` column (default `public.current_series()`, FK to `public.series` with cascade).
+  - `public.<table>` is now a view `where series = current_series()` (security_invoker, local check option). So every existing function and site query works unchanged, scoped to one series.
+  - `current_series()` reads the `x-series` request header, or `app.series`.
+  - Keys and unique indexes include `series`, since team names repeat across saves (e.g. two ERS careers).
+  - RLS on the tables checks the row's own series (`in_series`, `own_or_organizer`), so realtime, which has no headers, is per series too.
+  - The five functions that upserted `on conflict on constraint` now insert into `league.<table>` with the series: through a view, a constraint can't be named.
+  - `bid_history` reads `league.bids` directly; through the invoker view it would apply the member's own row rules.
+  - New functions: `publish_snapshot(members, snapshot, series_name)` (creates the series and its `league_settings` row), `my_series()` for the switcher, `export_series()`, `import_series(backup, as_id)`, `end_series(id)`.
+  - Existing data becomes the series `main`.
+- Toolkit:
+  - The league file has `"series": {"id", "name"}`. `SupabaseEnv.series` sends `x-series` on every REST call.
+  - `pull` now needs `--league`. New `archive --league f [-o file] [--end]` and `restore backup.json [--as id]`.
+  - The backup is written and read back before `--end` deletes anything.
+  - A restore keeps row ids, so it only works once the original is gone.
+- Site:
+  - `setSeries` plus a fetch wrapper adds `x-series`. `watchTable` subscribes to `league.<table>` filtered by `series=eq.<id>`.
+  - `my_series` loads the series list; the last one used is kept in localStorage.
+  - The sidebar header is the series switcher. The "nothing published yet" screen links to the member's other series.
+  - Organizer page: per-series file names (`league-<id>.json`, `changes-<id>.json`, save prefix = series name, "League" for `main`), and a Series card (start another, archive, end, restore).
+- Tests: `test/db-series.test.ts`:
+  - two series with the same teams
+  - a member in both
+  - header scoping, and realtime-style reads without a header
+  - orders per series
+  - export, end, restore round trip
+  - ending one series leaves the other
+  - migrating existing data to `main`
+  The test harness (`test/db.ts`) sends a series header (default `test`).
+- **Not verified live yet:** that Supabase passes the `x-series` header from the browser (CORS) and from PostgREST into `request.headers`, and that realtime works on the `league` schema. Check after running 013.
+
+**Steps for the user:**
+1. Run migration 013.
+2. Rename `league.json` to `league-main.json` and add `"series": {"id": "main", "name": "…"}`.
+3. Publish.
+4. To end the test league: `archive --league league-main.json --end`.
 
 ## Calendar & results: every round clickable (2026-10-01, user request)
 - MM keeps every finished round's results on its calendar event (race, qualifying, practice), so the extract now publishes `championship.races` (all finished rounds; `lastRace` stays, as the last of them). About 10 KB per round, public.
@@ -328,7 +372,7 @@ Members see the current and the confirmed next-season regulations, vote on the s
   - how to set or undo `nextYearsRules` safely (AddRule replaces the rule of the same group?)
   - how the vote results are stored, so the toolkit can overwrite MM's outcome
 
-## Next season's car: suppliers on the site (built 2026-10-01; migration 012 not yet run; not yet tested in game)
+## Next season's car: suppliers on the site (built 2026-10-01; migrations 010–012 run; not yet tested in game)
 In MM, designing next year's car means choosing suppliers (`CarDesignScreen` / `TeamAIController.FindSuppliersForNewChassis`): engine, brakes, fuel, materials (+ battery/ERS in hybrid series).
 - The chassis stats are the championship base + each supplier's `supplierStats` (`ApplyChampionshipBaseStat` + `ApplySupplierStats`).
 - The engine supplier's `randomEngineLevelModifier` goes onto the engine parts at the season change (non-spec series).
@@ -355,8 +399,8 @@ In MM, designing next year's car means choosing suppliers (`CarDesignScreen` / `
 - ✅ Organizer page: a "Season end: next season's suppliers" block from the final race weekend (see Window below).
 - ✅ README and `docs/save-schema.md` ("Next year's car and suppliers").
 - ⏭ To do:
-  - The user runs migration 012 on Supabase (011 is live) and publishes again.
-  - **Confirm the JSON shape of `championshipSuppliers`** in a save made after the final race (advance past the season's end): run `npx tsx src/cli.ts extract` and check that `design.nextYearCar.options` lists 4/6/5/4 deals.
+  - Publish again (migrations 010–012 are live).
+  - **Confirm the JSON shape of `championshipSuppliers`** in a save made after the final race (advance past the season's end): `npx tsx src/cli.ts suppliers "Save<name>" --league league.json` should list 4/6/5/4 deals per member team. (The `suppliers` command and its Organizer page docs were added 2026-10-01; migration 012 was run by the user the same day.)
   - Test in game at pre-season: does a member's pick show on MM's car screen, do the chassis stats and engine level follow, and do the refund and charge appear in finances?
   - Check when MM moves `currentPreSeasonEndDate` on to the next season (assumed: at the new season's start).
   - Member engines as engine options (with the engine season step). **The engine programme page has the same New Year issue:** `engine_season()` and the site use the game date's year, so a January pre-season checkpoint would count as next season. Fix it with the same `season` idea when building the engine step.

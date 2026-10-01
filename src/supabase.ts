@@ -4,6 +4,8 @@ import { request } from "node:https";
 export interface SupabaseEnv {
   url: string;
   serviceKey: string;
+  /** The series every request is for (sent as the x-series header). */
+  series?: string;
 }
 
 /** SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY from the environment or ./.env. */
@@ -44,6 +46,7 @@ function restOnce<T>(env: SupabaseEnv, method: string, path: string, body?: unkn
         ...(env.serviceKey.startsWith("sb_") ? {} : { authorization: `Bearer ${env.serviceKey}` }),
         ...(data ? { "content-type": "application/json", "content-length": data.length } : {}),
         prefer: "return=representation",
+        ...(env.series ? { "x-series": env.series } : {}),
       },
     }, (res) => {
       const chunks: Buffer[] = [];

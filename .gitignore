@@ -4,3 +4,6 @@ out/
 .env
 league.json
 changes.json
+league-*.json
+changes-*.json
+backup-*.json

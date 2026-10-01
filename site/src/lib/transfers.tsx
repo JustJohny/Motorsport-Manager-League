@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useState, t
 import { createDemoStore } from "./demo-transfers"
 import { useLeague } from "./league"
 import { DEFAULT_SETTINGS, type LeagueSettings } from "./rules"
-import { demoMode, supabase } from "./supabase"
+import { demoMode, supabase, watchTable } from "./supabase"
 import type { Person } from "./types"
 
 export interface TransferWindow {
@@ -152,11 +152,10 @@ export function TransfersProvider({ children }: { children: ReactNode }) {
     void reload()
     if (demo) return
     // Live: any change to auctions or windows reloads (cheap: one window's worth of rows).
-    const channel = supabase!
-      .channel("transfers")
-      .on("postgres_changes", { event: "*", schema: "public", table: "auctions" }, () => void reload())
-      .on("postgres_changes", { event: "*", schema: "public", table: "transfer_windows" }, () => void reload())
-      .subscribe()
+    const channel = supabase!.channel("transfers")
+    watchTable(channel, "auctions", () => void reload())
+    watchTable(channel, "transfer_windows", () => void reload())
+    channel.subscribe()
     return () => void supabase!.removeChannel(channel)
   }, [reload, demo])
 

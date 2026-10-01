@@ -2,13 +2,15 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { PageHeader } from "@/components/page-header"
-import { RaceCycle } from "@/components/race-cycle"
+import { Archive, Flag, Plus } from "lucide-react"
+import { CopyCommand, RaceCycle, seriesFiles } from "@/components/race-cycle"
 import { WindowControls } from "@/components/window-controls"
 import { fmtDate } from "@/lib/format"
 import { useLeague } from "@/lib/league"
 
 export function OrganizerPage() {
-  const { league } = useLeague()
+  const { league, current } = useLeague()
+  const files = seriesFiles(current)
   const seen = new Map(league.logins.map((l) => [l.discord_username, l]))
   const unmatched = league.logins.filter((l) => !league.members.some((m) => m.discord_username === l.discord_username))
   const ch = league.snapshot.championship
@@ -34,7 +36,7 @@ export function OrganizerPage() {
         <Card size="sm">
           <CardHeader>
             <CardTitle>Logins without a team</CardTitle>
-            <CardDescription>Add these Discord usernames to league.json as <code>"discord"</code>, then publish again.</CardDescription>
+            <CardDescription>Add these Discord usernames to <code>{files.league}</code> as <code>"discord"</code>, then publish again.</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
             {unmatched.length
@@ -43,6 +45,7 @@ export function OrganizerPage() {
           </CardContent>
         </Card>
       </div>
+      <SeriesCard />
       <Card size="sm">
         <CardHeader><CardTitle>Members</CardTitle></CardHeader>
         <CardContent>
@@ -74,5 +77,56 @@ export function OrganizerPage() {
         </CardContent>
       </Card>
     </>
+  )
+}
+
+/** Series = one MM save each. Starting one, and ending this one (backup first). */
+function SeriesCard() {
+  const { current, series } = useLeague()
+  const files = seriesFiles(current)
+  const example = JSON.stringify({
+    series: { id: "endurance", name: "Endurance league" },
+    championship: "<championship name in that save>",
+    members: [{ member: "you", team: "<team>", discord: "<discord username>", organizer: true }],
+  }, null, 2)
+  return (
+    <Card size="sm">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><Flag className="size-4" /> Series</CardTitle>
+        <CardDescription>
+          Each series is one MM save with its own teams, members and everything they do on the site. Members switch series at the
+          top of the sidebar. You're in {series.length} series; this one is <b>{current.name}</b> (id <code>{current.id}</code>).
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-6 text-sm lg:grid-cols-2">
+        <div className="flex flex-col gap-2">
+          <span className="flex items-center gap-2 font-medium"><Plus className="size-4" /> Start another series</span>
+          <span className="text-muted-foreground">
+            Make a league file for it in the toolkit folder with a new series id (lower case, digits, dashes), e.g.
+            <code> league-endurance.json</code>, and publish its save. It appears in the sidebar for its members.
+            The same Discord account can be in several series, with a different team in each.
+          </span>
+          <pre className="overflow-x-auto rounded-md bg-muted px-3 py-2 text-xs">{example}</pre>
+          <CopyCommand command={`npx tsx src/cli.ts publish "Save<save name>" --league league-endurance.json`} />
+        </div>
+        <div className="flex flex-col gap-2">
+          <span className="flex items-center gap-2 font-medium"><Archive className="size-4" /> End this series</span>
+          <span className="text-muted-foreground">
+            For a test league, or when a league is over. First a backup: every row of this series goes into one JSON file.
+          </span>
+          <CopyCommand command={`npx tsx src/cli.ts archive --league ${files.league}`} />
+          <span className="text-muted-foreground">
+            Then delete it from the site. This removes everything of <b>{current.name}</b> (snapshots, orders, bids, votes, engines,
+            supplier choices, members) and nothing of other series. The backup is written and checked first.
+          </span>
+          <CopyCommand command={`npx tsx src/cli.ts archive --league ${files.league} --end`} />
+          <span className="text-muted-foreground">To bring it back later (only while no series has that id):</span>
+          <CopyCommand command={`npx tsx src/cli.ts restore backup-${current.id}-<date>.json`} />
+          <span className="text-muted-foreground">
+            To start fresh in the same series id, end it, then publish the new save with the same league file.
+          </span>
+        </div>
+      </CardContent>
+    </Card>
   )
 }

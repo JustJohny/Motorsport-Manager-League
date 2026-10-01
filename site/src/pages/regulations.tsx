@@ -10,7 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { PageHeader } from "@/components/page-header"
 import { fmtDate, humanize } from "@/lib/format"
 import { useLeague } from "@/lib/league"
-import { demoMode, supabase } from "@/lib/supabase"
+import { demoMode, supabase, watchTable } from "@/lib/supabase"
 import type { Regulations, Rule, RuleVote, VoteChoice } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -38,7 +38,7 @@ function usePolitics() {
     if (demoMode) return
     void reload()
     const ch = supabase!.channel("politics")
-    for (const table of ["rule_votes", "rule_vote_results", "next_rule_overrides"]) ch.on("postgres_changes", { event: "*", schema: "public", table }, () => void reload())
+    for (const table of ["rule_votes", "rule_vote_results", "next_rule_overrides"]) watchTable(ch, table, () => void reload())
     ch.subscribe()
     return () => void supabase!.removeChannel(ch)
   }, [reload])

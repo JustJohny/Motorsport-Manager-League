@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { fmtMoneyShort, humanize } from "@/lib/format"
 import { useLeague } from "@/lib/league"
-import { demoMode, supabase } from "@/lib/supabase"
+import { demoMode, supabase, watchTable } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
 import type { SupplierOffer, TeamPrivate } from "@/lib/types"
 
@@ -33,9 +33,7 @@ function useSupplierChoices(team: string, season: number) {
   useEffect(() => {
     if (demoMode) return
     void reload()
-    const ch = supabase!.channel(`suppliers-${team}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "supplier_choices" }, () => void reload())
-      .subscribe()
+    const ch = watchTable(supabase!.channel(`suppliers-${team}`), "supplier_choices", () => void reload()).subscribe()
     return () => void supabase!.removeChannel(ch)
   }, [reload, team])
 
