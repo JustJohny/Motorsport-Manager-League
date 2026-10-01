@@ -255,7 +255,8 @@ npx tsx src/cli.ts validate "<save>"
 5. Before the league starts for real: test with a second real Discord account, and play one full race cycle with the Organizer page's guide (the first real `pull` against AI-built parts on a member team). Auction tuning is done (migration 007), and the placeholder members are gone from `league.json`.
 6. **Backlog of designed features, in the suggested build order** (the user's idea list is complete as of 2026-10-01):
    1. **Season regulations and politics.** It's useful every season, including the ERS one.
-   2. **Works engine programmes.** It only pays off in a series where the engine isn't spec. Build after testing a season change in game.
+   2. **Works engine programmes.** Site and database built. The season-change step waits for a pre-season save.
+   2b. **Next season's suppliers on the site.** Designed; build together with the engine season-change step (shared supplier code).
    3. **Illegal engine tech.** Builds on 2.
 
 ## Illegal (grey-area) parts: MM's scrutineering, shown on the site (built 2026-10-01)
@@ -321,6 +322,25 @@ Members see the current and the confirmed next-season regulations, vote on the s
   - `PoliticalVote.GetVoteImpactOnTeam` (team characteristics)
   - how to set or undo `nextYearsRules` safely (AddRule replaces the rule of the same group?)
   - how the vote results are stored, so the toolkit can overwrite MM's outcome
+
+## Next season's car: suppliers on the site (rules agreed 2026-10-01, not built)
+In MM, designing next year's car means choosing suppliers (`CarDesignScreen` / `TeamAIController.FindSuppliersForNewChassis`): engine, brakes, fuel, materials (+ battery/ERS in hybrid series).
+- The chassis stats are the championship base + each supplier's `supplierStats` (`ApplyChampionshipBaseStat` + `ApplySupplierStats`).
+- The engine supplier's `randomEngineLevelModifier` goes onto the engine parts at the season change (non-spec series).
+- Each supplier is paid on its own (`GetEngineTransaction` …).
+- `supplierManager.GetSuppliersForTeam(type, team, checkCanBuy)` lists what a team may buy (tier, `mTeamsThatCannotBuy`, discounts).
+
+**Rules (the user's choices):**
+- **Window:** it opens automatically when the season's last few races remain (like MM's car development period) and closes at the pull before pre-season starts.
+- **No choice = keep this season's suppliers** (if the team can still buy them).
+- **Visibility:** choices stay private until pre-season, then everyone sees who runs which suppliers, as in MM's team screens.
+- Member engines (engine programmes) appear as engine options next to MM's suppliers.
+
+**Plan:**
+- The extract publishes each member team's options per type (`GetSuppliersForTeam` logic: championship lists, can-buy, team price with discounts, stats, engine level range) and its current suppliers.
+- A migration adds `supplier_choices` (team, season, type, supplier id or member engine), private until pre-season, with an RPC that checks availability and budget.
+- At the pull before pre-season the toolkit sets the pending `nextYearCarDesign.mChassisStats` suppliers (or starts the design if the AI hasn't yet), recomputes the chassis stats and `mEngineModifier`, refunds the AI's supplier payments and charges the members' choices. This shares the engine-programme supplier code.
+- Like the engine step, it can only be tested in game with a save near pre-season.
 
 ## Phase 5: works engine programmes (site + database built 2026-10-01; season-change step not built)
 A member invests in their own engine programme, becomes an engine supplier, and sells engines to other members.
