@@ -2,6 +2,7 @@ import type { Obj } from "./graph.ts";
 import type {
   Building, CalendarEvent, Championship, LeagueConfig, LeagueState, Part, Person, RaceResults, SessionResult, TeamState,
 } from "./league-types.ts";
+import { teamDesign } from "./ops/design.ts";
 import { BUILDING_STATES, JOBS, PART_TYPES, Save, numOrNull, personKind, personName, type PartType } from "./model.ts";
 
 export type { LeagueConfig, LeagueState, TeamState } from "./league-types.ts";
@@ -56,6 +57,7 @@ function team(save: Save, t: Obj, champ: Obj, member: string | null): TeamState 
     fanBase: numOrNull(t.fanBase),
     hq: save.buildings(t).map((b) => building(save, b)),
     parts: Object.fromEntries(partTypes.map((type) => [type, save.parts(t, type).map((p) => part(save, p))])),
+    design: champ.series === 0 ? teamDesign(save, t) : null,
     staff: save.slots(t).map((s) => {
       const p = s.personHired ? save.g.deref<Obj>(s.personHired) : null;
       return { slotID: s.slotID, job: JOBS[s.jobType] ?? String(s.jobType), person: p ? person(save, p) : null };
@@ -102,6 +104,7 @@ function part(save: Save, p: Obj): Part {
     fittedToCar: fittedCar ? fittedCar.identifier : null,
     buildDate: p.buildDate,
     components: (p.components ?? []).length,
+    componentIds: save.g.list<Obj>(p.components ?? []).filter(Boolean).map((c) => c.id as number),
   };
 }
 

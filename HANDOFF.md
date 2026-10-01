@@ -200,7 +200,14 @@ npx tsx src/cli.ts validate "<save>"
        - Garuda's AI Front Wing design is cancelled and refunded, and a league Brakes design is started, done 2016-10-06.
        - Tatra improves performance on F-LEAGUE.
      - **Verified in game (2026-10-01, "League Test 10"):** the user reports that it all works. Garuda's league Brakes design (B-ZWEM, components 10+25, level 2) was built on 2016-10-06 as planned, and the AI fitted it straight away. The cancelled AI design was gone. Tatra's wing was still designing in that save (due 10-07); the user saw it in game.
-     - Next: steps 2–5 (extract, migration 005, site, pull).
+   - **Step 2 (extract) built 2026-10-01:**
+     - Each team's private data now has `design` (`TeamDesign` in `src/league-types.ts`):
+       - per part type, MM's design context (slots, settings, Design Centre, player flag), the components it can choose now, the open level and what unlocks the next ones
+       - the current design (type, components, start, end)
+       - improvement (lists, split, Factory slots, mechanics)
+     - Parts carry `componentIds`. That's about 14 KB per team, private only.
+     - **Component names:** MM has none. A component's text ID is its stats summary (`Modding`-less game: localisation CSVs live in `resources.assets`, and the component DB rows are `PSG_2000xxxx,"<b>Performance:</b> +15",...`). The site shows the summary, as MM does.
+     - Next: step 3, migration 005 (design orders, fitting, improvement).
      - **AI-finished parts on member teams: remove and refund** (user's decision). `removeUnorderedParts` does this: parts built after the league start whose components don't match an ordered design. A fitted one is replaced by the best spare first, and one refund is made per design.
    - MM internals: see docs/save-schema.md, "Part design and improvement". Component display names are localised (`mNameID`) and not in the save. Use `mCustomComponentName`, or find the localisation file in the game data.
 4. An organizer workflow document (between-race checklist).

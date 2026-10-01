@@ -25,6 +25,7 @@ describe.skipIf(!existsSync(SAVE))("publish", () => {
       expect(t).not.toHaveProperty("budget");
       expect(t).not.toHaveProperty("hq");
       expect(t).not.toHaveProperty("parts");
+      expect(t).not.toHaveProperty("design");
     }
     // No part GUID may leak into the public data.
     const partIds = split.teams.flatMap((t) => Object.values(t.private.parts).flat().map((p) => p.guid));
@@ -35,6 +36,28 @@ describe.skipIf(!existsSync(SAVE))("publish", () => {
 
   it("loses nothing: joining the split gives back the extract", () => {
     expect(joinSnapshot(JSON.parse(JSON.stringify(splitSnapshot(state))))).toEqual(state);
+  });
+
+  it("extracts each team's design options, current design and improvement", () => {
+    for (const t of state.teams) {
+      const d = t.design!;
+      expect(Object.keys(d.types).sort()).toEqual(["Brakes", "FrontWing", "RearWing", "Suspension", "Engine", "Gearbox"].filter((x) => x in d.types).sort());
+      for (const [type, o] of Object.entries(d.types)) {
+        expect(o.ctx.slots, `${t.name} ${type}`).toBeGreaterThanOrEqual(1);
+        expect(o.ctx.settings.materialsCost).toBeGreaterThan(0);
+        // Three components per open level, plus the lead engineer's.
+        expect(o.components.filter((c) => !c.engineer).length).toBe(3 * o.maxLevel);
+      }
+      const parts = Object.values(t.parts).flat().map((p) => p.guid);
+      for (const g of [...d.improvement.performance, ...d.improvement.reliability]) expect(parts).toContain(g);
+      expect([2, 4, 6, 8]).toContain(d.improvement.slots);
+      if (d.current) {
+        const opts = d.types[d.current.type];
+        expect(opts.components.map((c) => c.id)).toEqual(expect.arrayContaining(d.current.components));
+        expect(d.current.end > d.current.start).toBe(true);
+      }
+    }
+    expect(state.teams.filter((t) => t.design!.current).length).toBeGreaterThan(1);
   });
 
   it("maps Discord usernames to teams", () => {

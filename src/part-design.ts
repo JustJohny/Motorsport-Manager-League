@@ -1,43 +1,10 @@
 // MM's part design rules (CarPartDesign in Assembly-CSharp) on plain data, so the toolkit and
 // the league site agree on slots, cost and time. See docs/save-schema.md, "Part design".
-// Import-free on purpose: the site bundles this file.
+// Only type imports: the site bundles this file.
 
-export interface DesignComponent {
-  id: number;
-  level: number;
-  /** A lead engineer's own component (ComponentType.Engineer): never charged per slot level. */
-  engineer: boolean;
-  statBoost: number;
-  maxStatBoost: number;
-  reliabilityBoost: number;
-  maxReliabilityBoost: number;
-  /** Own cost / production days; 0 means "use the slot level's" (non-engineer only). */
-  cost: number;
-  days: number;
-  risk: number;
-  bonuses: { type: string; value: number }[];
-  /** MM's own rich-text summary, e.g. "<b>Performance:</b> +10". */
-  summary: string;
-}
+import type { DesignComponent, DesignContext } from "./league-types.ts";
 
-export interface DesignSettings {
-  materialsCost: number;
-  buildTimeDays: number;
-  costPerLevel: number[];
-  timePerLevel: number[];
-}
-
-export interface DesignContext {
-  settings: DesignSettings;
-  /** Normal slots: highest level of a part of this type in inventory + 1, clamped 1..5. */
-  slots: number;
-  /** Design Centre currentLevel when built, else null. */
-  designCentreLevel: number | null;
-  /** The player's career team pays full materials; AI teams 10 %. */
-  isPlayer: boolean;
-  /** The player's backstory time reduction, in days (player team only). */
-  playerTimeModifierDays?: number;
-}
+export type { DesignComponent, DesignContext, DesignSettings } from "./league-types.ts";
 
 export interface DesignPlan {
   /** Normal slots, by index; null = empty. */

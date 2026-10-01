@@ -2,6 +2,7 @@ import type { Json } from "../codec/sav.ts";
 import { float, num } from "../codec/sav.ts";
 import type { Obj } from "../graph.ts";
 import { NULL_DATE, PART_TYPES, type PartType, type Save } from "../model.ts";
+import type { TeamDesign } from "../league-types.ts";
 import { planDesign, type DesignComponent, type DesignContext, type DesignPlan } from "../part-design.ts";
 import { addDays, delayedEvents, insertByDate } from "./calendar.ts";
 import { findBuilding } from "./hq.ts";
@@ -86,6 +87,7 @@ export interface DesignOptions {
   available: { component: DesignComponent; obj: Obj }[];
   /** Highest component level the team's HQ allows (1..5). */
   maxLevel: number;
+  locked: { level: number; buildingType: number; buildingLevel: number }[];
 }
 
 /**
@@ -137,7 +139,45 @@ export function designOptions(save: Save, team: Obj, type: PartType): DesignOpti
     playerTimeModifierDays: isPlayer && save.data.player?.mPlayerBackStory?.mBackStory === 1
       ? timeSpanDays(save.data.player.mPlayerBackStory.mPartDesignTimeModifier) : 0,
   };
-  return { ctx, available, maxLevel };
+  const locked = unlocks.map((r, i) => ({ r: g.deref<Obj>(r), level: i + 1 }))
+    .filter(({ r, level }) => r && "buildingType" in r && !levelOpen(level - 1))
+    .map(({ r, level }) => ({ level, buildingType: r.buildingType as number, buildingLevel: (r.buildingLevel as number) + 1 }));
+  return { ctx, available, maxLevel, locked };
+}
+
+/** Everything the league site shows for a team's part design, fitting and improvement. */
+export function teamDesign(save: Save, team: Obj): TeamDesign {
+  const g = save.g;
+  const types: TeamDesign["types"] = {};
+  for (const type of Object.keys(COMPONENT_LISTS) as PartType[]) {
+    if (!save.parts(team, type).length) continue;
+    const o = designOptions(save, team, type);
+    types[type] = { ctx: o.ctx, components: o.available.map((a) => a.component), maxLevel: o.maxLevel, locked: o.locked };
+  }
+  const cpd = carPartDesign(save, team);
+  const part = cpd.mStage === STAGE.Designing && cpd.mCarPart ? g.deref<Obj>(cpd.mCarPart) : null;
+  const pi = g.deref<Obj>(g.deref<Obj>(team.carManager).partImprovement);
+  const list = (k: number) => {
+    const e = (pi.partsToImprove as Obj[]).find((x) => x.Key === k);
+    return e ? g.list<Obj>(e.Value).map((p) => p.id as string) : [];
+  };
+  return {
+    types,
+    current: part ? {
+      type: String(part.$type).replace(/Part$/, ""),
+      components: componentIds(save, part),
+      start: cpd.startDate,
+      end: cpd.endDate,
+      extraCopies: cpd.mExtraCopies ?? 0,
+    } : null,
+    improvement: {
+      performance: list(IMPROVE.Performance),
+      reliability: list(IMPROVE.Reliability),
+      split: num(pi.mNormalizedMechanicDistribution ?? 0.5),
+      slots: improvementSlots(save, team),
+      mechanics: Number(findBuilding(save, team, BUILDING.Factory).mStaffNumber ?? 0),
+    },
+  };
 }
 
 /** A C# TimeSpan as FullSerializer writes it ("1.00:00:00" or "00:00:00") in days. */

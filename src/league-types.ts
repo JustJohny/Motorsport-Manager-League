@@ -104,6 +104,72 @@ export interface Part {
   fittedToCar: number | null;
   buildDate: string;
   components: number;
+  /** Ids of the components it was designed with (matches league design orders). */
+  componentIds: number[];
+}
+
+/** One component a team can put in a design (see src/part-design.ts). */
+export interface DesignComponent {
+  id: number;
+  level: number;
+  /** A lead engineer's own component (ComponentType.Engineer): never charged per slot level. */
+  engineer: boolean;
+  statBoost: number;
+  maxStatBoost: number;
+  reliabilityBoost: number;
+  maxReliabilityBoost: number;
+  /** Own cost / production days; 0 means "use the slot level's" (non-engineer only). */
+  cost: number;
+  days: number;
+  risk: number;
+  bonuses: { type: string; value: number }[];
+  /** MM's own rich-text summary, e.g. "<b>Performance:</b> +10". MM components have no names. */
+  summary: string;
+}
+
+export interface DesignSettings {
+  materialsCost: number;
+  buildTimeDays: number;
+  costPerLevel: number[];
+  timePerLevel: number[];
+}
+
+export interface DesignContext {
+  settings: DesignSettings;
+  /** Normal slots: highest level of a part of this type in inventory + 1, clamped 1..5. */
+  slots: number;
+  /** Design Centre currentLevel when built, else null. */
+  designCentreLevel: number | null;
+  /** The player's career team pays full materials; AI teams 10 %. */
+  isPlayer: boolean;
+  /** The player's backstory time reduction, in days (player team only). */
+  playerTimeModifierDays?: number;
+}
+
+export interface PartDesignOptions {
+  ctx: DesignContext;
+  components: DesignComponent[];
+  /** Highest component level the HQ allows now (1..5). */
+  maxLevel: number;
+  /** What opens the next levels: building type and the level it must reach (as shown in game). */
+  locked: { level: number; buildingType: number; buildingLevel: number }[];
+}
+
+export interface TeamDesign {
+  /** Part type ("FrontWing") -> what the team can design for it. */
+  types: Record<string, PartDesignOptions>;
+  /** The design in progress (MM designs one part at a time). */
+  current: { type: string; components: number[]; start: string; end: string; extraCopies: number } | null;
+  improvement: {
+    /** Part GUIDs the mechanics work on. */
+    performance: string[];
+    reliability: string[];
+    /** Share of the mechanics on performance, 0..1. */
+    split: number;
+    /** Parts per list: 2/4/6/8 for Factory level 0-3. */
+    slots: number;
+    mechanics: number;
+  };
 }
 
 export interface Person {
@@ -143,6 +209,8 @@ export interface TeamState {
   hq: Building[];
   /** Part type ("FrontWing") -> parts the team owns. */
   parts: Record<string, Part[]>;
+  /** Part design, fitting and improvement (single-seater series only). */
+  design: TeamDesign | null;
   staff: StaffSlot[];
 }
 
@@ -158,8 +226,8 @@ export interface LeagueState {
  * What every league member may see about a team. Budget, HQ and parts stay private to the
  * team's member (and the organizer), as MM itself hides them for rival teams.
  */
-export type TeamPublic = Omit<TeamState, "budget" | "hq" | "parts">;
-export type TeamPrivate = Pick<TeamState, "budget" | "hq" | "parts">;
+export type TeamPublic = Omit<TeamState, "budget" | "hq" | "parts" | "design">;
+export type TeamPrivate = Pick<TeamState, "budget" | "hq" | "parts" | "design">;
 
 export interface PublicSnapshot {
   extractedAt: string;
