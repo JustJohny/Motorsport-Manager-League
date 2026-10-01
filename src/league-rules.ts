@@ -110,7 +110,8 @@ export function nextHqStep(b: Omit<HqBuilding, "type" | "progressStart">, unorde
   const level = ownedLevel(b);
   if (level >= b.maxLevel) return null;
   const cost = level === 0 ? b.initialCost : b.upgradeCosts[level - 1];
-  const weeks = level === 0 ? b.buildWeeks : b.upgradeWeeks[level - 1];
+  // Snapshots published before build times were extracted have no weeks: not orderable.
+  const weeks = level === 0 ? b.buildWeeks : b.upgradeWeeks?.[level - 1];
   if (cost == null || !weeks) return null;
   return { toLevel: level + 1, cost, weeks };
 }
