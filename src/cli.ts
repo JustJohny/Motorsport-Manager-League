@@ -172,16 +172,15 @@ switch (cmd) {
     if (engineSpend.length) notes.push(`${engineSpend.length} engine payment${engineSpend.length > 1 ? "s" : ""}`);
 
     // Next season's suppliers: applied once MM's AI has started next year's design (pre-season).
-    const supplierRows = await fetchSupplierContext(env);
-    if (supplierRows.length) {
-      const privs = await rest<{ team: string; private: { design?: { nextYearCar?: { state: string } } } }[]>(
-        env, "GET", "team_snapshots?select=team,private&order=snapshot_id.desc&limit=200");
-      const latest = new Map<string, string>();
-      for (const p of privs) if (!latest.has(p.team)) latest.set(p.team, p.private.design?.nextYearCar?.state ?? "waiting");
-      const sc = supplierChanges(supplierRows, new Set([...latest].filter(([, st]) => st === "designing").map(([t]) => t)));
-      changes.push(...sc.changes);
-      console.log(`Supplier choices applied: ${sc.changes.length}${sc.waiting.length ? `, waiting for pre-season: ${sc.waiting.join(", ")}` : ""}`);
+    const suppliers = await fetchSupplierContext(env);
+    const sc = supplierChanges(suppliers.rows, suppliers.cars, ctx.memberTeams);
+    changes.push(...sc.changes);
+    if (sc.changes.length || sc.waiting.length) {
+      console.log(`Next season's suppliers: ${sc.changes.length} team${sc.changes.length === 1 ? "" : "s"}${sc.waiting.length ? `, waiting for pre-season: ${sc.waiting.join(", ")}` : ""}`);
+      for (const c of sc.changes) if (c.op === "setSuppliers") console.log(`  ${c.team}: ${Object.entries(c.suppliers).map(([t, id]) => `${t} ${id}`).join(", ")}`);
     }
+    for (const u of sc.unavailable) console.log(`  WARNING: supplier no longer on offer, keeping current: ${u}`);
+    if (sc.changes.length) notes.push(`next season's suppliers for ${sc.changes.length} team${sc.changes.length === 1 ? "" : "s"}`);
 
     // Rule votes due before the next checkpoint, settled with the league's result instead of MM's;
     // then the organizer's choices for next season.

@@ -1,5 +1,5 @@
 import {
-  Bot, Car, ChevronsUp, Gavel, Clock, Coins, Cog, Disc3, Fan, Fuel, Gauge, Hammer, HeartPulse, Layers, Loader2, Lock,
+  Bot, CalendarClock, Car, ChevronsUp, Gavel, Clock, Coins, Cog, Disc3, Fan, Fuel, Gauge, Hammer, HeartPulse, Layers, Loader2, Lock,
   Package, PencilRuler, Settings2, ShieldCheck, ShieldPlus, Siren, Sparkles, Star, Timer, TriangleAlert, User, Waves, Wind,
   WindArrowDown, Wrench, type LucideIcon,
 } from "lucide-react"
@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { NextSeasonCard } from "@/components/next-season-card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { fmtDate, fmtMoney, fmtMoneyShort, fmtNum, fmtPct, humanize } from "@/lib/format"
@@ -118,9 +119,10 @@ export function PartsTab({ priv, team, own }: { priv: TeamPrivate; team: string;
     <div className="flex flex-col gap-4">
       {own && <BudgetStrip budget={priv.budget ?? 0} />}
       <Tabs defaultValue="design">
-        <TabsList variant="line">
+        <TabsList variant="line" className="h-auto! max-w-full flex-wrap justify-start gap-y-2">
           <TabsTrigger value="design"><PencilRuler /> Design a new part</TabsTrigger>
           <TabsTrigger value="parts"><Car /> Your parts: fitting &amp; improvement</TabsTrigger>
+          <TabsTrigger value="next"><CalendarClock /> Next season's car</TabsTrigger>
         </TabsList>
         <TabsContent value="design" className="pt-2">
           {design ? <DesignCard priv={priv} team={team} own={own} /> : <NoDesignData />}
@@ -135,6 +137,9 @@ export function PartsTab({ priv, team, own }: { priv: TeamPrivate; team: string;
           <div className="grid gap-3 lg:grid-cols-2">
             {Object.entries(priv.parts).map(([type, list]) => <PartCard key={type} type={type} parts={list} priv={priv} team={team} own={own} />)}
           </div>
+        </TabsContent>
+        <TabsContent value="next" className="pt-2">
+          {design ? <NextSeasonCard priv={priv} team={team} own={own} /> : <NoDesignData />}
         </TabsContent>
       </Tabs>
     </div>

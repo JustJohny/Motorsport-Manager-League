@@ -1,4 +1,5 @@
-import { Siren } from "lucide-react"
+import { ChevronRight, Siren } from "lucide-react"
+import { useSearchParams } from "react-router"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -13,7 +14,11 @@ export function ResultsPage() {
   const { me, league } = useLeague()
   const ch = league.snapshot.championship
   const next = ch.calendar.find((e) => !e.ended)
-  const race = ch.lastRace
+  // Snapshots published before every round's results were added only have the latest race.
+  const races = ch.races ?? (ch.lastRace ? [ch.lastRace] : [])
+  const [params, setParams] = useSearchParams()
+  const race = races.find((r) => r.round === Number(params.get("round"))) ?? races.at(-1) ?? null
+  const show = (round: number) => setParams(round === races.at(-1)?.round ? {} : { round: String(round) }, { replace: true })
   // The extract's qualifying rows carry no position or time yet, so order them by grid slot.
   const qualifying = [...(race?.qualifying ?? [])].sort((a, b) => a.grid - b.grid)
   const breaches = ch.rulesBreaches ?? []
@@ -27,22 +32,34 @@ export function ResultsPage() {
             <CardTitle>Calendar</CardTitle>
           </CardHeader>
           <CardContent className="flex flex-col">
-            {ch.calendar.map((e) => (
-              <div
-                key={e.round}
-                className={cn(
-                  "flex items-center gap-3 rounded-md px-2 py-1.5 text-sm",
-                  e === next && "bg-primary/10",
-                  e.ended && "text-muted-foreground",
-                )}
-              >
-                <span className="w-5 text-right tabular-nums">{e.round}</span>
-                <span className="flex-1 font-medium">{e.circuit}</span>
-                <span className="text-xs">{fmtDate(e.date)}</span>
-                {breaches.some((b) => b.round === e.round) && <Siren className="size-3.5 text-destructive" aria-label="A part was caught" />}
-                {e === next && <Badge>Next</Badge>}
-              </div>
-            ))}
+            {ch.calendar.map((e) => {
+              const hasResults = races.some((r) => r.round === e.round)
+              const selected = race?.round === e.round
+              return (
+                <button
+                  key={e.round}
+                  type="button"
+                  disabled={!hasResults}
+                  onClick={() => show(e.round)}
+                  aria-current={selected ? "true" : undefined}
+                  title={hasResults ? `Results of round ${e.round}` : undefined}
+                  className={cn(
+                    "flex items-center gap-3 rounded-md px-2 py-1.5 text-left text-sm",
+                    hasResults && "cursor-pointer transition-colors hover:bg-muted",
+                    e === next && "bg-primary/10",
+                    e.ended && !selected && "text-muted-foreground",
+                    selected && "bg-muted font-medium text-foreground ring-1 ring-border",
+                  )}
+                >
+                  <span className="w-5 text-right tabular-nums">{e.round}</span>
+                  <span className="flex-1 font-medium">{e.circuit}</span>
+                  <span className="text-xs">{fmtDate(e.date)}</span>
+                  {breaches.some((b) => b.round === e.round) && <Siren className="size-3.5 text-destructive" aria-label="A part was caught" />}
+                  {e === next && <Badge>Next</Badge>}
+                  {hasResults && <ChevronRight className={cn("size-3.5", selected ? "text-foreground" : "text-muted-foreground/50")} />}
+                </button>
+              )
+            })}
           </CardContent>
         </Card>
 
@@ -50,7 +67,10 @@ export function ResultsPage() {
           <Card size="sm">
             <CardHeader>
               <CardTitle>Round {race.round} · {race.circuit}</CardTitle>
-              <CardDescription>{fmtDate(race.date)}</CardDescription>
+              <CardDescription>
+                {fmtDate(race.date)}{race.round === races.at(-1)?.round ? " · latest race" : ""}
+                {races.length < ch.calendar.filter((e) => e.ended).length && " · earlier rounds appear after the organizer's next publish"}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="race">

@@ -4,7 +4,7 @@ import type {
 } from "./league-types.ts";
 import { teamDesign } from "./ops/design.ts";
 import { extractRegulations } from "./regulations.ts";
-import { currentSuppliers, nextYearDesignState, supplierOptions } from "./ops/suppliers.ts";
+import { currentSuppliers, nextCarSeason, nextYearDesignState, supplierOptions } from "./ops/suppliers.ts";
 import { BUILDING_STATES, JOBS, PART_TYPES, Save, numOrNull, personKind, personName, type PartType } from "./model.ts";
 
 export type { LeagueConfig, LeagueState, TeamState } from "./league-types.ts";
@@ -37,7 +37,8 @@ export function extractLeague(save: Save, cfg: LeagueConfig): LeagueState {
       eventNumber: champ.mEventNumber,
       calendar: calendar(save, champ),
       standings: standings(save, champ),
-      lastRace: lastRace(save, champ),
+      lastRace: raceResults(save, champ).at(-1) ?? null,
+      races: raceResults(save, champ),
       rulesBreaches: rulesBreaches(save, champ).map(({ part: _p, partType: _t, ...b }) => b),
       regulations: extractRegulations(save, champ, new Set(memberTeams.map((m) => m.team.name as string))),
     },
@@ -172,11 +173,16 @@ function standings(save: Save, ch: Obj): Championship["standings"] {
   return { drivers: drivers.sort(byPos), teams: teams.sort(byPos) };
 }
 
-function lastRace(save: Save, ch: Obj): RaceResults | null {
-  const events = save.g.list<Obj>(ch.calendar);
-  const idx = events.map((e) => !!e.mHasEventEnded).lastIndexOf(true);
-  if (idx < 0) return null;
-  const ev = events[idx];
+/** Results of every finished round this season (MM keeps them on the calendar events). */
+function raceResults(save: Save, ch: Obj): RaceResults[] {
+  return save.g.list<Obj>(ch.calendar).flatMap((ev, idx) => {
+    if (!ev.mHasEventEnded || !ev.results) return [];
+    const r = eventResults(save, ev, idx);
+    return r.race.length ? [r] : [];
+  });
+}
+
+function eventResults(save: Save, ev: Obj, idx: number): RaceResults {
   const results = save.g.deref<Obj>(ev.results);
   const session = (key: string): SessionResult[] => {
     const s = results[key]?.[0] ? save.g.deref<Obj>(results[key][0]) : null;
@@ -236,6 +242,7 @@ function withRules(save: Save, t: Obj, champ: Obj, design: TeamDesign): TeamDesi
     ...design,
     nextYearCar: {
       state: nextYearDesignState(save, t),
+      season: nextCarSeason(save, t),
       current: currentSuppliers(save, t) as Record<string, never>,
       options: supplierOptions(save, t) as Record<string, never>,
     },

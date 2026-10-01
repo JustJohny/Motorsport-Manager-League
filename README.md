@@ -38,6 +38,7 @@ See `examples/changes.example.json`. Operations:
 - `removeUnorderedParts {teams, keep, since}`: removes parts the AI designed *and finished* on member teams between checkpoints, and refunds them (once per design). A fitted one is first replaced on the car by the best spare part.
 - `setFitting {team, fitting: [{car, type, part}]}`: re-applies a member's fitting; parts that are gone are skipped.
 - `setImprovement {team, performance, reliability, split?}`: the parts (GUIDs) the mechanics improve, at most 2/4/6/8 per list for Factory level 0–3, plus the share of mechanics on performance (0..1).
+- `setSuppliers {team, suppliers: {Engine?, Brakes?, Fuel?, Materials?, Battery?, ERSAdvanced?}}`: supplier ids for next year's car, replacing MM's AI picks once pre-season has started it. The pending chassis stats shift by the supplier-stat difference, the engine level modifier follows the engine, and the AI's payment is refunded for each new supplier's price.
 - `addPart {team, type, stat, reliability, performance?, maxPerformance?, level?, name?, fitToCar?}`
 - `fitPart {team, type, part, car}` and `removePart {team, type, part}`
 - `hire {team, person, replacing | slotID, yearlyWages?, endDate?}`: works for drivers, lead engineers and mechanics. A free agent replaces someone, who is then released. Someone at another team **swaps** with the person they replace.
@@ -75,6 +76,9 @@ After the deadline: `mmsave pull -o changes.json --mark-applied`, then `mmsave a
 
 ## Regulations
 The Regulations page shows this season's and next season's rules and holds MM's rule votes on the site. Members vote with MM's vote power, and AI teams' votes are predicted with MM's logic (`src/politics.ts`) and published. At the checkpoint before a vote's game date, `pull` settles it with the league's result instead of MM's own vote (`concludeVote`). The organizer can set any rule group for next season (`setNextRule`, migration 008).
+
+## Next season's suppliers
+On Parts → Next season's car, members choose next year's engine, brakes, fuel and materials suppliers (battery and ERS too, where the rules switch them on) from every deal of their championship's tier that MM lets the team buy, at MM's price for the team. The window opens once 3 races remain (`src/supplier-rules.ts`). No choice keeps this season's supplier. Choices are private and stored against the season the car is for (migrations 010 and 011: `choose_supplier`, `clear_supplier_choice`). MM only designs next year's car at pre-season, so `pull` emits `setSuppliers` for member teams once their snapshot shows MM designing it, and repeats it on every pull until the car is built.
 
 ## Organizer workflow
 Each race has two checkpoints (after the race, and just before the next one). The site's **Organizer page** walks through them step by step: it detects the current checkpoint from the published game date, fills in the save names, and has copyable commands, the rules that keep the cycle working, and what to do when something fails.

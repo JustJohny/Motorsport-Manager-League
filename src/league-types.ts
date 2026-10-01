@@ -116,6 +116,8 @@ export interface Championship {
   calendar: CalendarEvent[];
   standings: { drivers: DriverStanding[]; teams: TeamStanding[] };
   lastRace: RaceResults | null;
+  /** Every finished round this season, in calendar order. Missing in snapshots published before 2026-10-01. */
+  races?: RaceResults[];
   /** Every part caught this season. Missing in snapshots published before 2026-10-01. */
   rulesBreaches?: RulesBreach[];
   /** Rules and the season's votes. Missing in snapshots published before 2026-10-01. */
@@ -254,6 +256,8 @@ export interface TeamDesign {
   nextYearCar?: {
     /** MM's AI starts next year's design when pre-season starts; choices apply from then. */
     state: "waiting" | "designing" | "complete";
+    /** The season the car is for (the year pre-season ends): choices are stored against it. */
+    season: number;
     current: Record<string, SupplierOffer>;
     options: Record<string, SupplierOffer[]>;
   };

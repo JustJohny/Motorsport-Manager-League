@@ -107,6 +107,12 @@ Decompile a class to C# with `dotnet tool install --tool-path <dir> ilspycmd`, t
 - `mechanics[stat]` is the split of the mechanics (`SplitMechanics(x)`: x = the share on Performance). Work happens on weekdays from 09:00 to 18:00.
 - The AI (`TeamAIController` ~734–804) refills both lists and the split by itself, and `FitPartsOnCars()` refits after every part it builds.
 
+## Next year's car and suppliers (from Assembly-CSharp)
+- MM designs next year's car only at pre-season: `NextYearCarDesign.state` is WaitingForDesign (1) during the season, Designing (0) once the AI's `HandleCarNewChassis` has picked suppliers and called `StartDesign`, and Complete (2) when built. There's no mid-season supplier choice in MM; the league's window is its own rule.
+- Pre-season straddles New Year: the ERS 2016 championship has `currentSeasonEndDate` 2016-12-06, `currentPreSeasonStartDate` 2016-12-13 and `currentPreSeasonEndDate` 2017-03-05. The season a car is for is the year of `currentPreSeasonEndDate`, not the game date's year. (Not yet seen: when MM moves these dates on to the next season.)
+- `supplierStats` keys are `CarChassisStats.Stats` (0 tyre wear, 1 tyre heating, 2 fuel efficiency, 3 improvability, 4 starting charge, 5 harvest efficiency). They're ratings, so higher is better: the dearest deals have the most tyre wear. Keys 4 and 5 are 0 outside hybrid series.
+- One supplier has many deals with the same name (all 15 ERS brakes deals are "Micronix Racing"), each with its own id, stats and price. Engine deals have `minEngineLevelModifier` = `maxEngineLevelModifier` (already rolled), so their level is one number.
+
 ## Verified in game (2026-09-30, save "League Test 2", player team)
 - `setBuilding`: Wind Tunnel shown at level 1.
 - `setBudget`: new budget shown, with our transaction note in the finance history.

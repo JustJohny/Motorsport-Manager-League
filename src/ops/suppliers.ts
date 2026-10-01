@@ -99,6 +99,14 @@ export function nextYearDesignState(save: Save, team: Obj): "waiting" | "designi
   return ny.state === NEXT_YEAR_STATE.Designing ? "designing" : ny.state === NEXT_YEAR_STATE.Complete ? "complete" : "waiting";
 }
 
+/**
+ * The season next year's car is for. Pre-season straddles New Year (ERS 2016: 13 Dec to 5 Mar), so
+ * it's the year pre-season ends, not the game date's year.
+ */
+export function nextCarSeason(save: Save, team: Obj): number {
+  return Number(String(save.championship(team).currentPreSeasonEndDate).slice(0, 4));
+}
+
 function findSupplier(save: Save, type: SupplierType, id: number): Obj {
   const s = save.g.list<Obj>(save.data.supplierManager[LIST_NAME[type]]).find((x) => x.id === id);
   if (!s) throw new Error(`No ${type} supplier ${id}`);
