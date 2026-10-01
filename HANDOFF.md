@@ -1,6 +1,6 @@
 # Handoff: MM League Toolkit
 
-_Last updated 2026-10-01 (auction live and verified in game; HQ orders deployed, migrations 003/004 run; needs a fresh publish). Read this first in a new session, then `README.md` and `docs/save-schema.md`._
+_Last updated 2026-10-01 (auction and HQ orders live and verified in game; next: phase 4, part development). Read this first in a new session, then `README.md` and `docs/save-schema.md`._
 
 ## The goal
 Run a **Motorsport Manager 1 (v1.53)** online league the way F1 Manager 24 community leagues run:
@@ -103,7 +103,7 @@ Steps 1–5 are done: Supabase is set up, Pages is deployed, and snapshots are p
 
 **Transfer window page:** it shows auctions only while bidding runs. After the deadline it's cleared, and the results move to the History tab (every window, "Awaiting organizer" until `pull --mark-applied`). Bidding closes on a timer set to the exact deadline, not on a polling clock.
 
-## Phase 3: HQ orders, live on the site (ordering and cancelling verified by the user 2026-10-01, snapshot #5)
+## Phase 3: HQ orders, live and verified in game
 **Rules agreed with the user:**
 - The game builds it, at MM's real times. The user chose this after learning the times are 20–116 weeks, i.e. multi-season projects. `league_settings.hq_speed` (default 1) can scale them.
 - Full MM price paid upfront.
@@ -126,7 +126,7 @@ Steps 1–5 are done: Supabase is set up, Pages is deployed, and snapshots are p
 
 **Verified in game (2026-10-01, "League Test 6"):** a Design Centre ordered on the site was pulled and applied, the save loads, and MM shows it as just begun construction.
 
-**Not verified in game yet:** that the build progresses over days and completes, and that a cancelled AI project really disappears in MM.
+**Also verified in game (2026-10-01):** the build progresses over days. A construction started by hand in MM ("League Test 7", standing in for an AI project) showed on the site as "AI project · cancelled at next apply", and after pull + apply ("League Test 8") it was reverted and refunded, while the ordered Design Centre kept building. Not yet seen: a build reaching completion (20+ weeks).
 
 ## How to work with it
 ```sh
@@ -174,7 +174,7 @@ npx tsx src/cli.ts validate "<save>"
 - HQ upgrades are applied instantly, bypassing build time and cost. The site should model time and cost itself. `setBuilding` warns on unmet prerequisites.
 
 ## Next steps
-1. **Phase 3:** run migrations 003 + 004, deploy, publish, order something, then pull + apply + play until it completes in game.
+1. **Phase 3 (done):** only left to see a toolkit-started build complete in game, which happens naturally as the league plays on.
 2. **Phase 2 (done):** test with a second real member.
    - Tuning to discuss: opening prices can be below an AI driver's current wage, and buyouts of long contracts are large ($11M for a 20-year-old on a deal to 2018).
 3. Phase 4: part development formula.
