@@ -11,6 +11,7 @@ import { defaultSavesDir } from "./paths.ts";
 import { memberRows, publish, splitSnapshot } from "./publish.ts";
 import { cancelUnorderedChange, fetchHqContext, fetchQueuedOrders, hqChanges, markOrdersApplied } from "./hq-orders.ts";
 import type { LeagueSettings } from "./league-rules.ts";
+import { choiceChanges, designChanges, fetchPartsContext, markDesignsApplied, undoAiParts } from "./part-orders.ts";
 import { rest, supabaseEnv } from "./supabase.ts";
 import { fetchWindow, markApplied, windowChanges, winners } from "./transfers.ts";
 
@@ -22,7 +23,7 @@ const USAGE = `mmsave - Motorsport Manager league save toolkit
   mmsave teams    <save.sav>                          list teams by championship
   mmsave extract  <save.sav> --league league.json [-o state.json]
   mmsave publish  <save.sav> --league league.json [--dry-run]   upload to the league website
-  mmsave pull     [-o changes.json] [--mark-applied] [--force] HQ orders + transfer results as changes
+  mmsave pull     [-o changes.json] [--mark-applied] [--force] HQ orders, part designs, fitting, improvement + transfer results as changes
   mmsave apply    <save.sav> <changes.json> [-o out.sav] [--name "Shown name"]
   mmsave diff     <a.sav> <b.sav> [--team NAME] [--path teamManager] [--depth N]
 
@@ -144,6 +145,9 @@ switch (cmd) {
     // First undo what the in-game AI did to member teams' HQ since the last apply.
     const ctx = await fetchHqContext(env);
     if (ctx.leagueStart && ctx.memberTeams.length) changes.push(cancelUnorderedChange(ctx.memberTeams, ctx.orders, ctx.leagueStart));
+    // ...and to their parts: AI designs and AI-built parts go, refunded.
+    const parts = await fetchPartsContext(env);
+    if (ctx.leagueStart && ctx.memberTeams.length) changes.push(...undoAiParts(ctx.memberTeams, parts.orders, ctx.leagueStart));
 
     console.log(`HQ orders: ${orders.length}`);
     for (const o of orders) {
@@ -151,6 +155,13 @@ switch (cmd) {
         + ` for $${Number(o.cost).toLocaleString()} (${Math.round(o.weeks * Number(settings.hq_speed))} weeks)`);
     }
     changes.push(...hqChanges(orders, Number(settings.hq_speed)));
+
+    console.log(`Part designs: ${parts.queued.length}`);
+    for (const o of parts.queued) console.log(`  ${o.team}: ${o.part_type} with components ${o.components.join(", ")} for $${Number(o.cost).toLocaleString()}`);
+    changes.push(...designChanges(parts.queued));
+    // Fitting and improvement are standing choices: re-applied every time, after the designs.
+    console.log(`Fitting choices: ${parts.fitting.length}, improvement choices: ${parts.improvement.length}`);
+    changes.push(...choiceChanges(parts.fitting, parts.improvement));
 
     let windowDone = false;
     if (!w) console.log("Transfer window: none waiting");
@@ -168,12 +179,14 @@ switch (cmd) {
       windowDone = true;
     }
     if (orders.length) notes.push(`${orders.length} HQ order${orders.length > 1 ? "s" : ""}`);
+    if (parts.queued.length) notes.push(`${parts.queued.length} part design${parts.queued.length > 1 ? "s" : ""}`);
 
     const json = JSON.stringify({ description: notes.join(" + ") || "nothing to apply", changes }, null, 2);
     if (opt.out) writeFileSync(opt.out, json), console.log(`wrote ${opt.out}`);
     else console.log(json);
     if (opt["mark-applied"]) {
       await markOrdersApplied(env, orders.map((o) => o.id));
+      await markDesignsApplied(env, parts.queued.map((o) => o.id));
       if (windowDone && w) await markApplied(env, w.window.id);
       console.log(`marked as applied: ${notes.join(" + ") || "nothing"}`);
     }

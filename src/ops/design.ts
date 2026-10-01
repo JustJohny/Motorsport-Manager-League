@@ -508,3 +508,28 @@ export function setImprovement(save: Save, op: SetImprovementOp): string {
   if (notes.length) msg += ` (skipped: ${notes.join("; ")})`;
   return msg;
 }
+
+export interface SetFittingOp {
+  op: "setFitting";
+  team: string | number;
+  /** The member's standing choice per car and part type. */
+  fitting: { car: 0 | 1; type: PartType; part: string }[];
+}
+
+/**
+ * Re-apply a member's fitting. Parts that no longer exist (worn out, or removed as AI-built) are
+ * skipped, and a part both cars ask for stays where the first choice puts it.
+ */
+export function setFitting(save: Save, op: SetFittingOp): string[] {
+  const team = save.team(op.team);
+  const log: string[] = [];
+  for (const f of op.fitting) {
+    const part = save.parts(team, f.type).find((p) => p.id === f.part);
+    if (!part) { log.push(`${team.name}: car ${f.car} ${f.type} ${f.part} is gone, left as it is`); continue; }
+    const car = save.cars(team)[f.car];
+    if (part.isFitted && part.fittedCar && save.g.deref(part.fittedCar) === car) continue;
+    if (part.isFitted && op.fitting.some((o) => o !== f && o.type === f.type && o.part === f.part && o.car !== f.car)) continue;
+    log.push(fitPart(save, { op: "fitPart", team: team.name, type: f.type, part: f.part, car: f.car }));
+  }
+  return log.length ? log : [`${team.name}: fitting unchanged`];
+}

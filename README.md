@@ -18,7 +18,7 @@ Needs Node 22+. The CLI finds saves in `…/AppData/LocalLow/Playsport Games/Mot
 | `teams <save>` | List teams by championship, with IDs |
 | `extract <save> --league league.json -o state.json` | Site-ready JSON: every team in the league championship (budget, HQ, parts, staff), free-agent market, calendar, standings, last race results |
 | `publish <save> --league league.json [--dry-run]` | Extract and upload to the league website (Supabase). Needs `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in `.env` (see `.env.example`) |
-| `pull [-o changes.json] [--mark-applied] [--force]` | Members' decisions as changes: queued HQ orders (`startBuilding` + `adjustBudget`) and, once its deadline has passed, the transfer window's signings (`hire` + `adjustBudget`). `--mark-applied` marks them done |
+| `pull [-o changes.json] [--mark-applied] [--force]` | Members' decisions as changes, in this order: undo the AI on member teams (`cancelUnorderedHq`, `cancelUnorderedDesigns`, `removeUnorderedParts`), queued HQ orders (`startBuilding` + `adjustBudget`), queued part designs (`startDesign` + `adjustBudget`), every member's standing fitting and improvement (`setFitting`, `setImprovement`), and, once its deadline has passed, the transfer window's signings (`hire` + `adjustBudget`). `--mark-applied` marks orders and the window done |
 | `apply <save> changes.json -o out.sav` | Apply member decisions and write a **new** save (never overwrites the input) |
 | `diff <a.sav> <b.sav> --team NAME` | Structural diff, for reverse-engineering what the game changes |
 | `validate <save>` | Check the object graph (duplicate ids, dangling or forward refs) |
@@ -36,6 +36,7 @@ See `examples/changes.example.json`. Operations:
 - `cancelDesign {team, refund?}`: stops the design in progress and refunds what MM charged (AI teams pay 10 % of materials).
 - `cancelUnorderedDesigns {teams, keep, since}`: like `cancelUnorderedHq`, for part designs the AI started on member teams. `keep` lists ordered designs by type and components.
 - `removeUnorderedParts {teams, keep, since}`: removes parts the AI designed *and finished* on member teams between checkpoints, and refunds them (once per design). A fitted one is first replaced on the car by the best spare part.
+- `setFitting {team, fitting: [{car, type, part}]}`: re-applies a member's fitting; parts that are gone are skipped.
 - `setImprovement {team, performance, reliability, split?}`: the parts (GUIDs) the mechanics improve, at most 2/4/6/8 per list for Factory level 0–3, plus the share of mechanics on performance (0..1).
 - `addPart {team, type, stat, reliability, performance?, maxPerformance?, level?, name?, fitToCar?}`
 - `fitPart {team, type, part, car}` and `removePart {team, type, part}`
