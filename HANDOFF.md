@@ -1,6 +1,6 @@
 # Handoff: MM League Toolkit
 
-_Last updated 2026-10-01 (auction, HQ orders and part development all live and verified in game). Read this first in a new session, then `README.md` and `docs/save-schema.md`._
+_Last updated 2026-10-01 (auction, HQ orders, part development, organizer race guide and grey-area parts live; regulations, engine programmes and illegal engines designed, not built). Read this first in a new session, then `README.md` and `docs/save-schema.md`._
 
 ## The goal
 Run a **Motorsport Manager 1 (v1.53)** online league the way F1 Manager 24 community leagues run:
@@ -252,7 +252,11 @@ npx tsx src/cli.ts validate "<save>"
    - The current checkpoint comes from the published game date: on or after the day before the next race's date is B (before race), anything earlier is A (after the last race).
    - Saves are named `League R<n> Post` / `League R<n+1> Pre`, filled in from the calendar, with copyable publish / pull / apply commands.
    - It also shows what's waiting for the next pull (queued designs, HQ orders, transfer window) and has collapsible rules and troubleshooting.
-5. Before the league starts for real: remove the placeholder members (`alice_discord`, `bob_discord`) from `league.json`, test with a second real Discord account, and settle the auction tuning (item 2).
+5. Before the league starts for real: test with a second real Discord account, and play one full race cycle with the Organizer page's guide (the first real `pull` against AI-built parts on a member team). Auction tuning is done (migration 007), and the placeholder members are gone from `league.json`.
+6. **Backlog of designed features, in the suggested build order** (the user's idea list is complete as of 2026-10-01):
+   1. **Season regulations and politics.** It's useful every season, including the ERS one.
+   2. **Works engine programmes.** It only pays off in a series where the engine isn't spec. Build after testing a season change in game.
+   3. **Illegal engine tech.** Builds on 2.
 
 ## Illegal (grey-area) parts: MM's scrutineering, shown on the site (built 2026-10-01)
 The user's idea: members may run parts that are faster but risk getting caught after a race. MM already does this (`PenaltyDirector.ScrutinizePartRules`), and the user chose to keep MM's system and make it visible:
