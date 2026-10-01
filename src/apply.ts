@@ -3,6 +3,7 @@ import {
   cancelDesign, cancelUnorderedDesigns, removeUnorderedParts, setFitting, setImprovement, startDesign,
   type CancelDesignOp, type CancelUnorderedDesignsOp, type RemoveUnorderedPartsOp, type SetFittingOp, type SetImprovementOp, type StartDesignOp,
 } from "./ops/design.ts";
+import { concludeVote, setNextRule, type ConcludeVoteOp, type SetNextRuleOp } from "./ops/politics.ts";
 import { adjustBudget, setBudget, type AdjustBudgetOp, type SetBudgetOp } from "./ops/finance.ts";
 import {
   cancelBuilding, cancelUnorderedHq, setBuilding, startBuilding,
@@ -13,7 +14,8 @@ import { hire, type HireOp } from "./ops/staff.ts";
 import { syncTeam, type SyncTeamOp } from "./ops/sync.ts";
 
 export type Change = SetBuildingOp | StartBuildingOp | CancelBuildingOp | CancelUnorderedHqOp | SetBudgetOp | AdjustBudgetOp | AddPartOp | RemovePartOp | FitPartOp | HireOp | SyncTeamOp
-  | StartDesignOp | CancelDesignOp | CancelUnorderedDesignsOp | RemoveUnorderedPartsOp | SetFittingOp | SetImprovementOp;
+  | StartDesignOp | CancelDesignOp | CancelUnorderedDesignsOp | RemoveUnorderedPartsOp | SetFittingOp | SetImprovementOp
+  | ConcludeVoteOp | SetNextRuleOp;
 
 export interface ChangeSet {
   /** Optional note, e.g. "Before round 6 - Munich". */
@@ -54,6 +56,8 @@ function run(save: Save, c: Change): string | string[] {
     case "removeUnorderedParts": return removeUnorderedParts(save, c);
     case "setFitting": return setFitting(save, c);
     case "setImprovement": return setImprovement(save, c);
+    case "concludeVote": return concludeVote(save, c);
+    case "setNextRule": return setNextRule(save, c);
     default: throw new Error(`Unknown op ${(c as { op: string }).op}`);
   }
 }

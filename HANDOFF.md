@@ -285,11 +285,11 @@ Members see the current and the confirmed next-season regulations, vote on the s
   - `src/regulations.ts`: `extractRegulations` → `championship.regulations` (public). It holds the current and next rule ids, a catalogue of every rule definition of the series in the save, this season's votes (held ones with MM's result; upcoming ones with predicted AI votes), and each team's vote power and characteristics.
   - Rule names come from the game's text in `resources.assets` (`gameDataDir()`, override with `MM_GAME_DIR`). The "HUDText","English","PSG_id" rows give the names and the rules CSV gives the descriptions. Placeholders are filled from the impacts (tracks, fuel, pit speed, race length). Descriptions with unfillable placeholders are dropped.
   - AI characteristics are approximated: fixed leanings + standings position (also used for team quality) + budget, driver, fuel and tyre ranks. Cornering and track stats are left out. Predictions are seeded (season, rule id, team), so what's published is what's applied.
-- ⏭ Step 2: migration 008.
+- ✅ Step 2: migration `008_regulations.sql` (**not yet run on Supabase**).
   - `rule_votes` (team, season, rule_id, choice, extra_power), member-visible, via an RPC `cast_rule_vote` (vote upcoming in the latest snapshot and not concluded; extra power ≤ the team's `votingPower`).
   - `rule_vote_results` (season, rule_id, yes, no, abstained, accepted), written by `pull --mark-applied`.
   - `next_rule_overrides` (season, group, rule_id), organizer-only, via the RPC `set_next_rule(group, rule_id|null)`.
-- ⏭ Step 3: toolkit ops.
+- ✅ Step 3: toolkit ops (`src/ops/politics.ts`) + `src/rule-votes.ts` + `pull`. Tests: `test/politics.test.ts` settles a real vote, reloads and validates.
   - `concludeVote` replaces MM's own vote:
     - `nextYearsRules` AddRule (replace by group) when accepted
     - push a VoteResults (yesVotesCount, noVotesCount, abstainedVotesCount, votedSubject ref, voteResult 0 accepted / 1 rejected)

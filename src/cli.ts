@@ -12,6 +12,7 @@ import { memberRows, publish, splitSnapshot } from "./publish.ts";
 import { cancelUnorderedChange, fetchHqContext, fetchQueuedOrders, hqChanges, markOrdersApplied } from "./hq-orders.ts";
 import type { LeagueSettings } from "./league-rules.ts";
 import { choiceChanges, designChanges, fetchPartsContext, markDesignsApplied, undoAiParts } from "./part-orders.ts";
+import { fetchRegulationContext, recordVoteResults, regulationChanges } from "./rule-votes.ts";
 import { rest, supabaseEnv } from "./supabase.ts";
 import { fetchWindow, markApplied, windowChanges, winners } from "./transfers.ts";
 
@@ -163,6 +164,21 @@ switch (cmd) {
     console.log(`Fitting choices: ${parts.fitting.length}, improvement choices: ${parts.improvement.length}`);
     changes.push(...choiceChanges(parts.fitting, parts.improvement));
 
+    // Rule votes due before the next checkpoint, settled with the league's result instead of MM's;
+    // then the organizer's choices for next season.
+    const reg = await fetchRegulationContext(env);
+    let voteResults: Awaited<ReturnType<typeof regulationChanges>>["results"] = [];
+    const regs = reg.snapshot?.championship.regulations;
+    if (reg.snapshot && regs) {
+      const next = reg.snapshot.championship.calendar.find((e) => !e.ended)?.date ?? null;
+      const r = regulationChanges(regs, reg.snapshot.championship.id, reg.snapshot.gameDate, next, reg.rows, reg.overrides, reg.decided);
+      voteResults = r.results;
+      for (const v of r.results) console.log(`  Rule vote ${v.rule_id}: ${v.accepted ? "accepted" : "rejected"} ${v.yes}-${v.no} (${v.abstained} abstained)`);
+      console.log(`Rule votes settled: ${r.results.length}, next-season overrides: ${reg.overrides.filter((o) => o.season === regs.season).length}`);
+      changes.push(...r.changes);
+      if (r.results.length) notes.push(`${r.results.length} rule vote${r.results.length > 1 ? "s" : ""}`);
+    }
+
     let windowDone = false;
     if (!w) console.log("Transfer window: none waiting");
     else if (new Date(w.window.closes_at) > new Date() && !opt.force) {
@@ -187,6 +203,7 @@ switch (cmd) {
     if (opt["mark-applied"]) {
       await markOrdersApplied(env, orders.map((o) => o.id));
       await markDesignsApplied(env, parts.queued.map((o) => o.id));
+      await recordVoteResults(env, voteResults);
       if (windowDone && w) await markApplied(env, w.window.id);
       console.log(`marked as applied: ${notes.join(" + ") || "nothing"}`);
     }
