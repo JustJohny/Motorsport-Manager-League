@@ -182,20 +182,16 @@ npx tsx src/cli.ts validate "<save>"
    - **Components from MM's real list**, per part type, with MM's unlock rules (Design Centre level, designer).
    - **Parts the AI designs on member teams are cancelled and refunded**, as with HQ projects.
    - **Members choose fitting** (which part goes on car 1 and car 2).
-   - **League limit: one active design per part type** per team, counted on the site.
+   - **One design at a time per team, as in MM.** MM has a single design slot per team, so the earlier "one per part type" choice was dropped (2026-10-01).
    - **Both cars in one order**, at MM's price for the second build. It counts as one design.
-   - **Paid upfront**, with money reserved on order and paid at apply, as with HQ.
+   - **Paid upfront at the player price** (full `materialsCost` + components, not the AI's 10 %), with money reserved on order and paid at apply, as with HQ.
    - **Two checkpoints per race cycle** (the user's plan, as in vanilla MM, where you fit new parts before the next race):
      1. After the race: publish, members act, then pull + apply. The organizer advances in MM to just before the next race, and parts get built.
      2. Before the race: publish again, members act, then pull + apply, then the race is played.
      - Members can do **everything** at both checkpoints: designs, fitting, HQ and bids. Orders placed before the race start at that apply.
      - **No fitting submitted = keep their last fitting.** The AI refits while the organizer advances, so every pull re-emits each member team's stored fitting. New parts stay in inventory.
-   - **Part improvement chosen by members:** as in vanilla MM, up to **2 built parts for performance and 2 for reliability**, worked on by the mechanics. Like fitting, the last choice is kept and re-emitted on every pull, so the AI's picks never last. To check in `PartImprovement`: whether only fitted parts qualify, and how the slots and rates are stored.
-   - MM facts so far (from `Assembly-CSharp.dll`, `CarPartDesign`):
-     - Base stat = season starting stat for the part type + 1.5 × the lead designer's matching `partContributionStats`.
-     - Cost = `PartTypeSlotSettings.materialsCost` per championship and part type, + component cost bonuses.
-     - Time = `buildTimeDays` − `designCentrePartDaysPerLevel[level]` − component bonuses.
-     - `maxPerformance` comes from the chassis' improvability.
+   - **Part improvement chosen by members:** as in vanilla MM, the parts to improve for performance and for reliability, with **MM's slot count: 2/4/6/8 per list for Factory level 0–3**. Any inventory part qualifies. Members also set the **mechanics split slider**. Like fitting, the last choice is kept and re-emitted on every pull, so the AI's picks never last.
+   - MM internals: see docs/save-schema.md, "Part design and improvement". Component display names are localised (`mNameID`) and not in the save. Use `mCustomComponentName`, or find the localisation file in the game data.
 4. An organizer workflow document (between-race checklist).
 
 ## Working notes for the assistant
