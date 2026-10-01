@@ -259,7 +259,7 @@ npx tsx src/cli.ts validate "<save>"
    2b. **Next season's suppliers on the site.** Built (toolkit, DB, site, organizer guide). Left: publish, and test at season end / pre-season in game; member engines as options come with the engine season step.
    3. **Illegal engine tech.** Builds on 2.
 
-## Series: several saves on one site, and ending a league (built 2026-10-01; migration 013 not yet run)
+## Series: several saves on one site, and ending a league (built 2026-10-01; migration 013 run, league-main.json set up and publish/pull run by the user the same day)
 **The user's decisions (2026-10-01):**
 - Switching or ending a league = **archive, then wipe**: a full JSON backup, then everything of that league deleted from the site.
 - Several series at once (e.g. open-wheel + endurance, one save each) = **one site with a series switcher**; one Discord account can run a team in each.
