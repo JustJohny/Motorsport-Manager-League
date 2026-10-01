@@ -200,7 +200,7 @@ npx tsx src/cli.ts validate "<save>"
        - Garuda's AI Front Wing design is cancelled and refunded, and a league Brakes design is started, done 2016-10-06.
        - Tatra improves performance on F-LEAGUE.
      - Next: the user plays past 2016-10-07. Check that both parts appear in the inventories (`mmsave extract`, or Tatra's UI), then do steps 2–5 (extract, migration 005, site, pull).
-     - Open: AI designs on member teams can also *complete* between checkpoints, which adds parts the member didn't order. Decide with the user whether `pull` removes them and refunds.
+     - **AI-finished parts on member teams: remove and refund** (user's decision). `removeUnorderedParts` does this: parts built after the league start whose components don't match an ordered design. A fitted one is replaced by the best spare first, and one refund is made per design.
    - MM internals: see docs/save-schema.md, "Part design and improvement". Component display names are localised (`mNameID`) and not in the save. Use `mCustomComponentName`, or find the localisation file in the game data.
 4. An organizer workflow document (between-race checklist).
 

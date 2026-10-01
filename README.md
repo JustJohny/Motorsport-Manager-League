@@ -35,6 +35,7 @@ See `examples/changes.example.json`. Operations:
 - `startDesign {team, type, components}`: starts designing a part the way MM's design screen does, from the team's own component list (component ids; engineer components open their extra slots). One design at a time per team, as in MM. MM's time rules apply, and the game builds the part with its own stats. It doesn't charge anything (use `adjustBudget`; the league charges MM's player price).
 - `cancelDesign {team, refund?}`: stops the design in progress and refunds what MM charged (AI teams pay 10 % of materials).
 - `cancelUnorderedDesigns {teams, keep, since}`: like `cancelUnorderedHq`, for part designs the AI started on member teams. `keep` lists ordered designs by type and components.
+- `removeUnorderedParts {teams, keep, since}`: removes parts the AI designed *and finished* on member teams between checkpoints, and refunds them (once per design). A fitted one is first replaced on the car by the best spare part.
 - `setImprovement {team, performance, reliability, split?}`: the parts (GUIDs) the mechanics improve, at most 2/4/6/8 per list for Factory level 0–3, plus the share of mechanics on performance (0..1).
 - `addPart {team, type, stat, reliability, performance?, maxPerformance?, level?, name?, fitToCar?}`
 - `fitPart {team, type, part, car}` and `removePart {team, type, part}`

@@ -321,6 +321,39 @@ describe.skipIf(!existsSync(SAVE))("operations on a real save", () => {
     // MM puts everyone on the only list with parts; otherwise the member's slider decides.
     expect(mech[3]).toBe(Math.round((rel ? 0.3 : 1) * (mech[3] + mech[1])));
   }, 120_000);
+  it("removes and refunds parts the AI designed and finished on member teams", () => {
+    const save = Save.load(SAVE);
+    const g = save.g;
+    const garuda = save.team("Garuda Racing");
+    // After the season-start parts (February, no components): only parts the AI designed.
+    const since = "2016-03-01T00:00:00.0000000";
+    const types = ["Brakes", "FrontWing", "RearWing", "Suspension"] as const;
+    const recent = types.flatMap((t) => save.parts(garuda, t).filter((p) => String(p.buildDate) > since).map((p) => ({ t, p })));
+    expect(recent.length).toBeGreaterThan(1);
+    // Pretend the league ordered the first one.
+    const kept = recent[0];
+    const keepIds = g.list<any>(kept.p.components).filter(Boolean).map((c: any) => c.id);
+    const budget = Number(save.finance(garuda).currentBudget);
+    const log = applyChanges(save, { changes: [{ op: "removeUnorderedParts", teams: ["Garuda Racing"], since, keep: [{ team: "Garuda Racing", type: kept.t, components: keepIds }] }] });
+    expect(log.join("\n")).toMatch(/removed .*\(built by the AI/);
+    expect(Number(save.finance(garuda).currentBudget)).toBeGreaterThan(budget);
+    expect(save.parts(garuda, kept.t)).toContain(kept.p);
+
+    save.prepareForWrite();
+    const reloaded = reload(save);
+    expect(reloaded.g.validate()).toEqual([]);
+    const rg = reloaded.team("Garuda Racing");
+    // Every car still has a part of each type fitted.
+    for (const car of reloaded.cars(rg)) {
+      const current = reloaded.g.list<any>(car.mCurrentPart);
+      for (const t of types) expect(current[["Brakes", "Engine", "FrontWing", "Gearbox", "RearWing", "Suspension"].indexOf(t)], t).toBeTruthy();
+    }
+    const left = types.flatMap((t) => reloaded.parts(rg, t).filter((p) => String(p.buildDate) > since));
+    for (const p of left) {
+      const ids = reloaded.g.list<any>(p.components).filter(Boolean).map((c: any) => c.id).sort().join();
+      expect(ids === [...keepIds].sort().join() || p.isFitted, p.name).toBe(true);
+    }
+  }, 120_000);
 });
 
 function applyPreview(save: Save, team: string, type: any, ids: number[]) {

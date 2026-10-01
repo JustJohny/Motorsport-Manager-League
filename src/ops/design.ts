@@ -6,6 +6,7 @@ import { planDesign, type DesignComponent, type DesignContext, type DesignPlan }
 import { addDays, delayedEvents, insertByDate } from "./calendar.ts";
 import { findBuilding } from "./hq.ts";
 import { adjustBudget } from "./finance.ts";
+import { fitPart } from "./parts.ts";
 
 /** Single-seater part types that can be designed, with the carPartDesign field of their components. */
 const COMPONENT_LISTS: Partial<Record<PartType, string>> = {
@@ -284,14 +285,7 @@ export function cancelDesign(save: Save, op: CancelDesignOp): string {
   if (cpd.mStage !== STAGE.Designing || !cpd.mCarPart) throw new Error(`${team.name} isn't designing a part`);
   const part = g.deref<Obj>(cpd.mCarPart);
   const type = PART_TYPES.find((t) => `${t}Part` === part.$type);
-  let price = 0;
-  if (type && COMPONENT_LISTS[type]) {
-    // GetDesignCost, as the team was charged (AI teams pay 10 % of materials).
-    const s = partSettings(save, team, type);
-    const comps = g.list<Obj>(part.components).filter(Boolean);
-    const compCost = comps.reduce((sum, c) => sum + (num(c.cost) !== 0 ? num(c.cost) : c.componentType === 1 ? 0 : num(s.costPerLevel[c.level - 1])), 0);
-    price = Math.round(Math.max(0, num(s.materialsCost) * (isPlayerTeam(save, team) ? 1 : 0.1) + compCost));
-  }
+  const price = type ? chargedPrice(save, team, type, part) : 0;
 
   const events = delayedEvents(save);
   for (let i = events.length - 1; i >= 0; i--) {
@@ -318,6 +312,71 @@ export function cancelDesign(save: Save, op: CancelDesignOp): string {
   return msg;
 }
 
+/** GetDesignCost for a part's components, as MM charged the team (AI teams pay 10 % of materials). */
+function chargedPrice(save: Save, team: Obj, type: PartType, part: Obj): number {
+  if (!COMPONENT_LISTS[type]) return 0;
+  const s = partSettings(save, team, type);
+  const comps = save.g.list<Obj>(part.components).filter(Boolean);
+  const compCost = comps.reduce((sum, c) => sum + (num(c.cost) !== 0 ? num(c.cost) : c.componentType === 1 ? 0 : num(s.costPerLevel[c.level - 1])), 0);
+  return Math.round(Math.max(0, num(s.materialsCost) * (isPlayerTeam(save, team) ? 1 : 0.1) + compCost));
+}
+
+const componentIds = (save: Save, part: Obj) => save.g.list<Obj>(part.components ?? []).filter(Boolean).map((c) => c.id as number);
+const sameSet = (a: number[], b: number[]) => a.length === b.length && [...a].sort().join() === [...b].sort().join();
+
+export interface RemoveUnorderedPartsOp {
+  op: "removeUnorderedParts";
+  teams: (string | number)[];
+  /** Designs the league ordered (any number of parts may come from one). */
+  keep: { team: string; type: PartType; components: number[] }[];
+  /** League start; parts built before it are left alone. */
+  since: string;
+}
+
+/**
+ * Parts the in-game AI designed *and* finished on member teams between checkpoints: remove
+ * them and refund their price (once per design: copies built the same day share it). A fitted
+ * one is replaced on the car by the team's best other part of that type first.
+ */
+export function removeUnorderedParts(save: Save, op: RemoveUnorderedPartsOp): string[] {
+  const log: string[] = [];
+  for (const key of op.teams) {
+    const team = save.team(key);
+    for (const type of Object.keys(COMPONENT_LISTS) as PartType[]) {
+      const unordered = save.parts(team, type).filter((p) => {
+        if (String(p.buildDate) <= op.since) return false;
+        const ids = componentIds(save, p);
+        return !op.keep.some((k) => k.team === team.name && k.type === type && sameSet(k.components, ids));
+      });
+      const refunded = new Set<string>();
+      for (const part of unordered) {
+        if (part.isFitted) {
+          const car = save.cars(team).findIndex((c) => save.g.same(c, part.fittedCar) || c === save.g.deref(part.fittedCar));
+          const spare = save.parts(team, type)
+            .filter((p) => !p.isFitted && !unordered.includes(p))
+            .sort((a, b) => num(b.mStats.mStat) + num(b.mStats.mPerformance) - num(a.mStats.mStat) - num(a.mStats.mPerformance))[0];
+          if (!spare) { log.push(`${team.name}: kept ${part.name}, the only ${type} left for car ${car}`); continue; }
+          log.push(fitPart(save, { op: "fitPart", team: team.name, type, part: spare.id, car: car as 0 | 1 }));
+        }
+        const list = save.partList(team, type);
+        list.splice(list.findIndex((p) => save.g.deref(p) === part), 1);
+        const entities = save.g.rawList(save.data.entityManager.mEntities);
+        const at = entities.findIndex((e) => save.g.deref(e) === part);
+        if (at >= 0) entities.splice(at, 1);
+        let msg = `${team.name}: removed ${type} ${part.name} (built by the AI, not ordered on the league site)`;
+        const design = `${String(part.buildDate).slice(0, 10)}|${componentIds(save, part).sort().join()}`;
+        const price = chargedPrice(save, team, type, part);
+        if (!refunded.has(design) && price > 0) {
+          refunded.add(design);
+          msg += "; " + adjustBudget(save, { op: "adjustBudget", team: team.name, delta: price, reason: `Refund: ${ENGLISH_NAME[type]} built by the AI` });
+        }
+        log.push(msg);
+      }
+    }
+  }
+  return log.length ? log : ["No unordered parts on member teams"];
+}
+
 export interface CancelUnorderedDesignsOp {
   op: "cancelUnorderedDesigns";
   /** Member teams: the league site decides their designs. */
@@ -332,13 +391,12 @@ export interface CancelUnorderedDesignsOp {
 export function cancelUnorderedDesigns(save: Save, op: CancelUnorderedDesignsOp): string[] {
   const g = save.g;
   const log: string[] = [];
-  const sameSet = (a: number[], b: number[]) => a.length === b.length && [...a].sort().join() === [...b].sort().join();
   for (const key of op.teams) {
     const team = save.team(key);
     const cpd = carPartDesign(save, team);
     if (cpd.mStage !== STAGE.Designing || !cpd.mCarPart || String(cpd.startDate) <= op.since) continue;
     const part = g.deref<Obj>(cpd.mCarPart);
-    const ids = g.list<Obj>(part.components).filter(Boolean).map((c) => c.id as number);
+    const ids = componentIds(save, part);
     const ordered = op.keep.some((k) => k.team === team.name && `${k.type}Part` === part.$type && sameSet(k.components, ids));
     if (!ordered) log.push(cancelDesign(save, { op: "cancelDesign", team: team.name }));
   }
