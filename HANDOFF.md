@@ -350,7 +350,7 @@ A member invests in their own engine programme, becomes an engine supplier, and 
 
 **Build progress:**
 - ✅ `src/engine-rules.ts` (pure, shared): concepts, rising point cost, `developEngine`, `projectChance`, `buildEngine` (seeded projects + ±5 % roll, legal vs works engine), `carryOver`, `customerEngine`, `illegalDetection`. Tests: `test/engine.test.ts`.
-- ✅ Migration `009_engine_programmes.sql` (**not yet run on Supabase**).
+- ✅ Migration `009_engine_programmes.sql` (run on Supabase by the user, 2026-10-01).
   - `engine_programmes` is public. `engine_plans`, `engine_builds` and `engine_spend` are private. There are also `engine_projects` (the cost list, checked against `PROJECTS`) and `engine_customers`.
   - RPCs: `found_engine_programme`, `set_engine_concept`, `buy_engine_points`, `choose_engine_project`, `set_engine_offer`, `buy_engine`. All spending is reserved through `engine_reserve` (budget check), and `hq_committed` counts it.
   - Tests: `test/db-engine.test.ts`.
