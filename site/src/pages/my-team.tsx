@@ -9,14 +9,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/page-header"
+import { PartsTab } from "@/components/parts-tab"
 import { PersonCard } from "@/components/person-card"
-import { fmtDate, fmtMoney, fmtMoneyShort, fmtNum, fmtPct, humanize } from "@/lib/format"
+import { fmtDate, fmtMoney, fmtMoneyShort, fmtPct } from "@/lib/format"
 import { useHqOrders } from "@/lib/hq"
+import { useParts } from "@/lib/parts"
 import { nextHqStep, unorderedProject } from "@/lib/rules"
 import { useTransfers } from "@/lib/transfers"
 import { cn } from "@/lib/utils"
 import { useLeague } from "@/lib/league"
-import type { Building, Part, TeamPrivate } from "@/lib/types"
+import type { Building, TeamPrivate } from "@/lib/types"
 import { useNavigate } from "react-router"
 
 export function MyTeamPage() {
@@ -66,7 +68,7 @@ export function MyTeamPage() {
           {people.map((s) => <PersonCard key={s.slotID} person={s.person!} role={s.job} gameDate={league.snapshot.gameDate} />)}
         </TabsContent>
         <TabsContent value="hq">{priv ? <HqTable hq={priv.hq} own={name === me.team} team={name} /> : <PrivateNote />}</TabsContent>
-        <TabsContent value="parts">{priv ? <Parts parts={priv.parts} /> : <PrivateNote />}</TabsContent>
+        <TabsContent value="parts">{priv ? <PartsTab priv={priv} team={name} own={name === me.team} /> : <PrivateNote />}</TabsContent>
       </Tabs>
     </>
   )
@@ -112,7 +114,8 @@ function HqTable({ hq, own, team }: { hq: TeamPrivate["hq"]; own: boolean; team:
   const appliedHere = h.applied.filter((o) => o.team === team)
   const budget = league.privateTeams[me.team]?.budget ?? 0
   const hqCommitted = h.committed(me.team)
-  const available = budget - hqCommitted - t.committed
+  const designCommitted = useParts().committed(me.team)
+  const available = budget - hqCommitted - designCommitted - t.committed
   const speed = Number(t.settings.hq_speed ?? 1)
   const days = (weeks: number) => weeks * 7 * speed
   // Races are about four weeks apart.
@@ -128,6 +131,7 @@ function HqTable({ hq, own, team }: { hq: TeamPrivate["hq"]; own: boolean; team:
         <div className="flex flex-wrap items-center gap-x-6 gap-y-1 rounded-lg bg-muted/50 px-4 py-2 text-sm tabular-nums">
           <span><span className="text-muted-foreground">Budget </span>{fmtMoneyShort(budget)}</span>
           <span><span className="text-muted-foreground">Queued HQ orders </span>−{fmtMoneyShort(hqCommitted)}</span>
+          {designCommitted > 0 && <span><span className="text-muted-foreground">Queued design </span>−{fmtMoneyShort(designCommitted)}</span>}
           {t.committed > 0 && <span><span className="text-muted-foreground">Leading bids </span>−{fmtMoneyShort(t.committed)}</span>}
           <span className="font-medium"><span className="text-muted-foreground">Available </span>{fmtMoneyShort(available)}</span>
           <span className="text-xs text-muted-foreground">Orders are paid and started in game before the next race; building takes MM's own time.</span>
@@ -218,54 +222,5 @@ function HqTable({ hq, own, team }: { hq: TeamPrivate["hq"]; own: boolean; team:
         </CardContent>
       </Card>
     </div>
-  )
-}
-
-function Parts({ parts }: { parts: TeamPrivate["parts"] }) {
-  return (
-    <div className="grid gap-3 lg:grid-cols-2">
-      {Object.entries(parts).map(([type, list]) => <PartCard key={type} type={type} parts={list} />)}
-    </div>
-  )
-}
-
-function PartCard({ type, parts }: { type: string; parts: Part[] }) {
-  const sorted = [...parts].sort((a, b) => (a.fittedToCar ?? 9) - (b.fittedToCar ?? 9) || (b.stat ?? 0) - (a.stat ?? 0))
-  const best = Math.max(...parts.map((p) => p.stat ?? 0))
-  return (
-    <Card size="sm">
-      <CardHeader>
-        <CardTitle>{humanize(type)}</CardTitle>
-        <CardDescription>{parts.length} in inventory · best {fmtNum(best)}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Part</TableHead>
-              <TableHead className="text-right">Level</TableHead>
-              <TableHead className="text-right">Stat</TableHead>
-              <TableHead className="text-right">Reliability</TableHead>
-              <TableHead className="text-right">Condition</TableHead>
-              <TableHead className="text-right">Car</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {sorted.map((p) => (
-              <TableRow key={p.guid}>
-                <TableCell className="font-mono text-xs">{p.name}</TableCell>
-                <TableCell className="text-right tabular-nums">{p.level}</TableCell>
-                <TableCell className={`text-right tabular-nums ${p.stat === best ? "font-semibold text-primary" : ""}`}>{fmtNum(p.stat)}</TableCell>
-                <TableCell className="text-right tabular-nums">{fmtPct(p.reliability)}</TableCell>
-                <TableCell className="text-right tabular-nums">{fmtPct(p.condition)}</TableCell>
-                <TableCell className="text-right">
-                  {p.fittedToCar != null ? <Badge>Car {p.fittedToCar + 1}</Badge> : <span className="text-xs text-muted-foreground">Storage</span>}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
-    </Card>
   )
 }

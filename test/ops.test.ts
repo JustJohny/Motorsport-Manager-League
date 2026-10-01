@@ -243,7 +243,7 @@ describe.skipIf(!existsSync(SAVE))("operations on a real save", () => {
     expect(log[0]).toMatch(/designing FrontWing/);
     expect(Number(save.finance(tatra).currentBudget)).toBe(budget); // charged separately (adjustBudget)
     expect(g.list(save.data.entityManager.mEntities)).toHaveLength(entities + 1);
-    expect(() => applyChanges(save, { changes: [{ op: "startDesign", team: "Tatra Racing", type: "Engine", components: pick }] }))
+    expect(() => applyChanges(save, { changes: [{ op: "startDesign", team: "Tatra Racing", type: "Brakes", components: pick }] }))
       .toThrow(/one part at a time/);
 
     save.prepareForWrite();

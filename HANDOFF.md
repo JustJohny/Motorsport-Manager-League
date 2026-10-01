@@ -218,7 +218,17 @@ npx tsx src/cli.ts validate "<save>"
      - `src/part-orders.ts` + `pull`: undo the AI (cancel designs, remove AI-built parts), then HQ, designs, `setFitting` and `setImprovement` for every member, then transfers.
      - Tests: `test/db-parts.test.ts`.
      - Careful: the next real `pull` also removes parts the AI built on member teams since the league start. Tatra's test wing from "League Test 9" was started by the toolkit, not ordered on the site, so it counts as unordered too.
-     - Next: step 4, the site (Parts tab: designer, fitting, improvement).
+   - **Step 4 (site) built 2026-10-01:** `site/src/components/parts-tab.tsx` + `site/src/lib/parts.tsx` (provider, realtime, demo mode).
+     - Design card:
+       - the running design (or "AI design · cancelled at next apply")
+       - the queued order with Cancel
+       - the designer: part type tabs, the team's components by level with what unlocks the locked levels, slots that fill live (bonus slots too), and live level, boosts, time and cost from `planDesign`
+     - Improvement card: list counts against Factory slots, and the mechanics slider (locked when only one list has parts, as MM does).
+     - Part tables: Car 1/2 fitting buttons (never strips the other car), P/R improvement toggles (disabled at max or when the list is full), and an "AI-built · removed at next apply" marker.
+     - The budget strip, HQ strip and bid dialog count the queued design.
+     - Checked in demo mode with headless Chromium: designer, order, fitting, improvement, phone width; no console errors.
+     - **Spec parts:** `championship.rules.specParts` (ERS: Engine 1, Gearbox 3) can't be designed in MM. They're excluded from the design options and refused by `startDesign`.
+     - Next: the user publishes ("League Test 10" or newer) and tries the Parts tab live. Then a real cycle: order, pull, apply, play, publish, fit, pull, apply, race.
      - **AI-finished parts on member teams: remove and refund** (user's decision). `removeUnorderedParts` does this: parts built after the league start whose components don't match an ordered design. A fitted one is replaced by the best spare first, and one refund is made per design.
    - MM internals: see docs/save-schema.md, "Part design and improvement". Component display names are localised (`mNameID`) and not in the save. Use `mCustomComponentName`, or find the localisation file in the game data.
 4. An organizer workflow document (between-race checklist).

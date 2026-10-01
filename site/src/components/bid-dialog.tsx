@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { fmtMoney, fmtNum, humanize, statAverage } from "@/lib/format"
 import { useHqOrders } from "@/lib/hq"
+import { useParts } from "@/lib/parts"
 import { useLeague } from "@/lib/league"
 import { bidCost, nextMinBid } from "@/lib/rules"
 import { useTransfers, type Auction } from "@/lib/transfers"
@@ -18,7 +19,8 @@ const JOB_FOR: Record<Auction["kind"], string> = { Driver: "Driver", Engineer: "
 export function BidDialog({ auction, trigger }: { auction: Auction; trigger: React.ReactNode }) {
   const { me, league } = useLeague()
   const t = useTransfers()
-  const hqCommitted = useHqOrders().committed(me.team)
+  // Queued HQ orders and the queued part design commit budget too (hq_committed in the database).
+  const hqCommitted = useHqOrders().committed(me.team) + useParts().committed(me.team)
   const minBid = nextMinBid(Number(auction.min_wage), auction.leading_wage == null ? null : Number(auction.leading_wage), t.settings)
   const [open, setOpen] = useState(false)
   const [wage, setWage] = useState(String(minBid))
@@ -110,7 +112,7 @@ export function BidDialog({ auction, trigger }: { auction: Auction; trigger: Rea
             <span className="font-medium">This bid commits</span><span className="text-right font-medium">{fmtMoney(cost.total)}</span>
             <span className="mt-2 text-muted-foreground">Budget</span><span className="mt-2 text-right">{fmtMoney(budget)}</span>
             <span className="text-muted-foreground">Your other leading bids</span><span className="text-right">−{fmtMoney(t.committed)}</span>
-            {hqCommitted > 0 && <><span className="text-muted-foreground">Queued HQ orders</span><span className="text-right">−{fmtMoney(hqCommitted)}</span></>}
+            {hqCommitted > 0 && <><span className="text-muted-foreground">Queued HQ orders and design</span><span className="text-right">−{fmtMoney(hqCommitted)}</span></>}
             <span className="font-medium">Left if you win everything</span>
             <span className={cn("text-right font-medium", left < 0 && "text-destructive")}>{fmtMoney(left)}</span>
           </div>

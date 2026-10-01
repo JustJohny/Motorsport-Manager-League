@@ -95,8 +95,15 @@ export interface DesignOptions {
  * component list (3 per level), the lead engineer's own components, and the levels the part's
  * development building unlocks.
  */
+/** Championship.rules.specParts: supplied parts (e.g. ERS engines and gearboxes) MM won't design. */
+export function isSpecPart(save: Save, team: Obj, type: PartType): boolean {
+  const rules = save.g.deref<Obj>(save.championship(team).rules);
+  return (rules?.specParts ?? []).includes(PART_TYPES.indexOf(type));
+}
+
 export function designOptions(save: Save, team: Obj, type: PartType): DesignOptions {
   designable(type);
+  if (isSpecPart(save, team, type)) throw new Error(`${type} is a spec part in ${save.championshipName(save.championship(team))}; it can't be designed`);
   const g = save.g;
   const cpd = carPartDesign(save, team);
   const settings = partSettings(save, team, type);
@@ -150,7 +157,7 @@ export function teamDesign(save: Save, team: Obj): TeamDesign {
   const g = save.g;
   const types: TeamDesign["types"] = {};
   for (const type of Object.keys(COMPONENT_LISTS) as PartType[]) {
-    if (!save.parts(team, type).length) continue;
+    if (!save.parts(team, type).length || isSpecPart(save, team, type)) continue;
     const o = designOptions(save, team, type);
     types[type] = { ctx: o.ctx, components: o.available.map((a) => a.component), maxLevel: o.maxLevel, locked: o.locked };
   }

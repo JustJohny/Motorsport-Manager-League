@@ -41,7 +41,8 @@ describe.skipIf(!existsSync(SAVE))("publish", () => {
   it("extracts each team's design options, current design and improvement", () => {
     for (const t of state.teams) {
       const d = t.design!;
-      expect(Object.keys(d.types).sort()).toEqual(["Brakes", "FrontWing", "RearWing", "Suspension", "Engine", "Gearbox"].filter((x) => x in d.types).sort());
+      // ERS engines and gearboxes are spec parts: MM won't design them.
+      expect(Object.keys(d.types).sort()).toEqual(["Brakes", "FrontWing", "RearWing", "Suspension"]);
       for (const [type, o] of Object.entries(d.types)) {
         expect(o.ctx.slots, `${t.name} ${type}`).toBeGreaterThanOrEqual(1);
         expect(o.ctx.settings.materialsCost).toBeGreaterThan(0);

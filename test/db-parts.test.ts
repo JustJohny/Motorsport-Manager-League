@@ -54,7 +54,7 @@ describe.skipIf(!existsSync(SAVE))("database: part design, fitting and improveme
     expect((await order(alice(), "FrontWing", [l1[0], l1[1], l1[2], l2[0]])).error).toMatch(/No free slot/);
     expect((await order(alice(), "FrontWing", [l1[0], l1[0]])).error).toMatch(/chosen twice/);
     expect((await order(alice(), "FrontWing", [999])).error).toMatch(/isn't available/);
-    expect((await order(alice(), "Engine", [l1[0]])).error).toMatch(/isn't available/);
+    expect((await order(alice(), "Engine", [l1[0]])).error).toMatch(/can't design that part/);
 
     const { rows, error } = await order(alice(), "FrontWing", ids);
     expect(error).toBeNull();

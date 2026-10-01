@@ -82,6 +82,8 @@ Decompile a class to C# with `dotnet tool install --tool-path <dir> ilspycmd`, t
 - `costPerLevel[5]` / `timePerLevel[5]` (`[0,2,3,4,5]`): what a component of that level adds when it has no own cost or time.
 - `unlockRequirements[5]`: levels 1–2 are always open. Levels 3/4/5 need the part type's development building (`buildingType` 2–7) at `buildingLevel` 0/1/2.
 
+**Spec parts can't be designed.** `championship.rules.specParts` lists part type indexes; in the ERS it is `[1, 3]` (Engine, Gearbox, supplied at level −1 and stat 150). The AI skips them too (`isSpecPart` in `TeamAIController`).
+
 **One design at a time per team.** `carManager.carPartDesign` holds a single `mCarPart` and `mStage` (0 Idle, 1 Designing). There is no queue.
 
 **Components.** `carPartDesign.<type>Components` is a `Dictionary<level-1, List<CarPartComponent>>`. Each season `ChooseComponentsForSeason` picks 3 random Stock/Risky components per level (1–5) for each team, so every team has its own list. The lead engineer adds one more per level (`engineer.availableComponents[level]`).
