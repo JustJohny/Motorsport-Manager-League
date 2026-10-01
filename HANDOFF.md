@@ -259,7 +259,13 @@ A member invests in their own engine programme, becomes an engine supplier, and 
 
 **Rules (the user's choices):**
 - **It only pays off where the engine isn't spec.** A programme can be built up while the league is in the ERS (engine and gearbox are spec there), but its engine only counts in a series without a spec engine, e.g. the WMC (`rules.specParts` = []).
-- **Seasonal R&D investment:** members put money into areas (power/engine level, fuel efficiency, reliability, …) over the season. At the season change it becomes next year's supplier stats.
+- **Seasonal R&D, shaped by decisions, not just money** (the user wants the outcome to depend on the member's choices, 2026-10-01). All four mechanics:
+  1. **An engine concept each season** (e.g. high-revving power, efficient long-life, balanced). It sets which stats can go high and which are capped.
+  2. **Trade-off allocation:** money buys development points, spread over power (engine level), fuel efficiency, tyre wear/heating, improvability (and the hybrid stats where the series has them). Pushing one area costs another, like component trade-offs in part design.
+  3. **Risky research projects:** optional, with a success chance raised by the engineer and HQ. A breakthrough gives a big boost; a failure wastes the money or hurts reliability. Rolled at the season change.
+  4. **Customer spec:** the owner sells the full works engine or a detuned one (cheaper, less power).
+  - **Luck: a little, like MM**, e.g. a small roll on the final stats, as MM rolls max reliability ±10 %. Choices decide the engine.
+  - Still to design when building: the concept list and caps, point costs, trade-off ratios, the project list and odds, how "reliability" maps to MM (MM suppliers have no reliability stat; maybe through the engine part's reliability).
 - **Customers: members only, at a price the owner sets.** AI teams keep MM's suppliers.
 - **Switching supplier: between seasons only**, as in MM.
 
