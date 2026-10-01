@@ -12,6 +12,7 @@ import { memberRows, publish, splitSnapshot } from "./publish.ts";
 import { cancelUnorderedChange, fetchHqContext, fetchQueuedOrders, hqChanges, markOrdersApplied } from "./hq-orders.ts";
 import type { LeagueSettings } from "./league-rules.ts";
 import { choiceChanges, designChanges, fetchPartsContext, markDesignsApplied, undoAiParts } from "./part-orders.ts";
+import { engineSpendChanges, fetchEngineSpend, markEngineSpendApplied } from "./engine-orders.ts";
 import { fetchRegulationContext, recordVoteResults, regulationChanges } from "./rule-votes.ts";
 import { rest, supabaseEnv } from "./supabase.ts";
 import { fetchWindow, markApplied, windowChanges, winners } from "./transfers.ts";
@@ -164,6 +165,12 @@ switch (cmd) {
     console.log(`Fitting choices: ${parts.fitting.length}, improvement choices: ${parts.improvement.length}`);
     changes.push(...choiceChanges(parts.fitting, parts.improvement));
 
+    // Engine programme spending (founding, development, research, engines bought from members).
+    const engineSpend = await fetchEngineSpend(env);
+    for (const r of engineSpend) console.log(`  Engine: ${r.team} ${r.description} $${Number(r.amount).toLocaleString()}${r.payee ? ` to ${r.payee}` : ""}`);
+    changes.push(...engineSpendChanges(engineSpend));
+    if (engineSpend.length) notes.push(`${engineSpend.length} engine payment${engineSpend.length > 1 ? "s" : ""}`);
+
     // Rule votes due before the next checkpoint, settled with the league's result instead of MM's;
     // then the organizer's choices for next season.
     const reg = await fetchRegulationContext(env);
@@ -204,6 +211,7 @@ switch (cmd) {
       await markOrdersApplied(env, orders.map((o) => o.id));
       await markDesignsApplied(env, parts.queued.map((o) => o.id));
       await recordVoteResults(env, voteResults);
+      await markEngineSpendApplied(env, engineSpend.map((r) => r.id));
       if (windowDone && w) await markApplied(env, w.window.id);
       console.log(`marked as applied: ${notes.join(" + ") || "nothing"}`);
     }
