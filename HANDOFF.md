@@ -103,7 +103,7 @@ Steps 1–5 are done: Supabase is set up, Pages is deployed, and snapshots are p
 
 **Transfer window page:** it shows auctions only while bidding runs. After the deadline it's cleared, and the results move to the History tab (every window, "Awaiting organizer" until `pull --mark-applied`). Bidding closes on a timer set to the exact deadline, not on a polling clock.
 
-## Phase 3: HQ orders, deployed, migrations 003/004 run
+## Phase 3: HQ orders, live on the site (ordering and cancelling verified by the user 2026-10-01, snapshot #5)
 **Rules agreed with the user:**
 - The game builds it, at MM's real times. The user chose this after learning the times are 20–116 weeks, i.e. multi-season projects. `league_settings.hq_speed` (default 1) can scale them.
 - Full MM price paid upfront.
