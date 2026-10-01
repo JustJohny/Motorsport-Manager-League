@@ -272,6 +272,27 @@ The user's idea: members may run parts that are faster but risk getting caught a
   - The "Stewards' decisions" card on the Calendar & results page is the public log (a siren marks rounds with busts).
 - Helpers: `bustChance` / `carBustChance` / `nextBustPenalty` in `src/part-design.ts`. Tests check them, and check that "League Test 10" yields Bernhauss' real bust at Munich.
 
+## Season regulations and politics (rules agreed 2026-10-01, not built)
+Members see the current and the confirmed next-season regulations, vote on the site with MM's voting system, and **the site's result always overwrites the in-game vote**.
+
+**Rules (the user's choices):**
+- **AI teams vote like MM:** the toolkit computes each AI team's vote with MM's logic (beneficial = Yes, detrimental = No, neutral = random or abstain, seeded) and publishes it, so members see the likely outcome.
+- **MM's vote power:** each team has `team.votingPower`. A member can spend extra on a vote, and abstaining banks +1 (`VoteChoice.Voted` / `Abstained`).
+- **Deadline:** a vote stays open on the site until the pull at the checkpoint before MM's vote date, and the result is applied in that pull.
+- **The organizer can change next season's rules** (add or remove, overriding votes). The current season's rules stay as they are, as in MM.
+
+**What MM has (PoliticalSystem, ChampionshipRules):**
+- `championship.rules` (current) and `championship.nextYearsRules`. `mRules` is a list of `PoliticalVote`, each with `ID`, `group` (e.g. PracticeLength), `effectType`, `impacts`, `benificialCharacteristics` / `detrimentalCharacteristics`, and name and description text IDs. They also carry flat fields (points, tyres, `specParts`, budgets…).
+- `championship.politicalSystem`:
+  - `mVotesForSeason`: 3–8 votes, scheduled by `GenerateCalendarEvents` on Wednesdays from May 1 to pre-season. `mCalendarEvents` holds their dates.
+  - `mNextVoteIndex`, `mActiveVote`, `mVoteChoices`, `mVoteResultsForSeason`.
+- On the vote date `Vote()` → `GetVoteChoices` (AI by `GetVoteImpactOnTeam`) → `ConcludeVoting`: the majority by `votePowerUsed` wins (a tie is random). Accepted → `nextYearsRules.AddRule(vote)`.
+- **Text:** rule names are localised IDs. The CSVs are plain in `resources.assets`, e.g. `PSG_10004395` = "Short Practice Sessions". The rules DB row holds the description template ("Practice sessions last {RuleSessionLength}.").
+- **To research when building:**
+  - `PoliticalVote.GetVoteImpactOnTeam` (team characteristics)
+  - how to set or undo `nextYearsRules` safely (AddRule replaces the rule of the same group?)
+  - how the vote results are stored, so the toolkit can overwrite MM's outcome
+
 ## Phase 5 idea: works engine programmes (rules agreed 2026-10-01, not built)
 A member invests in their own engine programme, becomes an engine supplier, and sells engines to other members.
 
