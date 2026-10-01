@@ -82,6 +82,21 @@ describe.skipIf(!existsSync(SAVE))("publish", () => {
     expect(nextBustPenalty(2)).toEqual({ placesLost: 6, fine: 300_000 });
   });
 
+  it("publishes the regulations: rules, the season's votes and the AI teams' votes", () => {
+    const r = state.championship.regulations!;
+    expect(r.current.length).toBeGreaterThan(20);
+    for (const id of [...r.current, ...r.next, ...r.votes.map((v) => v.ruleId)]) expect(r.rules[id], `rule ${id}`).toBeDefined();
+    expect(r.votes.length).toBeGreaterThan(0);
+    for (const v of r.votes.filter((x) => x.status === "upcoming")) {
+      // Only AI teams get a predicted vote; members vote on the site.
+      expect(v.aiVotes!.map((a) => a.team).sort()).toEqual(r.teams.filter((t) => !t.member).map((t) => t.team).sort());
+      for (const a of v.aiVotes!) expect(a.power).toBeGreaterThanOrEqual(1);
+    }
+    // One rule per group, as MM's ChampionshipRules.AddRule keeps it.
+    const groups = r.current.map((id) => r.rules[id].group);
+    expect(new Set(groups).size).toBe(groups.length);
+  });
+
   it("maps Discord usernames to teams", () => {
     expect(memberRows(league, state)).toEqual([
       { discord_username: "organizer", member: "organizer", team: "Tatra Racing", role: "organizer" },

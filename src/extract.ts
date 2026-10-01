@@ -3,6 +3,7 @@ import type {
   Building, CalendarEvent, Championship, LeagueConfig, LeagueState, Part, Person, RaceResults, RulesBreach, SessionResult, TeamDesign, TeamState,
 } from "./league-types.ts";
 import { teamDesign } from "./ops/design.ts";
+import { extractRegulations } from "./regulations.ts";
 import { BUILDING_STATES, JOBS, PART_TYPES, Save, numOrNull, personKind, personName, type PartType } from "./model.ts";
 
 export type { LeagueConfig, LeagueState, TeamState } from "./league-types.ts";
@@ -37,6 +38,7 @@ export function extractLeague(save: Save, cfg: LeagueConfig): LeagueState {
       standings: standings(save, champ),
       lastRace: lastRace(save, champ),
       rulesBreaches: rulesBreaches(save, champ).map(({ part: _p, partType: _t, ...b }) => b),
+      regulations: extractRegulations(save, champ, new Set(memberTeams.map((m) => m.team.name as string))),
     },
     teams: teamsInChamp.map((t) => team(save, t, champ, memberOf.get(t) ?? null)),
     freeAgents: save.people().filter((p) => save.isFreeAgent(p)).map((p) => person(save, p)),

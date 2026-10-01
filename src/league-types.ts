@@ -69,6 +69,46 @@ export interface RulesBreach {
   fine: number;
 }
 
+/** A rule definition (MM's PoliticalVote), e.g. "Short Practice Sessions" in group PracticeLength. */
+export interface Rule {
+  id: number;
+  group: string;
+  /** MM's effect summary, e.g. "Practice(Short)". */
+  effect: string;
+  /** English name from the game's text, or null when the game data wasn't found. */
+  name: string | null;
+  description: string | null;
+  /** Team characteristics (see TEAM_CHARACTERISTICS in src/politics.ts) the rule helps or hurts. */
+  beneficial: number[];
+  detrimental: number[];
+}
+
+export type VoteChoice = "yes" | "no" | "abstain";
+
+/** One of the season's rule votes, as MM scheduled it. */
+export interface RuleVote {
+  ruleId: number;
+  /** MM's vote date. */
+  date: string;
+  /** Held in game (or concluded by the league), or still to come. */
+  status: "held" | "upcoming";
+  result?: { yes: number; no: number; abstained: number; accepted: boolean };
+  /** Upcoming votes: how each AI team votes, by MM's logic (see predictAiVote). */
+  aiVotes?: { team: string; vote: VoteChoice; power: number }[];
+}
+
+export interface Regulations {
+  /** Game year the votes and next season's rules belong to. */
+  season: number;
+  /** Rule ids in force now, and confirmed for next season. */
+  current: number[];
+  next: number[];
+  /** Every rule definition found in the save, by id (the organizer chooses from these). */
+  rules: Record<number, Rule>;
+  votes: RuleVote[];
+  teams: { team: string; member: boolean; votingPower: number; characteristics: number[] }[];
+}
+
 export interface Championship {
   id: number;
   name: string;
@@ -78,6 +118,8 @@ export interface Championship {
   lastRace: RaceResults | null;
   /** Every part caught this season. Missing in snapshots published before 2026-10-01. */
   rulesBreaches?: RulesBreach[];
+  /** Rules and the season's votes. Missing in snapshots published before 2026-10-01. */
+  regulations?: Regulations;
 }
 
 export type BuildingState = "NotBuilt" | "BuildingInProgress" | "Constructed" | "Upgrading";

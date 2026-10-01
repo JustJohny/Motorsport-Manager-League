@@ -279,6 +279,31 @@ The user's idea: members may run parts that are faster but risk getting caught a
 ## Season regulations and politics (rules agreed 2026-10-01, not built)
 Members see the current and the confirmed next-season regulations, vote on the site with MM's voting system, and **the site's result always overwrites the in-game vote**.
 
+**Build progress (2026-10-01):**
+- ✅ Step 1, extract:
+  - `src/politics.ts` (pure, shared with the site): `TEAM_CHARACTERISTICS`, `teamCharacteristics`, `predictAiVote`, `tallyVote`, seeded `roll`, `voteCutoff`, `votesClosingNow`.
+  - `src/regulations.ts`: `extractRegulations` → `championship.regulations` (public). It holds the current and next rule ids, a catalogue of every rule definition of the series in the save, this season's votes (held ones with MM's result; upcoming ones with predicted AI votes), and each team's vote power and characteristics.
+  - Rule names come from the game's text in `resources.assets` (`gameDataDir()`, override with `MM_GAME_DIR`). The "HUDText","English","PSG_id" rows give the names and the rules CSV gives the descriptions. Placeholders are filled from the impacts (tracks, fuel, pit speed, race length). Descriptions with unfillable placeholders are dropped.
+  - AI characteristics are approximated: fixed leanings + standings position (also used for team quality) + budget, driver, fuel and tyre ranks. Cornering and track stats are left out. Predictions are seeded (season, rule id, team), so what's published is what's applied.
+- ⏭ Step 2: migration 008.
+  - `rule_votes` (team, season, rule_id, choice, extra_power), member-visible, via an RPC `cast_rule_vote` (vote upcoming in the latest snapshot and not concluded; extra power ≤ the team's `votingPower`).
+  - `rule_vote_results` (season, rule_id, yes, no, abstained, accepted), written by `pull --mark-applied`.
+  - `next_rule_overrides` (season, group, rule_id), organizer-only, via the RPC `set_next_rule(group, rule_id|null)`.
+- ⏭ Step 3: toolkit ops.
+  - `concludeVote` replaces MM's own vote:
+    - `nextYearsRules` AddRule (replace by group) when accepted
+    - push a VoteResults (yesVotesCount, noVotesCount, abstainedVotesCount, votedSubject ref, voteResult 0 accepted / 1 rejected)
+    - `mLatestVoteResult`, `mNewRuleAproved`++, `mNextVoteIndex`++, `mActiveVote` = the next vote or null
+    - remove that vote's calendar event (OnEventTrigger "Vote" on the politicalSystem; the k-th Vote event is the k-th vote)
+    - apply the teams' `votingPower` changes
+  - `setNextRule` sets a group in `nextYearsRules.mRules` to a catalogue rule (a ref to an existing PoliticalVote object), or back to the current rule.
+  - `pull`: `votesClosingNow` → `tallyVote` (member votes from the DB + published AI votes) → `concludeVote`; then the organizer's overrides → `setNextRule`.
+- ⏭ Step 4: site "Regulations" page:
+  - current vs next rules, highlighting changes and overrides
+  - upcoming votes with the member's vote and extra power, the live tally (AI + member votes) and when each closes
+  - held votes with their results
+  - the organizer's per-group selector for next season
+
 **Rules (the user's choices):**
 - **AI teams vote like MM:** the toolkit computes each AI team's vote with MM's logic (beneficial = Yes, detrimental = No, neutral = random or abstain, seeded) and publishes it, so members see the likely outcome.
 - **MM's vote power:** each team has `team.votingPower`. A member can spend extra on a vote, and abstaining banks +1 (`VoteChoice.Voted` / `Abstained`).
