@@ -354,6 +354,34 @@ describe.skipIf(!existsSync(SAVE))("operations on a real save", () => {
       expect(ids === [...keepIds].sort().join() || p.isFitted, p.name).toBe(true);
     }
   }, 120_000);
+
+  it("renames a driver everywhere the name is stored, with nationality, birth date and gender", () => {
+    const save = Save.load(SAVE);
+    const team = save.team("Garuda Racing");
+    const slot = save.slots(team).find((s) => s.slotID === 0)!;
+    const driver = save.g.deref<any>(slot.personHired);
+    const oldName = driver.name;
+    const peakYears = Number(driver.peakAge.slice(0, 4)) - Number(driver.dateOfBirth.slice(0, 4));
+    const gender = driver.gender === 0 ? "female" : "male";
+    applyChanges(save, { changes: [{ op: "renamePerson", team: "Garuda Racing", slotID: 0, firstName: "Kimi", lastName: "Räikkönen",
+      nationality: "Finland", dateOfBirth: "1979-10-17", gender }] });
+
+    const reloaded = reload(save);
+    expect(reloaded.g.validate()).toEqual([]);
+    expect(typeProblems(reloaded)).toEqual([]);
+    const p = reloaded.g.deref<any>(reloaded.slots(reloaded.team("Garuda Racing")).find((s) => s.slotID === 0)!.personHired);
+    expect([p.name, p.mShortName, p.mThreeLetterName]).toEqual(["Kimi Räikkönen", "K. Räikkönen", "Rai"]);
+    expect(reloaded.g.deref<any>(p.nationality).mCountryKey).toBe("Finland");
+    expect(p.dateOfBirth).toBe("1979-10-17T00:00:00.0000000");
+    expect(Number(p.peakAge.slice(0, 4)) - 1979).toBe(peakYears);
+    expect(p.gender).toBe(gender === "male" ? 0 : 1);
+    for (const m of reloaded.g.list<any>(reloaded.data.mechanicManager.mEntities)) {
+      expect(Object.keys(m.mDictDriversRelationships ?? {})).not.toContain(oldName);
+      expect(Object.keys(m.mDictRelationshipModificationHistory ?? {})).not.toContain(oldName);
+    }
+    const ev = p.contract.mCalendarEvent && reloaded.g.deref<any>(p.contract.mCalendarEvent);
+    if (ev) expect(ev.mDynamicDescription.translatedText.English).toContain("Kimi Räikkönen");
+  }, 120_000);
 });
 
 function applyPreview(save: Save, team: string, type: any, ids: number[]) {

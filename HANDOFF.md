@@ -133,6 +133,11 @@ Steps 1–5 are done: Supabase is set up, Pages is deployed, and snapshots are p
 
 **Also verified in game (2026-10-01):** the build progresses over days. A construction started by hand in MM ("League Test 7", standing in for an AI project) showed on the site as "AI project · cancelled at next apply", and after pull + apply ("League Test 8") it was reverted and refunded, while the ordered Design Centre kept building. Not yet seen: a build reaching completion (20+ weeks).
 
+## Real 2016 F1 names (2026-10-01)
+- `renamePerson` op (`src/ops/people.ts`): by team + slotID, it sets the name and optionally nationality, birth date and gender. See docs/save-schema.md, "Person names".
+- `examples/f1-2016-names.json` renames all 11 WMC teams in "SaveF1 League R1 Pre" (SPEC Racing, the user's spectator team, is left as is). It was applied to "SaveF1 League R1 2016" ("F1 League R1 2016" in MM's load menu). **Not yet loaded in game.**
+- Mapping: Steinmann = Mercedes, Rossini = Ferrari, Panther = Red Bull, Windsor = Williams, Kitano = McLaren, Van Dort = Force India, Rezzato = Toro Rosso, Thornton = Renault, Vélan = Sauber, Asia Road Racing = Haas, Cortossi = Manor.
+
 ## How to work with it
 ```sh
 npm test                                   # codec round-trip on all saves + operation tests
@@ -295,7 +300,7 @@ npx tsx src/cli.ts validate "<save>"
   - ending one series leaves the other
   - migrating existing data to `main`
   The test harness (`test/db.ts`) sends a series header (default `test`).
-- **Not verified live yet:** that Supabase passes the `x-series` header from the browser (CORS) and from PostgREST into `request.headers`, and that realtime works on the `league` schema. Check after running 013.
+- **Verified live by the user (2026-10-01):** the site works on the deployed build with series `main`: the `x-series` header gets through, and live updates work on the `league` schema.
 
 **Steps for the user:**
 1. Run migration 013.

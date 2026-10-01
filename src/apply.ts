@@ -12,11 +12,12 @@ import {
 } from "./ops/hq.ts";
 import { addPart, fitPart, removePart, type AddPartOp, type FitPartOp, type RemovePartOp } from "./ops/parts.ts";
 import { hire, type HireOp } from "./ops/staff.ts";
+import { renamePerson, type RenamePersonOp } from "./ops/people.ts";
 import { syncTeam, type SyncTeamOp } from "./ops/sync.ts";
 
 export type Change = SetBuildingOp | StartBuildingOp | CancelBuildingOp | CancelUnorderedHqOp | SetBudgetOp | AdjustBudgetOp | AddPartOp | RemovePartOp | FitPartOp | HireOp | SyncTeamOp
   | StartDesignOp | CancelDesignOp | CancelUnorderedDesignsOp | RemoveUnorderedPartsOp | SetFittingOp | SetImprovementOp
-  | ConcludeVoteOp | SetNextRuleOp | SetSuppliersOp;
+  | ConcludeVoteOp | SetNextRuleOp | SetSuppliersOp | RenamePersonOp;
 
 export interface ChangeSet {
   /** Optional note, e.g. "Before round 6 - Munich". */
@@ -50,6 +51,7 @@ function run(save: Save, c: Change): string | string[] {
     case "removePart": return removePart(save, c);
     case "fitPart": return fitPart(save, c);
     case "hire": return hire(save, c);
+    case "renamePerson": return renamePerson(save, c);
     case "syncTeam": return syncTeam(save, c);
     case "startDesign": return startDesign(save, c);
     case "cancelDesign": return cancelDesign(save, c);
