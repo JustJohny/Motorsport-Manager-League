@@ -104,7 +104,7 @@ Steps 1–5 are done: Supabase is set up, Pages is deployed, and snapshots are p
 **Nominating = the opening bid (user's UX request, 2026-10-01):**
 - The market's "Nominate with an opening bid" button opens the same `BidDialog` (with `person` instead of `auction`).
 - It calls the `nominate` RPC (`supabase/migrations/006_nominate.sql`), which runs `open_auction` + `place_bid` in one transaction, so a refused bid leaves no empty auction. Nominating someone already in auction becomes a normal bid.
-- Test: `test/db-nominate.test.ts`. **Migration 006 must be run in the Supabase SQL editor before deploying.**
+- Test: `test/db-nominate.test.ts`. Migration 006 was run on Supabase, and the user verified it live (2026-10-01).
 
 **Transfer window page:** it shows auctions only while bidding runs. After the deadline it's cleared, and the results move to the History tab (every window, "Awaiting organizer" until `pull --mark-applied`). Bidding closes on a timer set to the exact deadline, not on a polling clock.
 
