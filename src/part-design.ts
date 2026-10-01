@@ -127,3 +127,24 @@ export function predictPart(base: DesignBase, chosen: DesignComponent[]) {
     risk: chosen.reduce((s, c) => s + c.risk, 0),
   };
 }
+
+// MM's post-race scrutineering (PenaltyDirector.ScrutinizePartRules): every fitted part with
+// rules risk is checked; it's caught when Random(0..99) < (risk + investor bonus) x 5.
+export const SCRUTINEERING_CHANCE_PER_RISK = 0.05;
+
+/** Chance per race that one fitted part with this risk is caught. */
+export function bustChance(risk: number, investorBonus = 0): number {
+  if (!(risk > 0)) return 0;
+  return Math.min(1, Math.max(0, risk + investorBonus) * SCRUTINEERING_CHANCE_PER_RISK);
+}
+
+/** Chance per race that at least one of a car's fitted parts is caught. */
+export function carBustChance(risks: number[], investorBonus = 0): number {
+  return 1 - risks.reduce((p, r) => p * (1 - bustChance(r, investorBonus)), 1);
+}
+
+/** What the next bust costs: MM drops the car 2 places and fines $100K per offence this season. */
+export function nextBustPenalty(brokenThisSeason: number) {
+  const n = brokenThisSeason + 1;
+  return { placesLost: 2 * n, fine: 100_000 * n };
+}

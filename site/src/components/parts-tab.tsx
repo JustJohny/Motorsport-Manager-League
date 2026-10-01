@@ -1,10 +1,10 @@
 import {
-  Bot, Car, ChevronsUp, Clock, Coins, Cog, Disc3, Fan, Fuel, Gauge, Hammer, HeartPulse, Layers, Loader2, Lock,
-  Package, PencilRuler, Settings2, ShieldCheck, ShieldPlus, Sparkles, Star, Timer, TriangleAlert, User, Waves, Wind,
+  Bot, Car, ChevronsUp, Gavel, Clock, Coins, Cog, Disc3, Fan, Fuel, Gauge, Hammer, HeartPulse, Layers, Loader2, Lock,
+  Package, PencilRuler, Settings2, ShieldCheck, ShieldPlus, Siren, Sparkles, Star, Timer, TriangleAlert, User, Waves, Wind,
   WindArrowDown, Wrench, type LucideIcon,
 } from "lucide-react"
 import { Fragment, useMemo, useState, type ReactNode } from "react"
-import { planDesign, predictPart, type DesignPlan } from "../../../src/part-design.ts"
+import { bustChance, carBustChance, nextBustPenalty, planDesign, predictPart, type DesignPlan } from "../../../src/part-design.ts"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -131,6 +131,7 @@ export function PartsTab({ priv, team, own }: { priv: TeamPrivate; team: string;
             both choices are re-applied before every race. Newly designed parts appear here after the organizer's next publish.
           </p>
           {design ? <ImprovementCard priv={priv} team={team} own={own} /> : <NoDesignData />}
+          {design?.rules && <ScrutineeringCard priv={priv} team={team} />}
           <div className="grid gap-3 lg:grid-cols-2">
             {Object.entries(priv.parts).map(([type, list]) => <PartCard key={type} type={type} parts={list} priv={priv} team={team} own={own} />)}
           </div>
@@ -321,6 +322,7 @@ function Designer({ priv, busy, onOrder }: { priv: TeamPrivate; busy: boolean; o
               {result.risk !== 0 && <StatPill icon={TriangleAlert} label="Rules risk">{signed(result.risk, 0)}</StatPill>}
             </div>
             <div className="text-xs text-muted-foreground">MM rolls max reliability ±10 % when the design starts.</div>
+            {result.risk > 0 && <RiskWarning risk={result.risk} rules={design.rules} />}
           </div>
         </div>
       )}
@@ -542,6 +544,7 @@ function PartCard({ type, parts, priv, team, own }: { type: string; parts: Part[
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-xs">{part.name}</span>
+                      {(part.rulesRisk ?? 0) > 0 && <RiskBadge risk={part.rulesRisk!} bonus={priv.design?.rules?.riskBonus ?? 0} />}
                       {part.level > 0 && <Tier level={part.level} />}
                     </div>
                     {ai && <div className="flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400"><Bot className="size-3" /> AI-built · removed at next apply</div>}
@@ -599,6 +602,89 @@ function PartCard({ type, parts, priv, team, own }: { type: string; parts: Part[
             })}
           </TableBody>
         </Table>
+      </CardContent>
+    </Card>
+  )
+}
+
+// ---------------------------------------------------------------------------------------------
+// Rules risk: MM's post-race scrutineering
+
+const RISK_NAMES = ["None", "Low", "Medium", "High"]
+const riskName = (r: number) => RISK_NAMES[Math.min(3, Math.max(0, Math.round(r)))]
+
+function RiskBadge({ risk, bonus }: { risk: number; bonus: number }) {
+  return (
+    <span
+      className={cn("inline-flex items-center gap-0.5 rounded px-1 text-[10px] font-medium", risk >= 2 ? "bg-destructive/15 text-destructive" : "bg-amber-500/15 text-amber-600 dark:text-amber-400")}
+      title={`Rules risk ${riskName(risk)} (${risk}): when fitted, ${fmtPct(bustChance(risk, bonus))} chance per race of being caught by the scrutineers`}
+    >
+      <TriangleAlert className="size-3" /> {fmtPct(bustChance(risk, bonus))}
+    </span>
+  )
+}
+
+function RiskWarning({ risk, rules }: { risk: number; rules?: NonNullable<TeamPrivate["design"]>["rules"] }) {
+  const chance = bustChance(risk, rules?.riskBonus ?? 0)
+  const next = nextBustPenalty(rules?.brokenThisSeason ?? 0)
+  return (
+    <div className="flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
+      <TriangleAlert className="mt-px size-4 shrink-0 text-amber-500" />
+      <span>
+        <strong className="font-medium">Grey-area part: rules risk {riskName(risk)}.</strong> While fitted, it has a {fmtPct(chance)} chance per race
+        of being caught. If caught, the car drops {next.placesLost} places in the race result, you pay {fmtMoney(next.fine)},
+        and the part loses its gained performance and reliability.
+      </span>
+    </div>
+  )
+}
+
+/** Fitted risky parts per car, this season's offences and the team's own busts. */
+function ScrutineeringCard({ priv, team }: { priv: TeamPrivate; team: string }) {
+  const p = useParts()
+  const rules = priv.design!.rules!
+  const fit = effectiveFitting(priv, team, p.fitting)
+  const next = nextBustPenalty(rules.brokenThisSeason)
+  const cars = ([0, 1] as const).map((car) => {
+    const risky = Object.entries(fit).flatMap(([type, guids]) => {
+      const part = priv.parts[type]?.find((x) => x.guid === guids[car])
+      return part && (part.rulesRisk ?? 0) > 0 ? [{ type, part }] : []
+    })
+    return { car, risky, chance: carBustChance(risky.map((r) => r.part.rulesRisk!), rules.riskBonus) }
+  })
+  return (
+    <Card size="sm">
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2"><Siren className="size-4" /> Scrutineering</CardTitle>
+        <CardDescription>
+          After every race MM checks each fitted part with rules risk: {fmtPct(bustChance(1, rules.riskBonus))} per risk point.
+          Grey-area components (Risk +1, +2) give more performance but can get you caught. Busts are public on the Calendar &amp; results page.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-3">
+        <div className="flex flex-wrap gap-2">
+          {cars.map((c) => (
+            <StatPill key={c.car} icon={Car} label={`Car ${c.car + 1}: chance of a bust per race`}
+              className={c.chance > 0 ? "bg-amber-500/10" : undefined}>
+              {c.chance > 0 ? `${fmtPct(c.chance)} · ${c.risky.map((r) => humanize(r.type)).join(", ")}` : "No risky parts fitted"}
+            </StatPill>
+          ))}
+          <StatPill icon={Gavel} label="Offences this season">{rules.brokenThisSeason}</StatPill>
+          <StatPill icon={TriangleAlert} label="Next bust costs">{next.placesLost} places · {fmtMoneyShort(next.fine)}</StatPill>
+          {rules.riskBonus !== 0 && <StatPill icon={Coins} label="Investor risk bonus">{rules.riskBonus > 0 ? "+" : ""}{rules.riskBonus}</StatPill>}
+        </div>
+        {rules.breaches.length > 0 && (
+          <div className="flex flex-col gap-1 text-sm">
+            <span className="text-xs font-medium text-muted-foreground">Your busts this season</span>
+            {rules.breaches.map((b, i) => (
+              <span key={i} className="flex items-center gap-2">
+                <Siren className="size-3.5 text-destructive" />
+                Round {b.round} {b.circuit}: {humanize(b.partType)} <span className="font-mono text-xs">{b.part}</span> on {b.driver}'s car,
+                −{b.placesLost} places, {fmtMoney(b.fine)}
+              </span>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   )

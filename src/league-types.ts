@@ -54,6 +54,21 @@ export interface RaceResults {
   race: SessionResult[];
 }
 
+/**
+ * A part caught by MM's post-race scrutineering (PenaltyDirector.ScrutinizePartRules): the car
+ * dropped `placesLost` places in the race result and the team paid `fine`. Public, like a
+ * stewards' decision; which part it was stays with the team (TeamDesign.rules).
+ */
+export interface RulesBreach {
+  round: number;
+  circuit: string;
+  date: string;
+  team: string | null;
+  driver: string;
+  placesLost: number;
+  fine: number;
+}
+
 export interface Championship {
   id: number;
   name: string;
@@ -61,6 +76,8 @@ export interface Championship {
   calendar: CalendarEvent[];
   standings: { drivers: DriverStanding[]; teams: TeamStanding[] };
   lastRace: RaceResults | null;
+  /** Every part caught this season. Missing in snapshots published before 2026-10-01. */
+  rulesBreaches?: RulesBreach[];
 }
 
 export type BuildingState = "NotBuilt" | "BuildingInProgress" | "Constructed" | "Upgrading";
@@ -179,6 +196,15 @@ export interface TeamDesign {
   specParts?: string[];
   /** The design in progress (MM designs one part at a time). */
   current: { type: string; components: number[]; start: string; end: string; extraCopies: number } | null;
+  /** MM's scrutineering for this team (missing in snapshots published before 2026-10-01). */
+  rules?: {
+    /** Offences this season: the next bust costs 2 x (this + 1) places and $100K x (this + 1). */
+    brokenThisSeason: number;
+    /** The investor's part-risk bonus, added to every risky part's risk. */
+    riskBonus: number;
+    /** This team's own busts, with the part. */
+    breaches: (RulesBreach & { part: string; partType: string })[];
+  };
   improvement: {
     /** Part GUIDs the mechanics work on. */
     performance: string[];

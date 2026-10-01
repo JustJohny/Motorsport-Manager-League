@@ -1,9 +1,10 @@
+import { Siren } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/page-header"
-import { fmtDate, fmtTime } from "@/lib/format"
+import { fmtDate, fmtMoney, fmtTime } from "@/lib/format"
 import { useLeague } from "@/lib/league"
 import type { SessionResult } from "@/lib/types"
 import { cn } from "@/lib/utils"
@@ -15,6 +16,7 @@ export function ResultsPage() {
   const race = ch.lastRace
   // The extract's qualifying rows carry no position or time yet, so order them by grid slot.
   const qualifying = [...(race?.qualifying ?? [])].sort((a, b) => a.grid - b.grid)
+  const breaches = ch.rulesBreaches ?? []
 
   return (
     <>
@@ -37,6 +39,7 @@ export function ResultsPage() {
                 <span className="w-5 text-right tabular-nums">{e.round}</span>
                 <span className="flex-1 font-medium">{e.circuit}</span>
                 <span className="text-xs">{fmtDate(e.date)}</span>
+                {breaches.some((b) => b.round === e.round) && <Siren className="size-3.5 text-destructive" aria-label="A part was caught" />}
                 {e === next && <Badge>Next</Badge>}
               </div>
             ))}
@@ -68,6 +71,42 @@ export function ResultsPage() {
           <Card size="sm"><CardContent className="text-sm text-muted-foreground">No race has been run yet.</CardContent></Card>
         )}
       </div>
+
+      <Card size="sm">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Siren className="size-4" /> Stewards' decisions</CardTitle>
+          <CardDescription>
+            Parts caught by MM's scrutineers after the race this season. A caught car drops 2 places per offence that season
+            in the race result, and the team is fined $100K per offence.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {breaches.length ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Round</TableHead>
+                  <TableHead>Team</TableHead>
+                  <TableHead>Driver</TableHead>
+                  <TableHead className="text-right">Places lost</TableHead>
+                  <TableHead className="text-right">Fine</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {breaches.map((b, i) => (
+                  <TableRow key={i} className={cn(b.team === me.team && "bg-destructive/10")}>
+                    <TableCell>{b.round} · {b.circuit}</TableCell>
+                    <TableCell className="font-medium">{b.team}</TableCell>
+                    <TableCell>{b.driver}</TableCell>
+                    <TableCell className="text-right tabular-nums">−{b.placesLost}</TableCell>
+                    <TableCell className="text-right tabular-nums">{fmtMoney(b.fine)}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : <p className="text-sm text-muted-foreground">No parts caught this season.</p>}
+        </CardContent>
+      </Card>
     </>
   )
 }

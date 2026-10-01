@@ -254,6 +254,24 @@ npx tsx src/cli.ts validate "<save>"
    - It also shows what's waiting for the next pull (queued designs, HQ orders, transfer window) and has collapsible rules and troubleshooting.
 5. Before the league starts for real: remove the placeholder members (`alice_discord`, `bob_discord`) from `league.json`, test with a second real Discord account, and settle the auction tuning (item 2).
 
+## Illegal (grey-area) parts: MM's scrutineering, shown on the site (built 2026-10-01)
+The user's idea: members may run parts that are faster but risk getting caught after a race. MM already does this (`PenaltyDirector.ScrutinizePartRules`), and the user chose to keep MM's system and make it visible:
+- **Risk:** components with "Risk +1/+2" raise a part's `rulesRisk`. After every race each fitted part with risk is caught when Random(0..99) < (risk + investor `partRiskBonus`) × 5, i.e. 5 % per risk point.
+- **If caught:**
+  - `rulesBrokenThisSeason`++, and the car drops 2 × that many places in the race result, so points are lost through the result.
+  - A fine of $100K × that count.
+  - The part's performance and reliability are wiped, it's unfitted, and its risk drops by 1.
+- **Saved as:** a `PenaltyPartRulesBroken` (`mPart`, `mPlacesLost`, `mPenaltyCashAmount`) on the race result row, and a "<Part> - Rules Broken" transaction.
+- **Extract:**
+  - `championship.rulesBreaches` is the **public** stewards' log: round, team, driver, places lost and fine, but no part.
+  - `TeamDesign.rules` is private: offences this season, the investor bonus, and the team's own busts with the part.
+- **Site:**
+  - The designer warns when the chosen components carry risk (the chance, and what the next bust costs).
+  - Part tables show a risk badge with the chance per race.
+  - The "Scrutineering" card on the parts sub-tab shows the chance per car, offences, the next penalty and the team's own busts.
+  - The "Stewards' decisions" card on the Calendar & results page is the public log (a siren marks rounds with busts).
+- Helpers: `bustChance` / `carBustChance` / `nextBustPenalty` in `src/part-design.ts`. Tests check them, and check that "League Test 10" yields Bernhauss' real bust at Munich.
+
 ## Phase 5 idea: works engine programmes (rules agreed 2026-10-01, not built)
 A member invests in their own engine programme, becomes an engine supplier, and sells engines to other members.
 

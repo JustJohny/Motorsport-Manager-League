@@ -5,6 +5,7 @@ import { extractLeague } from "../src/extract.ts";
 import { Save } from "../src/model.ts";
 import { defaultSavesDir } from "../src/paths.ts";
 import { joinSnapshot, memberRows, splitSnapshot } from "../src/publish.ts";
+import { bustChance, carBustChance, nextBustPenalty } from "../src/part-design.ts";
 
 const SAVE = process.env.MM_TEST_SAVE ?? join(defaultSavesDir(), "SaveJonatan Sulik - Tatra Racing 2 (3).sav");
 const league = {
@@ -65,10 +66,39 @@ describe.skipIf(!existsSync(SAVE))("publish", () => {
     expect(state.teams.filter((t) => t.design!.current).length).toBeGreaterThan(1);
   });
 
+  it("keeps which part was caught out of the public stewards' log", () => {
+    const pub = splitSnapshot(state).public.championship;
+    expect(Array.isArray(pub.rulesBreaches)).toBe(true);
+    for (const b of pub.rulesBreaches!) expect(Object.keys(b)).not.toContain("part");
+    for (const t of state.teams) expect(t.design!.rules!.brokenThisSeason).toBeGreaterThanOrEqual(t.design!.rules!.breaches.length);
+  });
+
+  it("uses MM's scrutineering odds and penalties", () => {
+    expect(bustChance(0)).toBe(0);
+    expect(bustChance(1)).toBeCloseTo(0.05);
+    expect(bustChance(2, 1)).toBeCloseTo(0.15);
+    expect(carBustChance([1, 2])).toBeCloseTo(1 - 0.95 * 0.9);
+    expect(nextBustPenalty(0)).toEqual({ placesLost: 2, fine: 100_000 });
+    expect(nextBustPenalty(2)).toEqual({ placesLost: 6, fine: 300_000 });
+  });
+
   it("maps Discord usernames to teams", () => {
     expect(memberRows(league, state)).toEqual([
       { discord_username: "organizer", member: "organizer", team: "Tatra Racing", role: "organizer" },
       { discord_username: "alice", member: "alice", team: "Garuda Racing", role: "member" },
     ]);
   });
+});
+
+// "League Test 10" was played past Munich, where MM's scrutineers caught Bernhauss' front wing.
+const LT10 = join(defaultSavesDir(), "SaveLeague Test 10.sav");
+describe.skipIf(!existsSync(LT10))("rules breaches in a played save", () => {
+  it("finds the bust in the race results", () => {
+    const st = extractLeague(Save.load(LT10), league);
+    const b = st.championship.rulesBreaches!.find((x) => x.team === "Bernhauss Grand Prix Team")!;
+    expect(b).toMatchObject({ circuit: "Munich", placesLost: 2, fine: 100_000 });
+    const own = st.teams.find((t) => t.name === "Bernhauss Grand Prix Team")!.design!.rules!;
+    expect(own.brokenThisSeason).toBe(1);
+    expect(own.breaches[0]).toMatchObject({ round: b.round, partType: "FrontWing" });
+  }, 120_000);
 });

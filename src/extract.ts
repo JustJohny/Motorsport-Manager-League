@@ -1,6 +1,6 @@
 import type { Obj } from "./graph.ts";
 import type {
-  Building, CalendarEvent, Championship, LeagueConfig, LeagueState, Part, Person, RaceResults, SessionResult, TeamState,
+  Building, CalendarEvent, Championship, LeagueConfig, LeagueState, Part, Person, RaceResults, RulesBreach, SessionResult, TeamDesign, TeamState,
 } from "./league-types.ts";
 import { teamDesign } from "./ops/design.ts";
 import { BUILDING_STATES, JOBS, PART_TYPES, Save, numOrNull, personKind, personName, type PartType } from "./model.ts";
@@ -36,6 +36,7 @@ export function extractLeague(save: Save, cfg: LeagueConfig): LeagueState {
       calendar: calendar(save, champ),
       standings: standings(save, champ),
       lastRace: lastRace(save, champ),
+      rulesBreaches: rulesBreaches(save, champ).map(({ part: _p, partType: _t, ...b }) => b),
     },
     teams: teamsInChamp.map((t) => team(save, t, champ, memberOf.get(t) ?? null)),
     freeAgents: save.people().filter((p) => save.isFreeAgent(p)).map((p) => person(save, p)),
@@ -57,7 +58,7 @@ function team(save: Save, t: Obj, champ: Obj, member: string | null): TeamState 
     fanBase: numOrNull(t.fanBase),
     hq: save.buildings(t).map((b) => building(save, b)),
     parts: Object.fromEntries(partTypes.map((type) => [type, save.parts(t, type).map((p) => part(save, p))])),
-    design: champ.series === 0 ? teamDesign(save, t) : null,
+    design: champ.series === 0 ? withRules(save, t, champ, teamDesign(save, t)) : null,
     staff: save.slots(t).map((s) => {
       const p = s.personHired ? save.g.deref<Obj>(s.personHired) : null;
       return { slotID: s.slotID, job: JOBS[s.jobType] ?? String(s.jobType), person: p ? person(save, p) : null };
@@ -194,5 +195,46 @@ function lastRace(save: Save, ch: Obj): RaceResults | null {
     date: ev.eventDate,
     qualifying: session("qualifyingSessions"),
     race: session("raceSessions"),
+  };
+}
+
+/** Parts caught by MM's post-race scrutineering, from the race results' PenaltyPartRulesBroken. */
+function rulesBreaches(save: Save, ch: Obj): (RulesBreach & { part: string; partType: string })[] {
+  const out: (RulesBreach & { part: string; partType: string })[] = [];
+  save.g.list<Obj>(ch.calendar).forEach((ev, i) => {
+    if (!ev.mHasEventEnded) return;
+    const results = save.g.deref<Obj>(ev.results);
+    const race = results?.raceSessions?.[0] ? save.g.deref<Obj>(results.raceSessions[0]) : null;
+    for (const raw of race?.resultData ?? []) {
+      const r = save.g.deref<Obj>(raw);
+      for (const pen of (r.penalties ?? []).map((x: Obj) => save.g.deref<Obj>(x))) {
+        if (pen?.$type !== "PenaltyPartRulesBroken") continue;
+        const part = pen.mPart ? save.g.deref<Obj>(pen.mPart) : null;
+        out.push({
+          round: i + 1,
+          circuit: save.g.deref<Obj>(ev.circuit).locationName,
+          date: ev.eventDate,
+          team: save.g.deref<Obj>(r.team)?.name ?? null,
+          driver: personName(save.g.deref<Obj>(r.driver)),
+          placesLost: pen.mPlacesLost ?? 0,
+          fine: numOrNull(pen.mPenaltyCashAmount) ?? 0,
+          part: part?.name ?? "",
+          partType: String(part?.$type ?? "").replace(/Part$/, ""),
+        });
+      }
+    }
+  });
+  return out;
+}
+
+function withRules(save: Save, t: Obj, champ: Obj, design: TeamDesign): TeamDesign {
+  const investor = t.investor ? save.g.deref<Obj>(t.investor) : null;
+  return {
+    ...design,
+    rules: {
+      brokenThisSeason: t.rulesBrokenThisSeason ?? 0,
+      riskBonus: investor?.partRiskBonus ?? 0,
+      breaches: rulesBreaches(save, champ).filter((b) => b.team === t.name),
+    },
   };
 }
