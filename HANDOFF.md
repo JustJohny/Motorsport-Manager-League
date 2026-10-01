@@ -238,7 +238,7 @@ npx tsx src/cli.ts validate "<save>"
      - Still to see in a real league cycle: the two-checkpoint rhythm (order, pull, apply, advance, publish, fit, pull, apply, race), and AI-built parts being removed on a member team.
      - **AI-finished parts on member teams: remove and refund** (user's decision). `removeUnorderedParts` does this: parts built after the league start whose components don't match an ordered design. A fitted one is replaced by the best spare first, and one refund is made per design.
    - MM internals: see docs/save-schema.md, "Part design and improvement". MM components have no names; the site shows MM's summary text, as the game does.
-4. **An organizer workflow document (between-race checklist)** for the two-checkpoint cycle: publish, pull, apply, advance, publish, pull, apply, race. All four phases are in place, so this is the natural next step.
+4. **Organizer checklist: done** (`docs/organizer-checklist.md`, 2026-10-01). Saves are named `League R<n> Post` / `League R<n+1> Pre`, and its worked example is race 7 → 8.
 5. Before the league starts for real: remove the placeholder members (`alice_discord`, `bob_discord`) from `league.json`, test with a second real Discord account, and settle the auction tuning (item 2).
 
 ## Working notes for the assistant

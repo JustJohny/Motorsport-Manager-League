@@ -73,12 +73,8 @@ Projects the in-game AI starts on member teams are shown on the HQ tab as "AI pr
 
 After the deadline: `mmsave pull -o changes.json --mark-applied`, then `mmsave apply <save> changes.json …`, and publish again after the race.
 
-## Organizer workflow (proposed)
-1. The league runs in one championship. Each member owns an existing team (`league.json`), and the organizer's own career team can be any of them.
-2. **Between races**, save while in the HQ (not during a session) and run `extract`. The site shows members their team, the staff market and HQ.
-3. Members make decisions on the site, which produces `changes.json`. Use `syncTeam` for each member team, plus individual ops for new parts and hires.
-4. Run `apply`, then load `… (league).sav` in MM and play the race weekend. Member teams race with AI strategy but with the cars, staff and HQ the members chose.
-5. Save after the race and run `extract` again. The site imports the standings and `lastRace` results.
+## Organizer workflow
+Each race has two checkpoints (after the race, and just before the next one). The step-by-step commands are in [docs/organizer-checklist.md](docs/organizer-checklist.md).
 
 ## Game schema
 `schema/mm-1.53.json` holds the declared C# type of every serialized field, generated from the game's `Assembly-CSharp.dll`. The toolkit uses it to add the `$type` hints the game needs when edits move objects around (see `docs/save-schema.md`). To regenerate it for another game version:
