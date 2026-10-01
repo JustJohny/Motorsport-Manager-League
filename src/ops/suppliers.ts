@@ -61,25 +61,44 @@ const LIST_NAME: Record<SupplierType, string> = {
   Battery: "batterySuppliers", ERSAdvanced: "ersAdvancedSuppliers",
 };
 
+/** A C# Dictionary as FullSerializer may write it: [{Key, Value}] or an object keyed by name or number. */
+function dictValues(d: unknown): [string, unknown][] {
+  if (Array.isArray(d)) return d.map((e: Obj) => [String(e.Key), e.Value]);
+  if (d && typeof d === "object") return Object.entries(d).filter(([k]) => !k.startsWith("$"));
+  return [];
+}
+
 /**
- * What a team may buy for next year's car: every supplier of the championship's tier
- * (SupplierManager uses tier == championshipID + 1) that the team can buy. MM itself offers a
- * seeded random subset of these each season; the league offers them all.
+ * The deals MM drew for the championship's next season (SupplierManager.championshipSuppliers,
+ * filled by DetermineNewSeasonSuppliers at Championship.OnChampionshipPromotionsEnd, after the
+ * final race): about 4 engines, 6 brakes, 5 fuel and 4 materials deals. Empty until then.
+ */
+function drawnSuppliers(save: Save, champ: Obj, type: SupplierType): Obj[] {
+  const byChamp = dictValues(save.data.supplierManager.championshipSuppliers)
+    .find(([k]) => Number(k) === champ.championshipID)?.[1];
+  const idx = SUPPLIER_TYPES.indexOf(type);
+  const deals = dictValues(byChamp).find(([k]) => k === type || Number(k) === idx)?.[1];
+  return save.g.list<Obj>(Array.isArray(deals) ? deals : []);
+}
+
+/**
+ * What a team may buy for next year's car, as MM's car design screen offers it
+ * (SupplierManager.GetSuppliersForTeam): the deals MM drew for the championship that the team can
+ * buy, at the team's price. Empty until MM has drawn them after the final race.
  */
 export function supplierOptions(save: Save, team: Obj): Partial<Record<SupplierType, SupplierOption[]>> {
   const champ = save.championship(team);
-  const tier = champ.championshipID + 1;
-  const rules = save.g.deref<Obj>(champ.rules);
   const out: Partial<Record<SupplierType, SupplierOption[]>> = {};
   for (const type of SUPPLIER_TYPES) {
-    // Batteries and ERS only where the rules switch energy systems on (TeamAIController does the same).
-    if (type === "Battery" && !rules?.isEnergySystemActive) continue;
-    if (type === "ERSAdvanced" && !rules?.isERSAdvancedModeActive) continue;
-    const list = save.g.list<Obj>(save.data.supplierManager[LIST_NAME[type]] ?? [])
-      .filter((s) => s.mTier === tier && canBuy(s, team)).map((s) => toOption(save, s, team));
+    const list = drawnSuppliers(save, champ, type).filter((s) => canBuy(s, team)).map((s) => toOption(save, s, team));
     if (list.length) out[type] = list;
   }
   return out;
+}
+
+/** Whether every race of the season is done (MM draws next season's suppliers after the final one). */
+export function seasonOver(save: Save, team: Obj): boolean {
+  return save.g.list<Obj>(save.championship(team).calendar).every((e) => e.mHasEventEnded);
 }
 
 /** The suppliers on the team's current car. */

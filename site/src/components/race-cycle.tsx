@@ -3,7 +3,6 @@ import {
   Settings2, Upload, Users, Wrench, type LucideIcon,
 } from "lucide-react"
 import { useState, type ReactNode } from "react"
-import { SUPPLIER_WINDOW_RACES } from "../../../src/supplier-rules.ts"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -200,7 +199,7 @@ export function RaceCycle() {
           </TabsContent>
         </Tabs>
 
-        {league.snapshot.championship.calendar.filter((e) => !e.ended).length <= SUPPLIER_WINDOW_RACES && <PreSeason cmd={cmd} />}
+        {league.snapshot.championship.calendar.filter((e) => !e.ended).length <= 1 && <PreSeason cmd={cmd} />}
 
         <Details icon={ShieldAlert} title="Rules that keep it working">
           <li><b>Always apply to the save you just published.</b> Design options, parts and prices come from it; with a different save, apply stops with an error rather than guess.</li>
@@ -219,29 +218,30 @@ export function RaceCycle() {
   )
 }
 
-/** Shown once members can choose next season's suppliers (the last races of the season). */
+/** Shown from the final race weekend: next season's suppliers need two extra stops in MM. */
 function PreSeason({ cmd }: { cmd: { pull: string; publish: (s: string) => string; apply: (s: string) => string } }) {
-  const name = "League Pre-season"
+  const end = "League Season End", pre = "League Pre-season"
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2">
-      <span className="flex items-center gap-2 text-sm font-medium"><Settings2 className="size-4" /> Season end: the pre-season checkpoint</span>
+      <span className="flex items-center gap-2 text-sm font-medium"><Settings2 className="size-4" /> Season end: next season's suppliers</span>
       <span className="text-sm text-muted-foreground">
-        Members are choosing next season's suppliers (Parts → Next season's car). MM only takes them once its AI starts next
-        year's car, when pre-season starts (ERS: mid-December). Until then, pull reports those choices as "waiting".
+        After the final race MM offers the championship a few deals per supplier type (when the season ends, ERS: early December),
+        and its AI picks from them when pre-season starts (ERS: mid-December). Members choose on Parts → Next season's car.
       </span>
       <ol>
-        <Step n={1} icon={Gamepad2} title={<>After the last race, advance in MM into pre-season and save as <Save>{name}</Save></>}>
-          A few days after pre-season starts, so every team has started next year's car.
+        <Step n={1} icon={Gamepad2} title={<>After the final race, advance past the season's end (before pre-season) and save as <Save>{end}</Save></>}>
+          Then publish it, so members see MM's offers and can choose.
+          <CopyCommand command={cmd.publish(end)} />
         </Step>
-        <Step n={2} icon={Upload} title="Publish it">
-          <CopyCommand command={cmd.publish(name)} />
-          The members' Next season's car page then says MM is designing the car; they can still change their picks.
+        <Step n={2} icon={Gamepad2} title={<>Advance into pre-season and save as <Save>{pre}</Save></>}>
+          A few days in, so every team has started next year's car.
         </Step>
-        <Step n={3} icon={Download} title="Pull and apply">
+        <Step n={3} icon={Upload} title="Publish, pull and apply">
+          <CopyCommand command={cmd.publish(pre)} />
           <CopyCommand command={cmd.pull} />
-          <CopyCommand command={cmd.apply(name)} />
+          <CopyCommand command={cmd.apply(pre)} />
           Pull swaps MM's AI picks on member teams for their choices (or this season's suppliers), refunds the AI's payments and charges theirs.
-          Every pull repeats this until the car is built.
+          Every pull repeats this until the car is built. Teams still waiting for pre-season are listed.
         </Step>
       </ol>
     </div>

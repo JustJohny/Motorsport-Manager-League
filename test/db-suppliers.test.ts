@@ -7,7 +7,8 @@ import type { LeagueState } from "../src/league-types.ts";
 import { Save } from "../src/model.ts";
 import { defaultSavesDir } from "../src/paths.ts";
 import { memberRows, splitSnapshot } from "../src/publish.ts";
-import { SUPPLIER_WINDOW_RACES, supplierWindow } from "../src/supplier-rules.ts";
+import { supplierWindow } from "../src/supplier-rules.ts";
+import { fakeDraw } from "./supplier-draw.ts";
 import { leagueDb } from "./db.ts";
 
 const SAVE = process.env.MM_TEST_SAVE ?? join(defaultSavesDir(), "SaveJonatan Sulik - Tatra Racing 2 (3).sav");
@@ -21,35 +22,41 @@ const league = {
 
 describe.skipIf(!existsSync(SAVE))("database: next season's suppliers", () => {
   let t: Awaited<ReturnType<typeof leagueDb>>;
-  let state: LeagueState;
+  let state: LeagueState, ended: LeagueState;
   const alice = () => t.member("alice"), bob = () => t.member("bob");
-  const car = (team: string) => state.teams.find((x) => x.name === team)!.design!.nextYearCar!;
+  const car = (team: string, s = ended) => s.teams.find((x) => x.name === team)!.design!.nextYearCar!;
+  const publish = (s: LeagueState) => t.service("select public.publish_snapshot($1, $2)", [JSON.stringify(memberRows(league, s)), JSON.stringify(splitSnapshot(s))]);
   const choices = async (who: ReturnType<typeof alice>) =>
     (await who.query<{ team: string; season: number; supplier_type: string; supplier_id: number }>(
       "select team, season, supplier_type, supplier_id from supplier_choices order by supplier_type")).rows;
 
   beforeAll(async () => {
-    state = extractLeague(Save.load(SAVE), league);
+    const save = Save.load(SAVE);
+    state = extractLeague(save, league);
+    // After the final race: every round done, and MM has drawn next season's deals.
+    for (const e of save.g.list<any>(save.championship(save.team("Garuda Racing")).calendar)) e.mHasEventEnded = true;
+    fakeDraw(save, save.team("Garuda Racing"));
+    ended = extractLeague(save, league);
     t = await leagueDb();
-    expect((await t.service("select public.publish_snapshot($1, $2)", [JSON.stringify(memberRows(league, state)), JSON.stringify(splitSnapshot(state))])).error).toBeNull();
+    expect((await publish(state)).error).toBeNull();
   }, 120_000);
 
   it("keys choices by the season the car is for", () => {
     // Base save: ERS 2016, pre-season ends in March 2017.
-    expect(car("Garuda Racing").season).toBe(2017);
-    expect(car("Garuda Racing").state).toBe("waiting");
+    expect(car("Garuda Racing", state).season).toBe(2017);
+    expect(car("Garuda Racing", state).state).toBe("waiting");
   });
 
-  it("opens the window when 3 races remain", async () => {
+  it("opens once MM has drawn next season's deals after the final race", async () => {
+    // Mid-season: no offers yet.
+    expect(car("Garuda Racing", state).options).toEqual({});
+    expect(supplierWindow(state.championship.calendar, "waiting", car("Garuda Racing", state).options).status).toBe("closed");
+    expect((await alice().query("select public.choose_supplier('Engine', 1)")).error).toMatch(/after the final race/);
+    // Season over: MM's 4/6/5/4 deals.
+    expect(Object.fromEntries(Object.entries(car("Garuda Racing").options).map(([k, v]) => [k, v.length]))).toEqual({ Engine: 4, Brakes: 6, Fuel: 5, Materials: 4 });
+    expect(supplierWindow(ended.championship.calendar, "waiting", car("Garuda Racing").options).status).toBe("open");
+    expect((await publish(ended)).error).toBeNull();
     const engine = car("Garuda Racing").options.Engine[0];
-    const left = state.championship.calendar.filter((e) => !e.ended).length;
-    expect(left).toBeGreaterThan(SUPPLIER_WINDOW_RACES);
-    expect(supplierWindow(state.championship.calendar, "waiting").status).toBe("closed");
-    expect((await alice().query("select public.choose_supplier('Engine', $1)", [engine.id])).error).toMatch(/opens when 3 races remain/);
-    // Play on to the last 3 races.
-    await t.service(`update snapshots set public = jsonb_set(public, '{championship,calendar}',
-      (select jsonb_agg(case when (e ->> 'round')::int <= $1 then jsonb_set(e, '{ended}', 'true') else e end)
-       from jsonb_array_elements(public -> 'championship' -> 'calendar') e))`, [state.championship.calendar.length - SUPPLIER_WINDOW_RACES]);
     expect((await alice().query("select public.choose_supplier('Engine', $1)", [engine.id])).error).toBeNull();
     expect(await choices(alice())).toEqual([{ team: "Garuda Racing", season: 2017, supplier_type: "Engine", supplier_id: engine.id }]);
   });

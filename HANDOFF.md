@@ -256,7 +256,7 @@ npx tsx src/cli.ts validate "<save>"
 6. **Backlog of designed features, in the suggested build order** (the user's idea list is complete as of 2026-10-01):
    1. **Season regulations and politics.** It's useful every season, including the ERS one.
    2. **Works engine programmes.** Site and database built. The season-change step waits for a pre-season save.
-   2b. **Next season's suppliers on the site.** Built (toolkit, DB, site, organizer guide). Left: run migration 011, publish, and test at pre-season in game; member engines as options come with the engine season step.
+   2b. **Next season's suppliers on the site.** Built (toolkit, DB, site, organizer guide). Left: run migration 012, publish, and test at season end / pre-season in game; member engines as options come with the engine season step.
    3. **Illegal engine tech.** Builds on 2.
 
 ## Calendar & results: every round clickable (2026-10-01, user request)
@@ -328,7 +328,7 @@ Members see the current and the confirmed next-season regulations, vote on the s
   - how to set or undo `nextYearsRules` safely (AddRule replaces the rule of the same group?)
   - how the vote results are stored, so the toolkit can overwrite MM's outcome
 
-## Next season's car: suppliers on the site (built 2026-10-01; migration 011 not yet run; not yet tested in game)
+## Next season's car: suppliers on the site (built 2026-10-01; migration 012 not yet run; not yet tested in game)
 In MM, designing next year's car means choosing suppliers (`CarDesignScreen` / `TeamAIController.FindSuppliersForNewChassis`): engine, brakes, fuel, materials (+ battery/ERS in hybrid series).
 - The chassis stats are the championship base + each supplier's `supplierStats` (`ApplyChampionshipBaseStat` + `ApplySupplierStats`).
 - The engine supplier's `randomEngineLevelModifier` goes onto the engine parts at the season change (non-spec series).
@@ -346,22 +346,24 @@ In MM, designing next year's car means choosing suppliers (`CarDesignScreen` / `
 - ✅ Migration `010_supplier_choices.sql` (run on Supabase by the user, 2026-10-01): `supplier_choices` and `choose_supplier(type, id)`. Migration `011_supplier_window.sql` (**not yet run**) replaces `choose_supplier` and adds `clear_supplier_choice(type)` (back to "keep current"). Both check the team's options in the latest snapshot and the window (`supplier_window_car`). No budget reservation: the prices are swapped at apply.
 - ✅ **Season key fixed:** MM's pre-season straddles New Year (ERS: 13 Dec 2016 to 5 Mar 2017), so choices keyed by the game date's year would get lost at a January checkpoint. The extract now publishes `nextYearCar.season` = the year of `currentPreSeasonEndDate` (`nextCarSeason`), and the RPC and pull use it.
 - ✅ `pull` (`supplierChanges` in `src/engine-orders.ts`): for every member team whose latest snapshot says "designing", emits `setSuppliers` with each type's choice for that car's season, else this season's supplier if still offered ("no choice = keep current", now implemented). It warns about choices no longer on offer and lists teams still waiting. It repeats on every pull while MM designs; `setSuppliers` skips what's already set.
-- ✅ Tests: `test/db-suppliers.test.ts` (window closed at 6 races left, open at 3; own options only; change and clear; privacy; refused once built) plus a pure test of `supplierChanges`.
+- ✅ Tests: `test/db-suppliers.test.ts` (closed mid-season, open once MM's draw is published, faked with `test/supplier-draw.ts`; own options only; change and clear; privacy; refused once built) plus a pure test of `supplierChanges`.
 - ✅ Site: Parts → **Next season's car** sub-tab (`site/src/components/next-season-card.tsx`; a Parts sub-tab rather than the Engine page, since it covers brakes, fuel and materials too).
   - A status badge (closed with races to go / open / MM designing / built), and this season's supplier bill against next season's.
   - Per type, every deal, cheapest first, with price, engine level and stats, and ▲/▼ deltas against this season's supplier. "Choose", "Keep" and "Keep this season's" (clear).
   - Repeated supplier names are numbered "deal 1, 2…". A note when engines are spec.
   - Checked in demo mode with headless Chromium: open and closed window, desktop and phone width, no console errors. The Parts sub-tab list now wraps on phones.
-- ✅ Organizer page: a "Season end: the pre-season checkpoint" block, shown once 3 races or fewer remain (advance into pre-season, save "League Pre-season", publish, pull, apply).
+- ✅ Organizer page: a "Season end: next season's suppliers" block from the final race weekend (see Window below).
 - ✅ README and `docs/save-schema.md` ("Next year's car and suppliers").
 - ⏭ To do:
-  - The user runs migration 011 on Supabase and publishes again (snapshots need `nextYearCar.season`).
+  - The user runs migration 012 on Supabase (011 is live) and publishes again.
+  - **Confirm the JSON shape of `championshipSuppliers`** in a save made after the final race (advance past the season's end): run `npx tsx src/cli.ts extract` and check that `design.nextYearCar.options` lists 4/6/5/4 deals.
   - Test in game at pre-season: does a member's pick show on MM's car screen, do the chassis stats and engine level follow, and do the refund and charge appear in finances?
   - Check when MM moves `currentPreSeasonEndDate` on to the next season (assumed: at the new season's start).
   - Member engines as engine options (with the engine season step). **The engine programme page has the same New Year issue:** `engine_season()` and the site use the game date's year, so a January pre-season checkpoint would count as next season. Fix it with the same `season` idea when building the engine step.
 
 **Rules (the user's choices):**
-- **Window:** it opens automatically once **3 races** remain (the user's pick, 2026-10-01) and stays open while MM designs next year's car at pre-season; it closes once the car is built. MM itself has no mid-season choice.
+- **Offers = MM's own draw (user's decision, 2026-10-01, replacing "every deal of the tier"):** the user found 15 "Micronix Racing" brake deals confusing. MM's car design screen offers each championship a few drawn deals per type (`championshipSuppliers`, see docs/save-schema.md), so the site shows exactly those. The extract only publishes them once the season is over or MM is designing the car (the draw may linger into the next season).
+- **Window:** opens when a published save has MM's draw (after the final race, at the season's end), stays open while MM designs next year's car at pre-season, closes once it's built. This replaces the earlier "3 races left" (MM has no offers that early). Migration 012 changes `supplier_window_car` to match. The Organizer page shows the season-end steps from the final race weekend: save "League Season End" past the season's end and publish; then "League Pre-season", publish, pull, apply.
 - **No choice = keep this season's suppliers** (if the team can still buy them).
 - **Visibility:** choices stay private until pre-season, then everyone sees who runs which suppliers, as in MM's team screens.
 - Member engines (engine programmes) appear as engine options next to MM's suppliers.

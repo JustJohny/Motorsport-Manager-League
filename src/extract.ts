@@ -4,7 +4,7 @@ import type {
 } from "./league-types.ts";
 import { teamDesign } from "./ops/design.ts";
 import { extractRegulations } from "./regulations.ts";
-import { currentSuppliers, nextCarSeason, nextYearDesignState, supplierOptions } from "./ops/suppliers.ts";
+import { currentSuppliers, nextCarSeason, nextYearDesignState, seasonOver, supplierOptions } from "./ops/suppliers.ts";
 import { BUILDING_STATES, JOBS, PART_TYPES, Save, numOrNull, personKind, personName, type PartType } from "./model.ts";
 
 export type { LeagueConfig, LeagueState, TeamState } from "./league-types.ts";
@@ -244,7 +244,10 @@ function withRules(save: Save, t: Obj, champ: Obj, design: TeamDesign): TeamDesi
       state: nextYearDesignState(save, t),
       season: nextCarSeason(save, t),
       current: currentSuppliers(save, t) as Record<string, never>,
-      options: supplierOptions(save, t) as Record<string, never>,
+      // MM's draw from the season's end until the car is built. It may outlive the season it was
+      // drawn for, so it only counts once the season is over or MM is designing the car.
+      options: (nextYearDesignState(save, t) === "designing" || (nextYearDesignState(save, t) === "waiting" && seasonOver(save, t))
+        ? supplierOptions(save, t) : {}) as Record<string, never>,
     },
     rules: {
       brokenThisSeason: t.rulesBrokenThisSeason ?? 0,
