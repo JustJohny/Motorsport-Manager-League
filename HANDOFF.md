@@ -75,7 +75,7 @@ Steps 1–5 are done: Supabase is set up, Pages is deployed, and snapshots are p
 **Rules agreed with the user:**
 - A bid is a yearly wage plus a 25% sign-on fee.
 - The opening price comes from a stats formula.
-- Members can bid on free agents and on AI teams' staff. AI staff cost a buyout (remaining contract value) and swap with the released person.
+- Members can bid on free agents and on AI teams' staff. AI staff cost a buyout and swap with the released person.
 - The bidder names who is replaced.
 - Each bid beats the leader by at least 5%.
 - Contracts run 1–3 seasons, chosen by the bidder.
@@ -181,7 +181,11 @@ npx tsx src/cli.ts validate "<save>"
 ## Next steps
 1. **Phase 3 (done):** only left to see a toolkit-started build complete in game, which happens naturally as the league plays on.
 2. **Phase 2 (done):** test with a second real member.
-   - Tuning to discuss: opening prices can be below an AI driver's current wage, and buyouts of long contracts are large ($11M for a 20-year-old on a deal to 2018).
+   - **Auction tuning, agreed 2026-10-01 (migration `007_auction_tuning.sql`):**
+     - The buyout is MM's `ContractPerson.GetContractTerminationCost`: the months of wage left, clamped to 1..6. It was the whole rest of the contract (Tanvir Jha: $18.2M → $4.1M).
+     - AI staff open at no less than their current wage.
+     - The formula's bases are recalibrated to the median AI wage per skill in the ERS: Driver $2.24M, Engineer $0.74M, Mechanic $0.37M (were 1.5M / 0.25M / 0.3M).
+     - Test: every AI staff member's price matches between SQL and `src/league-rules.ts`.
 3. **Phase 4: part development (done, verified by the user 2026-10-01: the site works and the applied save reflects the changes in game).** Rules agreed with the user (2026-10-01), replacing the earlier "formula from team assets" idea:
    - **The game builds it**, like HQ: the site sends the design, the toolkit starts it in MM, and MM finishes it with its own stats and time.
    - **Components from MM's real list**, per part type, with MM's unlock rules (Design Centre level, designer).

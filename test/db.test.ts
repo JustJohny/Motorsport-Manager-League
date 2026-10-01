@@ -123,6 +123,19 @@ describe.skipIf(!existsSync(SAVE))("database: snapshots and staff auction", () =
     expect((await openAuction(bob(), staffOf("Octane Racing", "Driver")[0].guid)).error).toMatch(/already works for you/);
   });
 
+  it("prices every AI staff member like the site: MM's buyout (≤6 months) and at least their wage", async () => {
+    const staff = state.teams.filter((x) => !x.member).flatMap((x) => x.staff.filter((s) => s.person).map((s) => s.person!));
+    expect(staff.length).toBeGreaterThan(20);
+    for (const p of staff) {
+      const r = (await t.service<{ open: string; buyout: string }>("select public.min_wage($1) as open, public.buyout($1, $2) as buyout",
+        [JSON.stringify(p), state.gameDate])).rows[0];
+      expect(Number(r.open), p.name).toBe(minWage(p, DEFAULT_SETTINGS));
+      expect(Number(r.buyout), p.name).toBe(buyout(p, state.gameDate));
+      expect(Number(r.open)).toBeGreaterThanOrEqual(p.contract.yearlyWages);
+      expect(Number(r.buyout)).toBeLessThanOrEqual(Math.round(p.contract.yearlyWages / 2 / 1000) * 1000 + 1000);
+    }
+  });
+
   it("won't let one person be replaced by two leading bids", async () => {
     const [p1, p2] = state.freeAgents.filter((p) => p.kind === "Mechanic").slice(0, 2);
     const [m] = staffOf("Octane Racing", "Mechanic");

@@ -18,7 +18,8 @@ export interface LeagueSettings {
 export const DEFAULT_SETTINGS: LeagueSettings = {
   sign_on_fee_pct: 0.25,
   min_increment_pct: 0.05,
-  min_wage_base: { Driver: 1_500_000, Engineer: 250_000, Mechanic: 300_000 },
+  // Median wage MM's AI teams pay per skill in the ERS (migration 007).
+  min_wage_base: { Driver: 2_240_000, Engineer: 740_000, Mechanic: 370_000 },
   min_wage_exponent: 2,
   min_wage_floor: 50_000,
   max_contract_years: 3,
@@ -36,10 +37,14 @@ export function statAverage(p: Pick<Person, "stats">): number {
 
 const roundTo = (v: number, step: number) => Math.round(v / step) * step;
 
-/** Opening price of an auction. */
-export function minWage(p: Pick<Person, "stats" | "kind">, s: LeagueSettings): number {
+/**
+ * Opening price of an auction: the stats formula, and for someone under contract at an AI team
+ * at least their current wage (nobody moves for a pay cut). Mirrors public.min_wage.
+ */
+export function minWage(p: Pick<Person, "stats" | "kind"> & { contract?: Pick<Person["contract"], "team" | "yearlyWages"> }, s: LeagueSettings): number {
   const base = s.min_wage_base[p.kind] ?? 0;
-  return Math.max(s.min_wage_floor, roundTo(base * (statAverage(p) / 10) ** s.min_wage_exponent, 10_000));
+  const current = p.contract?.team ? p.contract.yearlyWages : 0;
+  return Math.max(s.min_wage_floor, roundTo(base * (statAverage(p) / 10) ** s.min_wage_exponent, 10_000), current);
 }
 
 /** The lowest next bid: the opening price, or the leader plus the step, rounded up to $1K. */
@@ -47,10 +52,15 @@ export function nextMinBid(minWageValue: number, leadingWage: number | null, s: 
   return leadingWage == null ? minWageValue : Math.ceil((leadingWage * (1 + s.min_increment_pct)) / 1000) * 1000;
 }
 
-/** Remaining contract value of someone under contract at an AI team. */
+/**
+ * What buying someone out of an AI team's contract costs: MM's own termination cost
+ * (ContractPerson.GetContractTerminationCost), the months of wage left, clamped to 1..6.
+ * Mirrors public.buyout.
+ */
 export function buyout(p: Pick<Person, "contract">, gameDate: string): number {
-  const years = (gameTime(p.contract.end) - gameTime(gameDate)) / (365.25 * DAY);
-  return roundTo(Math.max(0, p.contract.yearlyWages * years), 1000);
+  const days = Math.floor((gameTime(p.contract.end) - gameTime(gameDate)) / DAY);
+  const months = Math.min(6, Math.max(1, Math.round((days / 365) * 12)));
+  return roundTo((p.contract.yearlyWages / 12) * months, 1000);
 }
 
 /** Fraction of the game year left; contracts and seasons end on 31 December. */

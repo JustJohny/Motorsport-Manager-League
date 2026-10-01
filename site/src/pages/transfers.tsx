@@ -175,7 +175,7 @@ function CurrentWindow() {
           <CardDescription className="grid gap-1">
             <span>Each bid is a yearly wage for 1–{t.settings.max_contract_years} seasons and names who in your team the signing replaces.</span>
             <span>A bid must beat the leader by {Math.round(t.settings.min_increment_pct * 100)}%. You can't raise your own leading bid.</span>
-            <span>When the window closes, winners pay a {Math.round(t.settings.sign_on_fee_pct * 100)}% sign-on fee, plus a buyout (the remaining contract) for AI teams' staff, who swap with the person you release.</span>
+            <span>When the window closes, winners pay a {Math.round(t.settings.sign_on_fee_pct * 100)}% sign-on fee, plus a buyout for AI teams' staff (MM's own rule: the months of wage left on their contract, at most 6), who swap with the person you release. AI teams' staff open at no less than their current wage.</span>
             <span>Your leading bids must fit in your budget, including the extra wages for the rest of this season.</span>
           </CardDescription>
         </CardHeader>

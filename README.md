@@ -57,7 +57,7 @@ A Vite + React + shadcn/ui site on GitHub Pages, with Supabase for data and Disc
 The organizer opens a window with a deadline on the Organizer page. Members nominate free agents or AI teams' staff from the Staff market. Nominating places the nominator's opening bid in the same dialog, all or nothing (`nominate`, migration 006). Everyone then bids live on the Transfer window page. Rules (enforced in `supabase/migrations/002_auctions.sql`, mirrored for display in `src/league-rules.ts`, tunable in the `league_settings` table):
 - A bid is a yearly wage for 1–3 seasons and names who in the bidder's team it replaces. Bids beat the leader by 5%, and nobody can raise their own leading bid.
 - Opening price = base per role × (stat average / 10)², at least $50K.
-- Winners pay a 25% sign-on fee. AI teams' staff also cost a buyout (the remaining contract value) and swap with the released person.
+- Winners pay a 25% sign-on fee. AI teams' staff also cost a buyout, MM's own termination cost (the months of wage left, at most 6), and swap with the released person. They open at no less than their current wage. The opening-price formula's bases are calibrated to what MM's AI teams pay (migration 007).
 - Everything a member's leading bids would cost (fees, buyouts, and the extra wages for the rest of this season) must fit in the budget.
 - Bid amounts are public; who a team would release is visible only to that team and the organizer.
 
