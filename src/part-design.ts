@@ -2,9 +2,9 @@
 // the league site agree on slots, cost and time. See docs/save-schema.md, "Part design".
 // Only type imports: the site bundles this file.
 
-import type { DesignComponent, DesignContext } from "./league-types.ts";
+import type { DesignBase, DesignComponent, DesignContext } from "./league-types.ts";
 
-export type { DesignComponent, DesignContext, DesignSettings } from "./league-types.ts";
+export type { DesignBase, DesignComponent, DesignContext, DesignSettings } from "./league-types.ts";
 
 export interface DesignPlan {
   /** Normal slots, by index; null = empty. */
@@ -107,5 +107,23 @@ export function planDesign(ctx: DesignContext, chosen: DesignComponent[]): Desig
     gameCost,
     days,
     level: partLevel(all),
+  };
+}
+
+/**
+ * Expected stats of the designed part (CarPartComponent.ApplyStats): stat and max-performance
+ * boosts scale with the team's development rate; reliability boosts add as they are. MM adds a
+ * little randomness (max reliability ±10 %, development variance), so this is an estimate.
+ */
+export function predictPart(base: DesignBase, chosen: DesignComponent[]) {
+  const rate = base.developmentRate;
+  return {
+    stat: base.stat + chosen.reduce((s, c) => s + c.statBoost * rate, 0),
+    // Below zero the mechanics simply can't improve the part.
+    maxPerformance: Math.max(0, base.maxPerformance + chosen.reduce((s, c) => s + c.maxStatBoost * rate, 0)),
+    // MM keeps reliability within 0..100 %.
+    reliability: Math.min(1, Math.max(0, base.reliability + chosen.reduce((s, c) => s + c.reliabilityBoost, 0))),
+    maxReliability: base.maxReliability + chosen.reduce((s, c) => s + c.maxReliabilityBoost, 0),
+    risk: chosen.reduce((s, c) => s + c.risk, 0),
   };
 }

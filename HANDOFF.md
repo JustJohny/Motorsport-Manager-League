@@ -228,6 +228,12 @@ npx tsx src/cli.ts validate "<save>"
      - The budget strip, HQ strip and bid dialog count the queued design.
      - Checked in demo mode with headless Chromium: designer, order, fitting, improvement, phone width; no console errors.
      - **Spec parts:** `championship.rules.specParts` (ERS: Engine 1, Gearbox 3) can't be designed in MM. They're excluded from the design options and refused by `startDesign`.
+     - **User feedback round 1 (2026-10-01), fixed:**
+       - Engineer components of a level the facility doesn't unlock were selectable. They're no longer offered: their own level must be open, like every other component of that tier.
+       - Locked tiers show a lock and the building they need, and components that can't fit a free slot are greyed out.
+       - The designer shows the starting point (MM's `SetBaseStats`) next to the estimated new part (`predictPart`). Performance and max performance match MM's own design parts exactly; max reliability is within MM's ±10 % roll.
+       - The Parts tab is split into the sub-tabs "Design a new part" and "Your parts: fitting & improvement", so the mechanics slider can't be mistaken for part of the design.
+       - Lucide icons throughout (the user wants game-like icons, never emoji): part types, stats, tier stars in rarity colours (Basic to Legendary), component summary lines, slots, cost and time.
      - Next: the user publishes ("League Test 10" or newer) and tries the Parts tab live. Then a real cycle: order, pull, apply, play, publish, fit, pull, apply, race.
      - **AI-finished parts on member teams: remove and refund** (user's decision). `removeUnorderedParts` does this: parts built after the league start whose components don't match an ordered design. A fitted one is replaced by the best spare first, and one refund is made per design.
    - MM internals: see docs/save-schema.md, "Part design and improvement". Component display names are localised (`mNameID`) and not in the save. Use `mCustomComponentName`, or find the localisation file in the game data.

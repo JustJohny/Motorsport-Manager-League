@@ -2,7 +2,7 @@ import type { Json } from "../codec/sav.ts";
 import { float, num } from "../codec/sav.ts";
 import type { Obj } from "../graph.ts";
 import { NULL_DATE, PART_TYPES, type PartType, type Save } from "../model.ts";
-import type { TeamDesign } from "../league-types.ts";
+import type { DesignBase, TeamDesign } from "../league-types.ts";
 import { planDesign, type DesignComponent, type DesignContext, type DesignPlan } from "../part-design.ts";
 import { addDays, delayedEvents, insertByDate } from "./calendar.ts";
 import { findBuilding } from "./hq.ts";
@@ -83,6 +83,7 @@ export function toDesignComponent(save: Save, c: Obj): DesignComponent {
 
 export interface DesignOptions {
   ctx: DesignContext;
+  base: DesignBase;
   /** Components the team may choose now, with their game objects. */
   available: { component: DesignComponent; obj: Obj }[];
   /** Highest component level the team's HQ allows (1..5). */
@@ -122,6 +123,9 @@ export function designOptions(save: Save, team: Obj, type: PartType): DesignOpti
     if (engineerComps[i]) list.unshift(g.deref<Obj>(engineerComps[i]));
     for (const obj of list) {
       if (!obj || (obj.unlockRequirements ?? []).some((r: Json) => isLocked(save, team, r))) continue;
+      // An engineer's component is offered with level i, but its own level must be open too:
+      // a Great component needs the level-3 facility like every other Great one.
+      if (obj.level - 1 !== i && !levelOpen(obj.level - 1)) continue;
       available.push({ component: toDesignComponent(save, obj), obj });
     }
   }
@@ -146,10 +150,37 @@ export function designOptions(save: Save, team: Obj, type: PartType): DesignOpti
     playerTimeModifierDays: isPlayer && save.data.player?.mPlayerBackStory?.mBackStory === 1
       ? timeSpanDays(save.data.player.mPlayerBackStory.mPartDesignTimeModifier) : 0,
   };
+  const base = designBase(save, team, type, ctx);
   const locked = unlocks.map((r, i) => ({ r: g.deref<Obj>(r), level: i + 1 }))
     .filter(({ r, level }) => r && "buildingType" in r && !levelOpen(level - 1))
     .map(({ r, level }) => ({ level, buildingType: r.buildingType as number, buildingLevel: (r.buildingLevel as number) + 1 }));
-  return { ctx, available, maxLevel, locked };
+  return { ctx, base, available, maxLevel, locked };
+}
+
+const STAT_KEYS = ["topSpeed", "acceleration", "braking", "lowSpeedCorners", "mediumSpeedCorners", "highSpeedCorners"];
+const DEV_RATE: Partial<Record<PartType, string>> = {
+  Brakes: "brakesDevelopmentRate", Engine: "engineDevelopmentRate", FrontWing: "frontWingDevelopmentRate",
+  Gearbox: "gearboxDevelopmentRate", RearWing: "rearWingDevelopmentRate", Suspension: "suspensionDevelopmentRate",
+};
+// GameStatsConstants.initialReliabilityValue / initialMaxReliabilityValue.
+const INITIAL_RELIABILITY = 0.4;
+const INITIAL_MAX_RELIABILITY = 0.45;
+
+/** CarPartDesign.SetBaseStats: the new part before its components. */
+function designBase(save: Save, team: Obj, type: PartType, ctx: DesignContext): DesignBase {
+  const engineer = leadEngineer(save, team);
+  const pcs = engineer ? save.g.deref<Obj>(save.g.deref<Obj>(engineer.stats ?? engineer.mStats)?.partContributionStats) : null;
+  const statType = Number(save.parts(team, type)[0]?.mStats?.statType ?? 0);
+  const skill = num(pcs?.[STAT_KEYS[statType]] ?? 0);
+  const chassis = save.g.deref<Obj>(save.cars(team)[0]?.chassisStats);
+  const dcLevel = findBuilding(save, team, BUILDING.DesignCentre).currentLevel as number;
+  return {
+    stat: seasonStartStat(save, team, type) + Math.floor(skill) * 1.5,
+    maxPerformance: num(chassis?.mImprovability ?? 0),
+    reliability: INITIAL_RELIABILITY,
+    maxReliability: INITIAL_MAX_RELIABILITY + (dcLevel - 1) * 0.05 + skill * 0.02,
+    developmentRate: num(team[DEV_RATE[type]!] ?? 1),
+  };
 }
 
 /** Everything the league site shows for a team's part design, fitting and improvement. */
@@ -159,7 +190,7 @@ export function teamDesign(save: Save, team: Obj): TeamDesign {
   for (const type of Object.keys(COMPONENT_LISTS) as PartType[]) {
     if (!save.parts(team, type).length || isSpecPart(save, team, type)) continue;
     const o = designOptions(save, team, type);
-    types[type] = { ctx: o.ctx, components: o.available.map((a) => a.component), maxLevel: o.maxLevel, locked: o.locked };
+    types[type] = { ctx: o.ctx, base: o.base, components: o.available.map((a) => a.component), maxLevel: o.maxLevel, locked: o.locked };
   }
   const cpd = carPartDesign(save, team);
   const part = cpd.mStage === STAGE.Designing && cpd.mCarPart ? g.deref<Obj>(cpd.mCarPart) : null;

@@ -146,8 +146,21 @@ export interface DesignContext {
   playerTimeModifierDays?: number;
 }
 
+/** A new part before its components, as MM's SetBaseStats makes it. */
+export interface DesignBase {
+  /** Season starting stat + 1.5 x the lead engineer's skill for this part. */
+  stat: number;
+  /** The chassis' improvability. */
+  maxPerformance: number;
+  reliability: number;
+  maxReliability: number;
+  /** The team's development rate for this part: components' stat boosts are multiplied by it. */
+  developmentRate: number;
+}
+
 export interface PartDesignOptions {
   ctx: DesignContext;
+  base: DesignBase;
   components: DesignComponent[];
   /** Highest component level the HQ allows now (1..5). */
   maxLevel: number;

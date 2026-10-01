@@ -48,6 +48,9 @@ describe.skipIf(!existsSync(SAVE))("publish", () => {
         expect(o.ctx.settings.materialsCost).toBeGreaterThan(0);
         // Three components per open level, plus the lead engineer's.
         expect(o.components.filter((c) => !c.engineer).length).toBe(3 * o.maxLevel);
+        // Nothing above the levels the team's facility unlocks, engineer components included.
+        for (const c of o.components) expect(c.level, `${t.name} ${type} component ${c.id}`).toBeLessThanOrEqual(o.maxLevel);
+        expect(o.base.stat).toBeGreaterThan(0);
       }
       const parts = Object.values(t.parts).flat().map((p) => p.guid);
       for (const g of [...d.improvement.performance, ...d.improvement.reliability]) expect(parts).toContain(g);

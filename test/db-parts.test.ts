@@ -40,15 +40,24 @@ describe.skipIf(!existsSync(SAVE))("database: part design, fitting and improveme
   }, 120_000);
 
   it("prices a design like the site, with MM's slot rules", async () => {
+    // Octane's engineer has a level-2 component that opens an extra slot.
+    const oct = team("Octane Racing").design!.types.FrontWing;
+    const engineer = oct.components.find((c) => c.engineer && c.bonuses.some((b) => b.type === "BonusUnlockExtraSlot"))!;
+    const octIds = [engineer.id, ...oct.components.filter((c) => !c.engineer && c.level === 2).slice(0, 2).map((c) => c.id), oct.components.find((c) => !c.engineer && c.level === 1)!.id];
+    const octPlan = planDesign(oct.ctx, octIds.map((id) => oct.components.find((c) => c.id === id)!));
+    expect(octPlan.bonusSlots).toHaveLength(1);
+    const octOrder = await order(bob(), "FrontWing", octIds);
+    expect(octOrder.error).toBeNull();
+    const octRow = (await bob().query<{ cost: string }>("select cost from design_orders where id = $1", [octOrder.rows[0].id])).rows[0];
+    expect(Number(octRow.cost)).toBe(octPlan.cost);
+    expect((await bob().query("select public.cancel_design($1)", [octOrder.rows[0].id])).error).toBeNull();
+
     const opts = team("Garuda Racing").design!.types.FrontWing;
     const comp = (id: number) => opts.components.find((c) => c.id === id)!;
-    const engineer = opts.components.find((c) => c.engineer && c.bonuses.some((b) => b.type === "BonusSpecificLevelComponentAddNoDays"))!;
     const l2 = opts.components.filter((c) => !c.engineer && c.level === 2).map((c) => c.id);
     const l1 = opts.components.filter((c) => !c.engineer && c.level === 1).map((c) => c.id);
-    // The engineer's component opens a bonus slot, so four components fit three slots.
-    const ids = [engineer.id, l2[0], l2[1], l1[0]];
+    const ids = [l2[0], l2[1], l1[0]];
     const plan = planDesign(opts.ctx, ids.map(comp));
-    expect(plan.bonusSlots).toHaveLength(1);
 
     // Too many: three level-1 parts and a level 2 in three slots.
     expect((await order(alice(), "FrontWing", [l1[0], l1[1], l1[2], l2[0]])).error).toMatch(/No free slot/);
@@ -71,9 +80,12 @@ describe.skipIf(!existsSync(SAVE))("database: part design, fitting and improveme
     const id = tatra.types.FrontWing.components.find((c) => !c.engineer && c.level === 1)!.id;
     expect((await order(org(), "FrontWing", [id])).error).toMatch(/still designing a part until/);
 
-    expect((await bob().query("select team from design_orders")).rows).toEqual([]);
-    expect((await org().query("select team from design_orders")).rows).toEqual([{ team: "Garuda Racing" }]);
-    const mine = (await alice().query<{ id: number; cost: string }>("select id, cost from design_orders")).rows[0];
+    const queued = "select team from design_orders where status = 'queued'";
+    expect((await bob().query(queued)).rows).toEqual([]);
+    expect((await org().query(queued)).rows).toEqual([{ team: "Garuda Racing" }]);
+    // Bob sees only his own (cancelled) order, never Garuda's.
+    expect((await bob().query<{ team: string }>("select team from design_orders")).rows.every((r) => r.team === "Octane Racing")).toBe(true);
+    const mine = (await alice().query<{ id: number; cost: string }>("select id, cost from design_orders where status = 'queued'")).rows[0];
     expect((await bob().query("select public.cancel_design($1)", [mine.id])).error).toMatch(/No queued design/);
 
     // The queued design commits budget: an HQ order for more than what's left is refused.
