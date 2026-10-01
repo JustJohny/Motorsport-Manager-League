@@ -323,12 +323,30 @@ Members see the current and the confirmed next-season regulations, vote on the s
   - how to set or undo `nextYearsRules` safely (AddRule replaces the rule of the same group?)
   - how the vote results are stored, so the toolkit can overwrite MM's outcome
 
-## Next season's car: suppliers on the site (rules agreed 2026-10-01, not built)
+## Next season's car: suppliers on the site (toolkit + DB built 2026-10-01; site card not built)
 In MM, designing next year's car means choosing suppliers (`CarDesignScreen` / `TeamAIController.FindSuppliersForNewChassis`): engine, brakes, fuel, materials (+ battery/ERS in hybrid series).
 - The chassis stats are the championship base + each supplier's `supplierStats` (`ApplyChampionshipBaseStat` + `ApplySupplierStats`).
 - The engine supplier's `randomEngineLevelModifier` goes onto the engine parts at the season change (non-spec series).
 - Each supplier is paid on its own (`GetEngineTransaction` …).
 - `supplierManager.GetSuppliersForTeam(type, team, checkCanBuy)` lists what a team may buy (tier, `mTeamsThatCannotBuy`, discounts).
+
+**Build progress (2026-10-01):**
+- ✅ `src/ops/suppliers.ts`:
+  - `supplierOptions`: every supplier with tier = championshipID + 1 that the team can buy (`CanTeamBuyThis`), priced with `GetPrice` (team discounts). MM itself offers a seeded random subset each season; the league offers all. Battery/ERS only when the rules switch energy systems on.
+  - `currentSuppliers`, and `nextYearDesignState` (MM's AI starts next year's design in `OnPreSeasonStart`; state 0 = designing, 1 = waiting, 2 = complete).
+  - The `setSuppliers` op swaps suppliers in the pending `nextYearCarDesign.mChassisStats`: it shifts the chassis stats by the supplier-stat difference, sets `mEngineModifier` for the engine, refunds the old supplier's price and charges the new one. It errors before pre-season.
+  - Tests: `test/suppliers.test.ts` simulates a pre-season design.
+  - C# dictionaries can be saved as `{}` when empty; `dictEntries` handles both shapes.
+- ✅ The extract publishes `design.nextYearCar` (state, current, options) privately per team.
+- ✅ Migration `010_supplier_choices.sql` (**not yet run on Supabase**): `supplier_choices`, and the RPC `choose_supplier(type, id)` (checked against the team's options in the latest snapshot; no budget reservation, since the prices are swapped at apply).
+- ✅ `pull` (`supplierChanges` in `src/engine-orders.ts`) applies the choices for teams whose snapshot state is "designing", and lists the others as waiting.
+- ⏭ To do:
+  - A DB test for `choose_supplier`.
+  - The site card "Next season's suppliers" (e.g. on the Engine programme page): options per type with price, stats (0 tyre wear, 1 tyre heating, 2 fuel, 3 improvability) and engine-level range; default "keep current"; show the state ("applied at the pre-season checkpoint").
+  - Member engines as engine options (with the engine season step).
+  - Make the organizer race guide mention a pre-season checkpoint.
+  - README.
+  - Then publish, and test in game at pre-season.
 
 **Rules (the user's choices):**
 - **Window:** it opens automatically when the season's last few races remain (like MM's car development period) and closes at the pull before pre-season starts.

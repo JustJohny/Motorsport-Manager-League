@@ -217,6 +217,18 @@ export interface DesignBase {
   developmentRate: number;
 }
 
+/** An MM supplier a team can buy (engine, brakes, fuel, materials…), priced for that team. */
+export interface SupplierOffer {
+  id: number;
+  type: string;
+  name: string;
+  tier: number;
+  price: number;
+  /** CarChassisStats.Stats index (0 tyre wear, 1 tyre heating, 2 fuel efficiency, 3 improvability…) → value. */
+  stats: Record<number, number>;
+  engineLevel?: [number, number];
+}
+
 export interface PartDesignOptions {
   ctx: DesignContext;
   base: DesignBase;
@@ -238,6 +250,13 @@ export interface TeamDesign {
   specParts?: string[];
   /** The design in progress (MM designs one part at a time). */
   current: { type: string; components: number[]; start: string; end: string; extraCopies: number } | null;
+  /** Next season's car: MM's supplier choice (missing in snapshots published before 2026-10-01). */
+  nextYearCar?: {
+    /** MM's AI starts next year's design when pre-season starts; choices apply from then. */
+    state: "waiting" | "designing" | "complete";
+    current: Record<string, SupplierOffer>;
+    options: Record<string, SupplierOffer[]>;
+  };
   /** MM's scrutineering for this team (missing in snapshots published before 2026-10-01). */
   rules?: {
     /** Offences this season: the next bust costs 2 x (this + 1) places and $100K x (this + 1). */

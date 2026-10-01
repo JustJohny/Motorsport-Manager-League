@@ -12,7 +12,7 @@ import { memberRows, publish, splitSnapshot } from "./publish.ts";
 import { cancelUnorderedChange, fetchHqContext, fetchQueuedOrders, hqChanges, markOrdersApplied } from "./hq-orders.ts";
 import type { LeagueSettings } from "./league-rules.ts";
 import { choiceChanges, designChanges, fetchPartsContext, markDesignsApplied, undoAiParts } from "./part-orders.ts";
-import { engineSpendChanges, fetchEngineSpend, markEngineSpendApplied } from "./engine-orders.ts";
+import { engineSpendChanges, fetchEngineSpend, fetchSupplierContext, markEngineSpendApplied, supplierChanges } from "./engine-orders.ts";
 import { fetchRegulationContext, recordVoteResults, regulationChanges } from "./rule-votes.ts";
 import { rest, supabaseEnv } from "./supabase.ts";
 import { fetchWindow, markApplied, windowChanges, winners } from "./transfers.ts";
@@ -170,6 +170,18 @@ switch (cmd) {
     for (const r of engineSpend) console.log(`  Engine: ${r.team} ${r.description} $${Number(r.amount).toLocaleString()}${r.payee ? ` to ${r.payee}` : ""}`);
     changes.push(...engineSpendChanges(engineSpend));
     if (engineSpend.length) notes.push(`${engineSpend.length} engine payment${engineSpend.length > 1 ? "s" : ""}`);
+
+    // Next season's suppliers: applied once MM's AI has started next year's design (pre-season).
+    const supplierRows = await fetchSupplierContext(env);
+    if (supplierRows.length) {
+      const privs = await rest<{ team: string; private: { design?: { nextYearCar?: { state: string } } } }[]>(
+        env, "GET", "team_snapshots?select=team,private&order=snapshot_id.desc&limit=200");
+      const latest = new Map<string, string>();
+      for (const p of privs) if (!latest.has(p.team)) latest.set(p.team, p.private.design?.nextYearCar?.state ?? "waiting");
+      const sc = supplierChanges(supplierRows, new Set([...latest].filter(([, st]) => st === "designing").map(([t]) => t)));
+      changes.push(...sc.changes);
+      console.log(`Supplier choices applied: ${sc.changes.length}${sc.waiting.length ? `, waiting for pre-season: ${sc.waiting.join(", ")}` : ""}`);
+    }
 
     // Rule votes due before the next checkpoint, settled with the league's result instead of MM's;
     // then the organizer's choices for next season.

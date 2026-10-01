@@ -4,6 +4,7 @@ import type {
 } from "./league-types.ts";
 import { teamDesign } from "./ops/design.ts";
 import { extractRegulations } from "./regulations.ts";
+import { currentSuppliers, nextYearDesignState, supplierOptions } from "./ops/suppliers.ts";
 import { BUILDING_STATES, JOBS, PART_TYPES, Save, numOrNull, personKind, personName, type PartType } from "./model.ts";
 
 export type { LeagueConfig, LeagueState, TeamState } from "./league-types.ts";
@@ -233,6 +234,11 @@ function withRules(save: Save, t: Obj, champ: Obj, design: TeamDesign): TeamDesi
   const investor = t.investor ? save.g.deref<Obj>(t.investor) : null;
   return {
     ...design,
+    nextYearCar: {
+      state: nextYearDesignState(save, t),
+      current: currentSuppliers(save, t) as Record<string, never>,
+      options: supplierOptions(save, t) as Record<string, never>,
+    },
     rules: {
       brokenThisSeason: t.rulesBrokenThisSeason ?? 0,
       riskBonus: investor?.partRiskBonus ?? 0,
