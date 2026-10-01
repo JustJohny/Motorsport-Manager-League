@@ -2,7 +2,7 @@
 // league site and the database tests agree on AI votes and results. Only type imports: the site
 // bundles this file.
 
-import type { Rule, RuleVote, VoteChoice } from "./league-types.ts";
+import type { Regulations, Rule, RuleVote, VoteChoice } from "./league-types.ts";
 
 /** PoliticalVote.TeamCharacteristics, in enum order. */
 export const TEAM_CHARACTERISTICS = [
@@ -112,3 +112,18 @@ export function votesClosingNow(votes: RuleVote[], gameDate: string, nextRaceDat
   const cutoff = voteCutoff(gameDate, nextRaceDate);
   return votes.filter((v) => v.status === "upcoming" && v.date < cutoff);
 }
+
+export interface RuleVoteRow { team: string; season: number; rule_id: number; choice: VoteChoice; extra_power: number }
+export interface OverrideRow { season: number; rule_group: string; rule_id: number }
+export interface VoteResultRow { season: number; rule_id: number; yes: number; no: number; abstained: number; accepted: boolean }
+
+/** Every team's vote on a rule: members from the site (no vote = abstain, as MM does), AI as published. */
+export function castVotes(regs: Regulations, ruleId: number, rows: RuleVoteRow[]): CastVote[] {
+  const vote = regs.votes.find((v) => v.ruleId === ruleId);
+  const members = regs.teams.filter((t) => t.member).map((t) => {
+    const r = rows.find((x) => x.team === t.team && x.rule_id === ruleId && x.season === regs.season);
+    return { team: t.team, vote: r?.choice ?? "abstain", power: r && r.choice !== "abstain" ? 1 + r.extra_power : 1 } as CastVote;
+  });
+  return [...members, ...(vote?.aiVotes ?? [])];
+}
+

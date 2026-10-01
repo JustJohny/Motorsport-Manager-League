@@ -276,7 +276,7 @@ The user's idea: members may run parts that are faster but risk getting caught a
   - The "Stewards' decisions" card on the Calendar & results page is the public log (a siren marks rounds with busts).
 - Helpers: `bustChance` / `carBustChance` / `nextBustPenalty` in `src/part-design.ts`. Tests check them, and check that "League Test 10" yields Bernhauss' real bust at Munich.
 
-## Season regulations and politics (rules agreed 2026-10-01, not built)
+## Season regulations and politics (built 2026-10-01; migration 008 must be run, then publish)
 Members see the current and the confirmed next-season regulations, vote on the site with MM's voting system, and **the site's result always overwrites the in-game vote**.
 
 **Build progress (2026-10-01):**
@@ -298,7 +298,7 @@ Members see the current and the confirmed next-season regulations, vote on the s
     - apply the teams' `votingPower` changes
   - `setNextRule` sets a group in `nextYearsRules.mRules` to a catalogue rule (a ref to an existing PoliticalVote object), or back to the current rule.
   - `pull`: `votesClosingNow` → `tallyVote` (member votes from the DB + published AI votes) → `concludeVote`; then the organizer's overrides → `setNextRule`.
-- ⏭ Step 4: site "Regulations" page:
+- ✅ Step 4 (built 2026-10-01, checked in demo mode): the site's "Regulations" page (`site/src/pages/regulations.tsx`, sidebar link) has:
   - current vs next rules, highlighting changes and overrides
   - upcoming votes with the member's vote and extra power, the live tally (AI + member votes) and when each closes
   - held votes with their results

@@ -73,6 +73,9 @@ Projects the in-game AI starts on member teams are shown on the HQ tab as "AI pr
 
 After the deadline: `mmsave pull -o changes.json --mark-applied`, then `mmsave apply <save> changes.json …`, and publish again after the race.
 
+## Regulations
+The Regulations page shows this season's and next season's rules and holds MM's rule votes on the site. Members vote with MM's vote power, and AI teams' votes are predicted with MM's logic (`src/politics.ts`) and published. At the checkpoint before a vote's game date, `pull` settles it with the league's result instead of MM's own vote (`concludeVote`). The organizer can set any rule group for next season (`setNextRule`, migration 008).
+
 ## Organizer workflow
 Each race has two checkpoints (after the race, and just before the next one). The site's **Organizer page** walks through them step by step: it detects the current checkpoint from the published game date, fills in the save names, and has copyable commands, the rules that keep the cycle working, and what to do when something fails.
 
