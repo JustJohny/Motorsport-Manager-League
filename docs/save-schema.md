@@ -73,6 +73,38 @@ No checksum was seen. The game loads files whose compressed bytes differ from it
 - **The AI pays upfront.** AI teams get an expense transaction of the full price the day they start, e.g. "Test Track - Build" $8M or "Handling Development Centre Level 2 - Upgrade" $8M. `cancelBuilding` refunds that amount (`initialCost`, or `upgradeCost[currentLevel]`), reverts `state` (1 → 0 NotBuilt, 3 → 2 Constructed), resets the progress and dates, and removes the building's `UpdateProgress` calendar events.
 - **Cloning pitfall.** Cloning `{ ...template }` (a spread copy) loses the runtime type the schema tracker recorded for `template`, which fails `annotate` ("unknown runtime type") once the clone gets an `$id`. Copy the type over (`save.types.runtime.set(clone, runtime.get(template))`). Contract events in `hire` had the same latent bug; it's fixed now.
 
+## Part design and improvement (from Assembly-CSharp, decompiled with ilspycmd)
+Decompile a class to C# with `dotnet tool install --tool-path <dir> ilspycmd`, then `<dir>/ilspycmd -t CarPartDesign "<game>/MM_Data/Managed/Assembly-CSharp.dll" -r "<game>/MM_Data/Managed"`. This is far easier to read than `monodis` IL.
+
+**Settings** live in `partSettingsManager.championshipPartSettings[championshipID][partType]` (`PartTypeSlotSettings`). ERS is championship 2. Part types: 0 Brakes, 1 Engine, 2 FrontWing, 3 Gearbox, 4 RearWing, 5 Suspension. Each type has:
+- `materialsCost`: e.g. Engine $1.35M, Gearbox $900k, Brakes $450k.
+- `buildTimeDays`: 16–25.
+- `costPerLevel[5]` / `timePerLevel[5]` (`[0,2,3,4,5]`): what a component of that level adds when it has no own cost or time.
+- `unlockRequirements[5]`: levels 1–2 are always open. Levels 3/4/5 need the part type's development building (`buildingType` 2–7) at `buildingLevel` 0/1/2.
+
+**One design at a time per team.** `carManager.carPartDesign` holds a single `mCarPart` and `mStage` (0 Idle, 1 Designing). There is no queue.
+
+**Components.** `carPartDesign.<type>Components` is a `Dictionary<level-1, List<CarPartComponent>>`. Each season `ChooseComponentsForSeason` picks 3 random Stock/Risky components per level (1–5) for each team, so every team has its own list. The lead engineer adds one more per level (`engineer.availableComponents[level]`).
+- Component fields: `id`, `level`, `componentType`, `statBoost`, `maxStatBoost`, `reliabilityBoost`, `maxReliabilityBoost`, `productionTime`, `cost`, `riskLevel`, `unlockRequirements`, `activationRequirements`, `mBonuses`, `mNameID` (localised, not in the save), and `mCustomComponentName` (a rich-text summary such as "Performance: +10 / Reliability: -15%").
+- **Slots:** `GetNumberOfSlots` = the highest level of a part of that type in inventory + 1, clamped to 1..5. A component of level L fits a slot index ≥ L-1. Part level from the sum of component levels: ≥1 → 1, ≥3 → 2, ≥6 → 3, ≥10 → 4, ≥15 → 5.
+
+**Stats** (`SetBaseStats` + `ApplyComponents`):
+- Main stat = `seasonPartStartingStat[type]` (the best part's stat at season start) + floor(lead engineer `partContributionStats[statType]`) × 1.5, then component boosts × the team's `<part>DevelopmentRate` and a development variance from engineer skill. This build has extra development code, so let MM compute it.
+- `maxPerformance` = the chassis' improvability.
+- `maxReliability` = initial + (Design Centre level − 1) × 0.05 + engineer contribution × 0.02, ±0.1 random at `StartDesigning`.
+
+**Cost.** For the player's team: `materialsCost` + the components' cost. AI teams pay only **10 % of `materialsCost`** + components. The AI path (`TeamAIController`, line ~713) charges a Debit transaction and then calls `StartDesigning()`.
+
+**Time.** `buildTimeDays` + `designCentrePartDaysPerLevel[DC level]` + component times (`timePerLevel` only for a component in the last slot) − the player's `designPartTimeModifier`.
+
+**Start and finish.** `StartDesigning` sets the stage, `startDate` and `endDate`, and adds a `CalendarEvent_v1` (category Design, `OnEventTrigger` = `PartComplete`). `PartComplete` clones `1 + mExtraCopies` parts into the inventory. For AI teams it then calls `teamAIController.FitPartsOnCars()`. `Cancel` (player UI) refunds half.
+
+**Improvement** (`carManager.partImprovement`):
+- `partsToImprove[1 = Reliability | 3 = Performance]`: lists of inventory parts. Any part in the inventory can be improved, not only fitted ones, unless it is banned or already at its max.
+- **Slots per list = round(lerp(2, 8, Factory level / 3))**: 2/4/6/8 for Factory 0–3.
+- `mechanics[stat]` is the split of the mechanics (`SplitMechanics(x)`: x = the share on Performance). Work happens on weekdays from 09:00 to 18:00.
+- The AI (`TeamAIController` ~734–804) refills both lists and the split by itself, and `FitPartsOnCars()` refits after every part it builds.
+
 ## Verified in game (2026-09-30, save "League Test 2", player team)
 - `setBuilding`: Wind Tunnel shown at level 1.
 - `setBudget`: new budget shown, with our transaction note in the finance history.
