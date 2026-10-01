@@ -354,7 +354,7 @@ A member invests in their own engine programme, becomes an engine supplier, and 
   - `engine_programmes` is public. `engine_plans`, `engine_builds` and `engine_spend` are private. There are also `engine_projects` (the cost list, checked against `PROJECTS`) and `engine_customers`.
   - RPCs: `found_engine_programme`, `set_engine_concept`, `buy_engine_points`, `choose_engine_project`, `set_engine_offer`, `buy_engine`. All spending is reserved through `engine_reserve` (budget check), and `hq_committed` counts it.
   - Tests: `test/db-engine.test.ts`.
-- ✅ `pull` charges reserved engine spending (`src/engine-orders.ts`) and pays the owner for engine sales.
+- ✅ `pull` charges reserved engine spending (`src/engine-orders.ts`) and pays the owner for engine sales. Verified by the user: pull lists the engine payments correctly (2026-10-01).
 - ✅ Site page "Engine programme" (`site/src/pages/engine.tsx`): found, concept, buy points, projected engine, research projects (illegal ones marked with the detection odds), customer offer, the member engine market, and a spec-engine banner. Live only; demo mode shows a note.
 - ⏭ **Season-change step (toolkit), to build and test at pre-season (2016-12-13):**
   1. After AI teams have started next year's design (`nextYearCarDesign.state` = Designing), the toolkit runs `buildEngine` for each programme (engineer skill = the lead engineer's stat average, DC level from HQ) and stores `engine_builds`.
