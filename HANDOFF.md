@@ -190,6 +190,7 @@ npx tsx src/cli.ts validate "<save>"
      2. Before the race: publish again, members act, then pull + apply, then the race is played.
      - Members can do **everything** at both checkpoints: designs, fitting, HQ and bids. Orders placed before the race start at that apply.
      - **No fitting submitted = keep their last fitting.** The AI refits while the organizer advances, so every pull re-emits each member team's stored fitting. New parts stay in inventory.
+   - **Part improvement chosen by members:** as in vanilla MM, up to **2 built parts for performance and 2 for reliability**, worked on by the mechanics. Like fitting, the last choice is kept and re-emitted on every pull, so the AI's picks never last. To check in `PartImprovement`: whether only fitted parts qualify, and how the slots and rates are stored.
    - MM facts so far (from `Assembly-CSharp.dll`, `CarPartDesign`):
      - Base stat = season starting stat for the part type + 1.5 × the lead designer's matching `partContributionStats`.
      - Cost = `PartTypeSlotSettings.materialsCost` per championship and part type, + component cost bonuses.
