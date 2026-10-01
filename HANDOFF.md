@@ -177,7 +177,19 @@ npx tsx src/cli.ts validate "<save>"
 1. **Phase 3 (done):** only left to see a toolkit-started build complete in game, which happens naturally as the league plays on.
 2. **Phase 2 (done):** test with a second real member.
    - Tuning to discuss: opening prices can be below an AI driver's current wage, and buyouts of long contracts are large ($11M for a 20-year-old on a deal to 2018).
-3. Phase 4: part development formula.
+3. **Phase 4: part development.** Rules agreed with the user (2026-10-01), replacing the earlier "formula from team assets" idea:
+   - **The game builds it**, like HQ: the site sends the design, the toolkit starts it in MM, and MM finishes it with its own stats and time.
+   - **Components from MM's real list**, per part type, with MM's unlock rules (Design Centre level, designer).
+   - **Parts the AI designs on member teams are cancelled and refunded**, as with HQ projects.
+   - **Members choose fitting** (which part goes on car 1 and car 2).
+   - **League limit: one active design per part type** per team, counted on the site.
+   - **Both cars in one order**, at MM's price for the second build. It counts as one design.
+   - **Paid upfront**, with money reserved on order and paid at apply, as with HQ.
+   - MM facts so far (from `Assembly-CSharp.dll`, `CarPartDesign`):
+     - Base stat = season starting stat for the part type + 1.5 × the lead designer's matching `partContributionStats`.
+     - Cost = `PartTypeSlotSettings.materialsCost` per championship and part type, + component cost bonuses.
+     - Time = `buildTimeDays` − `designCentrePartDaysPerLevel[level]` − component bonuses.
+     - `maxPerformance` comes from the chassis' improvability.
 4. An organizer workflow document (between-race checklist).
 
 ## Working notes for the assistant
