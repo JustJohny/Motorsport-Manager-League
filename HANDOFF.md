@@ -1,6 +1,6 @@
 # Handoff: MM League Toolkit
 
-_Last updated 2026-09-30 (auction live and verified in game; HQ orders + AI-project cancelling built and pushed; migrations 003/004 still to run). Read this first in a new session, then `README.md` and `docs/save-schema.md`._
+_Last updated 2026-10-01 (auction live and verified in game; HQ orders deployed, migrations 003/004 run; needs a fresh publish). Read this first in a new session, then `README.md` and `docs/save-schema.md`._
 
 ## The goal
 Run a **Motorsport Manager 1 (v1.53)** online league the way F1 Manager 24 community leagues run:
@@ -103,7 +103,7 @@ Steps 1–5 are done: Supabase is set up, Pages is deployed, and snapshots are p
 
 **Transfer window page:** it shows auctions only while bidding runs. After the deadline it's cleared, and the results move to the History tab (every window, "Awaiting organizer" until `pull --mark-applied`). Bidding closes on a timer set to the exact deadline, not on a polling clock.
 
-## Phase 3: HQ orders, built and tested but not yet live
+## Phase 3: HQ orders, deployed, migrations 003/004 run
 **Rules agreed with the user:**
 - The game builds it, at MM's real times. The user chose this after learning the times are 20–116 weeks, i.e. multi-season projects. `league_settings.hq_speed` (default 1) can scale them.
 - Full MM price paid upfront.
@@ -115,7 +115,7 @@ Steps 1–5 are done: Supabase is set up, Pages is deployed, and snapshots are p
 - `supabase/migrations/003_hq_orders.sql`: `hq_orders` (private), `order_hq` (price, weeks, prerequisites, one per building, budget together with leading bids), `cancel_hq`. `place_bid` also counts queued HQ orders now.
 - `src/hq-orders.ts` + `pull`: orders → `startBuilding` + `adjustBudget`. `pull` now collects HQ orders and, once past the deadline, the transfer window, and no longer fails when there's no window.
 - Site: HQ tab with an Order/Cancel column, a budget strip (budget − HQ orders − leading bids), and completion dates. The bid dialog also counts HQ orders.
-- Extract: buildings now carry `buildWeeks` and `upgradeWeeks`, so **publish again** after deploying.
+- Extract: buildings now carry `buildWeeks` and `upgradeWeeks`, so **publish again** after deploying. Older snapshots lack them: the HQ tab used to crash to a black page (fixed 2026-10-01, such buildings just aren't orderable; the site also has an error boundary now).
 
 **AI projects on member teams (the user's decision: cancel and refund):**
 - `pull` always emits `cancelUnorderedHq` first, with member teams, keep = applied and queued orders, and since = the first published game date.
