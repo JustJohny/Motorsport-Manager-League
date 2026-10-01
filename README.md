@@ -32,6 +32,10 @@ See `examples/changes.example.json`. Operations:
 - `startBuilding {team, building, speed?}`: starts building (level 0 → 1) or upgrading, like MM's own HQ screen. MM's build time is in **weeks** (`buildTime` / `upgradeTime[level]` × 7 days), times `speed` (default 1). The game finishes it by itself. It doesn't charge anything (use `adjustBudget`).
 - `cancelBuilding {team, building, refund?, reason?}`: stops a construction in progress and refunds the price MM charged when it started (the AI pays upfront too).
 - `cancelUnorderedHq {teams, keep, since}`: cancels and refunds every construction on the listed teams that started after `since` and isn't in `keep`. `pull` always emits this first: the in-game AI also runs member teams between races and starts HQ projects with their money.
+- `startDesign {team, type, components}`: starts designing a part the way MM's design screen does, from the team's own component list (component ids; engineer components open their extra slots). One design at a time per team, as in MM. MM's time rules apply, and the game builds the part with its own stats. It doesn't charge anything (use `adjustBudget`; the league charges MM's player price).
+- `cancelDesign {team, refund?}`: stops the design in progress and refunds what MM charged (AI teams pay 10 % of materials).
+- `cancelUnorderedDesigns {teams, keep, since}`: like `cancelUnorderedHq`, for part designs the AI started on member teams. `keep` lists ordered designs by type and components.
+- `setImprovement {team, performance, reliability, split?}`: the parts (GUIDs) the mechanics improve, at most 2/4/6/8 per list for Factory level 0–3, plus the share of mechanics on performance (0..1).
 - `addPart {team, type, stat, reliability, performance?, maxPerformance?, level?, name?, fitToCar?}`
 - `fitPart {team, type, part, car}` and `removePart {team, type, part}`
 - `hire {team, person, replacing | slotID, yearlyWages?, endDate?}`: works for drivers, lead engineers and mechanics. A free agent replaces someone, who is then released. Someone at another team **swaps** with the person they replace.

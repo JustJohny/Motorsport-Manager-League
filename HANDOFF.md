@@ -191,6 +191,16 @@ npx tsx src/cli.ts validate "<save>"
      - Members can do **everything** at both checkpoints: designs, fitting, HQ and bids. Orders placed before the race start at that apply.
      - **No fitting submitted = keep their last fitting.** The AI refits while the organizer advances, so every pull re-emits each member team's stored fitting. New parts stay in inventory.
    - **Part improvement chosen by members:** as in vanilla MM, the parts to improve for performance and for reliability, with **MM's slot count: 2/4/6/8 per list for Factory level 0–3**. Any inventory part qualifies. Members also set the **mechanics split slider**. Like fitting, the last choice is kept and re-emitted on every pull, so the AI's picks never last.
+   - **Step 1 (toolkit) built 2026-10-01:**
+     - `src/part-design.ts`: pure slot, cost and time rules, shared with the site later.
+     - `src/ops/design.ts`: `startDesign`, `cancelDesign`, `cancelUnorderedDesigns`, `setImprovement`, plus `designOptions` / `previewDesign`.
+     - Tests: our time matches every running AI design in the save, and our cost matches their transactions. MM's transaction amounts are rounded to thousands.
+     - **In-game test save "League Test 9"** (from LT8, `out/design-test.json`):
+       - Tatra designs a level-3 Front Wing (components 200, 67, 20, 14), using the engineer's "Take No Time" component with its extra slot; $1.22M, done 2016-10-07.
+       - Garuda's AI Front Wing design is cancelled and refunded, and a league Brakes design is started, done 2016-10-06.
+       - Tatra improves performance on F-LEAGUE.
+     - Next: the user plays past 2016-10-07. Check that both parts appear in the inventories (`mmsave extract`, or Tatra's UI), then do steps 2–5 (extract, migration 005, site, pull).
+     - Open: AI designs on member teams can also *complete* between checkpoints, which adds parts the member didn't order. Decide with the user whether `pull` removes them and refunds.
    - MM internals: see docs/save-schema.md, "Part design and improvement". Component display names are localised (`mNameID`) and not in the save. Use `mCustomComponentName`, or find the localisation file in the game data.
 4. An organizer workflow document (between-race checklist).
 

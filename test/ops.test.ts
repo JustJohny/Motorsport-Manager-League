@@ -7,6 +7,7 @@ import { extractLeague } from "../src/extract.ts";
 import { Save } from "../src/model.ts";
 import { defaultSavesDir } from "../src/paths.ts";
 import { typeMismatches } from "../src/schema.ts";
+import { carPartDesign, designOptions, improvementSlots, previewDesign } from "../src/ops/design.ts";
 
 // Uses a real mid-season save (ERS, round 6). Set MM_TEST_SAVE to point at your own.
 const SAVE = process.env.MM_TEST_SAVE ?? join(defaultSavesDir(), "SaveJonatan Sulik - Tatra Racing 2 (3).sav");
@@ -214,4 +215,114 @@ describe.skipIf(!existsSync(SAVE))("operations on a real save", () => {
     expect(after.hq.find((b) => b.name === building.name)!.state).toBe("BuildingInProgress");
     expect(after.budget).toBe(tatra.budget! + upgrading.upgradeCosts[upgrading.level - 1]!);
   }, 120_000);
+  it("starts a part design the way MM's design screen does, and the game's own designs match our cost and time", () => {
+    const save = Save.load(SAVE);
+    const g = save.g;
+    // Every design MM's AI has running: our rules give the same time as the game set.
+    for (const t of save.teams().filter((t) => save.championship(t).championshipID === 2)) {
+      const cpd = carPartDesign(save, t);
+      if (cpd.mStage !== 1) continue;
+      const part = g.deref<any>(cpd.mCarPart);
+      const type = part.$type.replace("Part", "");
+      const ids = g.list<any>(part.components).filter(Boolean).map((c: any) => c.id);
+      const opts = designOptions(save, t, type);
+      expect(opts.available.map((a) => a.component.id), t.name).toEqual(expect.arrayContaining(ids));
+      const days = (Date.parse(cpd.endDate.slice(0, 19) + "Z") - Date.parse(cpd.startDate.slice(0, 19) + "Z")) / 86_400_000;
+      const plan = applyPreview(save, t.name, type, ids);
+      expect(plan.days, `${t.name} ${type}`).toBeCloseTo(days, 3);
+    }
+
+    // Tatra (the player's team) designs a front wing from its own list.
+    const tatra = save.team("Tatra Racing");
+    if (carPartDesign(save, tatra).mStage === 1) applyChanges(save, { changes: [{ op: "cancelDesign", team: "Tatra Racing", refund: false }] });
+    const opts = designOptions(save, tatra, "FrontWing");
+    const pick = [1, 2].map((lvl) => opts.available.find((a) => !a.component.engineer && a.component.level === lvl)!.component.id);
+    const budget = Number(save.finance(tatra).currentBudget);
+    const entities = g.list(save.data.entityManager.mEntities).length;
+    const log = applyChanges(save, { changes: [{ op: "startDesign", team: "Tatra Racing", type: "FrontWing", components: pick }] });
+    expect(log[0]).toMatch(/designing FrontWing/);
+    expect(Number(save.finance(tatra).currentBudget)).toBe(budget); // charged separately (adjustBudget)
+    expect(g.list(save.data.entityManager.mEntities)).toHaveLength(entities + 1);
+    expect(() => applyChanges(save, { changes: [{ op: "startDesign", team: "Tatra Racing", type: "Engine", components: pick }] }))
+      .toThrow(/one part at a time/);
+
+    save.prepareForWrite();
+    expect(typeMismatches(save.types, save.data)).toEqual([]);
+    const reloaded = reload(save);
+    expect(reloaded.g.validate()).toEqual([]);
+    expect(typeProblems(reloaded)).toEqual([]);
+    const cpd = carPartDesign(reloaded, reloaded.team("Tatra Racing"));
+    const part = reloaded.g.deref<any>(cpd.mCarPart);
+    expect(cpd.mStage).toBe(1);
+    expect(part.$type).toBe("FrontWingPart");
+    expect(reloaded.g.list<any>(part.components).filter(Boolean).map((c) => c.id).sort()).toEqual([...pick].sort());
+    expect(reloaded.g.list(cpd.componentSlots).length).toBe(opts.ctx.slots);
+    // MM's completion event: PartComplete on this design at its end date, shown to the player.
+    const ev = reloaded.g.deref<any>(cpd.mCalendarEvent);
+    expect(ev.OnEventTrigger.methodNames).toEqual(["PartComplete"]);
+    expect(reloaded.g.deref(ev.OnEventTrigger.targets[0])).toBe(cpd);
+    expect(ev.triggerDate).toBe(cpd.endDate);
+    expect(ev.showOnCalendar).toBe(true);
+    expect(ev.mDynamicDescription.translatedText.English).toBe("Designing Front Wing Finished");
+    const events = reloaded.g.list<any>(reloaded.data.calendar.mDelayedEvents);
+    expect(events).toContain(ev);
+    const dates = events.map((e) => e.triggerDate as string);
+    expect(dates).toEqual([...dates].sort());
+  }, 120_000);
+
+  it("cancels and refunds designs the league didn't order, and sets improvement", () => {
+    const save = Save.load(SAVE);
+    const g = save.g;
+    const designing = save.teams().filter((t) => save.championship(t).championshipID === 2 && carPartDesign(save, t).mStage === 1 && !save.g.same(save.data.player.mPlayerTeam, t));
+    expect(designing.length).toBeGreaterThan(1);
+    const [a, b] = designing;
+    const partOf = (t: any) => g.deref<any>(carPartDesign(save, t).mCarPart);
+    const keepIds = g.list<any>(partOf(b).components).filter(Boolean).map((c: any) => c.id);
+    const keepType = partOf(b).$type.replace("Part", "");
+    const budgetA = Number(save.finance(a).currentBudget);
+    const log = applyChanges(save, { changes: [{
+      op: "cancelUnorderedDesigns", teams: [a.name, b.name], since: "2016-01-01T00:00:00.0000000",
+      keep: [{ team: b.name, type: keepType, components: keepIds }],
+    }] });
+    expect(log).toHaveLength(1);
+    expect(log[0]).toMatch(new RegExp(`${a.name}: cancelled designing .*budget`));
+    expect(Number(save.finance(a).currentBudget)).toBeGreaterThan(budgetA);
+    expect(carPartDesign(save, a).mStage).toBe(0);
+    expect(carPartDesign(save, b).mStage).toBe(1);
+
+    // Improvement: performance on the newest parts, reliability on one, 30 % of the mechanics on performance.
+    // Parts that still have room to improve, as MM's AddPartToImprove requires.
+    const all = (["FrontWing", "RearWing", "Brakes", "Suspension"] as const).flatMap((t) => save.parts(a, t)).filter((p) => !p.isBanned);
+    const n = (v: any) => Number(typeof v === "object" ? v.rawJSON ?? v : v);
+    const perf = all.filter((p) => n(p.mStats.mPerformance) < n(p.mStats.maxPerformance));
+    const rel = all.find((p) => n(p.mStats.mReliability) < n(p.mStats.maxReliability));
+    const maxed = all.find((p) => n(p.mStats.mReliability) >= n(p.mStats.maxReliability))!;
+    const max = improvementSlots(save, a);
+    const impLog = applyChanges(save, { changes: [{ op: "setImprovement", team: a.name, performance: perf.slice(0, Math.min(2, max)).map((p) => p.id), reliability: [rel ?? maxed].map((p) => p.id), split: 0.3 }] });
+    // A part already at its max reliability is skipped, as MM's AddPartToImprove does.
+    if (!rel) expect(impLog[0]).toMatch(/skipped: .* already at its max/);
+    expect(() => applyChanges(save, { changes: [{ op: "setImprovement", team: a.name, performance: Array(max + 1).fill(perf[0].id), reliability: [] }] }))
+      .toThrow(/at most/);
+
+    save.prepareForWrite();
+    const reloaded = reload(save);
+    expect(reloaded.g.validate()).toEqual([]);
+    expect(typeProblems(reloaded)).toEqual([]);
+    const ra = reloaded.team(a.name);
+    const rcpd = carPartDesign(reloaded, ra);
+    expect(rcpd.mCarPart).toBeNull();
+    expect(reloaded.g.list<any>(reloaded.data.calendar.mDelayedEvents).some((e) => e.OnEventTrigger?.methodNames?.[0] === "PartComplete" && reloaded.g.deref(e.OnEventTrigger.targets[0]) === rcpd)).toBe(false);
+    const pi = reloaded.g.deref<any>(reloaded.g.deref<any>(ra.carManager).partImprovement);
+    const list = (k: number) => reloaded.g.list<any>(pi.partsToImprove.find((e: any) => e.Key === k).Value).map((p) => p.id);
+    expect(list(3)).toEqual(perf.slice(0, Math.min(2, max)).map((p) => p.id));
+    expect(list(1)).toEqual(rel ? [rel.id] : []);
+    const mech = Object.fromEntries(pi.mechanics.map((m: any) => [m.Key, m.Value]));
+    expect(mech[3] + mech[1]).toBeGreaterThan(0);
+    // MM puts everyone on the only list with parts; otherwise the member's slider decides.
+    expect(mech[3]).toBe(Math.round((rel ? 0.3 : 1) * (mech[3] + mech[1])));
+  }, 120_000);
 });
+
+function applyPreview(save: Save, team: string, type: any, ids: number[]) {
+  return previewDesign(save, save.team(team), type, ids);
+}
