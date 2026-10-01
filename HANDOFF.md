@@ -185,6 +185,11 @@ npx tsx src/cli.ts validate "<save>"
    - **League limit: one active design per part type** per team, counted on the site.
    - **Both cars in one order**, at MM's price for the second build. It counts as one design.
    - **Paid upfront**, with money reserved on order and paid at apply, as with HQ.
+   - **Two checkpoints per race cycle** (the user's plan, as in vanilla MM, where you fit new parts before the next race):
+     1. After the race: publish, members act, then pull + apply. The organizer advances in MM to just before the next race, and parts get built.
+     2. Before the race: publish again, members act, then pull + apply, then the race is played.
+     - Members can do **everything** at both checkpoints: designs, fitting, HQ and bids. Orders placed before the race start at that apply.
+     - **No fitting submitted = keep their last fitting.** The AI refits while the organizer advances, so every pull re-emits each member team's stored fitting. New parts stay in inventory.
    - MM facts so far (from `Assembly-CSharp.dll`, `CarPartDesign`):
      - Base stat = season starting stat for the part type + 1.5 × the lead designer's matching `partContributionStats`.
      - Cost = `PartTypeSlotSettings.materialsCost` per championship and part type, + component cost bonuses.
