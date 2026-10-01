@@ -236,6 +236,7 @@ npx tsx src/cli.ts validate "<save>"
      - Part tables: Car 1/2 fitting buttons (never strips the other car), P/R improvement toggles (disabled at max or when the list is full), and an "AI-built · removed at next apply" marker.
      - The budget strip, HQ strip and bid dialog count the queued design.
      - Checked in demo mode with headless Chromium: designer, order, fitting, improvement, phone width; no console errors.
+     - **Spec parts shown, greyed out (user request 2026-10-01):** `TeamDesign.specParts` lists them. The designer shows every part type in MM's order, with spec ones disabled, marked "Spec", and a note. The part tables mark them too, with improvement disabled. Republish to get `specParts` (older snapshots just hide spec types).
      - **Spec parts:** `championship.rules.specParts` (ERS: Engine 1, Gearbox 3) can't be designed in MM. They're excluded from the design options and refused by `startDesign`.
      - **User feedback round 1 (2026-10-01), fixed:**
        - Engineer components of a level the facility doesn't unlock were selectable. They're no longer offered: their own level must be open, like every other component of that tier.

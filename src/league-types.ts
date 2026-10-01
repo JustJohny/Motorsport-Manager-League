@@ -171,6 +171,12 @@ export interface PartDesignOptions {
 export interface TeamDesign {
   /** Part type ("FrontWing") -> what the team can design for it. */
   types: Record<string, PartDesignOptions>;
+  /**
+   * Part types that are spec in this championship (championship.rules.specParts, e.g. ERS
+   * engines and gearboxes): every team runs the supplier's part, so they can't be designed or
+   * improved. Missing in snapshots published before 2026-10-01.
+   */
+  specParts?: string[];
   /** The design in progress (MM designs one part at a time). */
   current: { type: string; components: number[]; start: string; end: string; extraCopies: number } | null;
   improvement: {

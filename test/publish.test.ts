@@ -43,6 +43,7 @@ describe.skipIf(!existsSync(SAVE))("publish", () => {
       const d = t.design!;
       // ERS engines and gearboxes are spec parts: MM won't design them.
       expect(Object.keys(d.types).sort()).toEqual(["Brakes", "FrontWing", "RearWing", "Suspension"]);
+      expect(d.specParts).toEqual(["Engine", "Gearbox"]);
       for (const [type, o] of Object.entries(d.types)) {
         expect(o.ctx.slots, `${t.name} ${type}`).toBeGreaterThanOrEqual(1);
         expect(o.ctx.settings.materialsCost).toBeGreaterThan(0);

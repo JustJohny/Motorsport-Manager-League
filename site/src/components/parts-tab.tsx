@@ -25,6 +25,8 @@ import type { DesignComponent, Part, PartDesignOptions, TeamPrivate } from "@/li
 export const PART_ICONS: Record<string, LucideIcon> = {
   Brakes: Disc3, Engine: Fan, FrontWing: Wind, Gearbox: Cog, RearWing: WindArrowDown, Suspension: Waves,
 }
+/** MM's part order. */
+const PART_ORDER = ["Brakes", "Engine", "FrontWing", "Gearbox", "RearWing", "Suspension"]
 const partIcon = (type: string) => PART_ICONS[type.replace(/(GT|GET)$/, "")] ?? Settings2
 
 const TIERS = [
@@ -243,7 +245,8 @@ function DesignSummary({ type, components, badge, extra, action, note, className
 
 function Designer({ priv, busy, onOrder }: { priv: TeamPrivate; busy: boolean; onOrder: (type: string, ids: number[]) => Promise<void> }) {
   const design = priv.design!
-  const types = Object.keys(design.types)
+  const types = PART_ORDER.filter((t) => t in design.types)
+  const spec = design.specParts ?? []
   const [type, setType] = useState(types[0])
   const [picked, setPicked] = useState<number[]>([])
   const opts = design.types[type]
@@ -268,11 +271,29 @@ function Designer({ priv, busy, onOrder }: { priv: TeamPrivate; busy: boolean; o
 
   return (
     <div className="flex flex-col gap-4">
-      <Tabs value={type} onValueChange={(v) => { setType(v); setPicked([]) }}>
-        <TabsList className="flex-wrap">
-          {types.map((t) => { const Icon = partIcon(t); return <TabsTrigger key={t} value={t}><Icon /> {humanize(t)}</TabsTrigger> })}
-        </TabsList>
-      </Tabs>
+      <div className="flex flex-col gap-1.5">
+        <Tabs value={type} onValueChange={(v) => { setType(v); setPicked([]) }}>
+          <TabsList className="h-auto flex-wrap">
+            {PART_ORDER.filter((t) => t in design.types || spec.includes(t)).map((t) => {
+              const Icon = partIcon(t)
+              const isSpec = spec.includes(t)
+              return (
+                <TabsTrigger key={t} value={t} disabled={isSpec} title={isSpec ? `${humanize(t)} is a spec part: it can't be designed or improved` : undefined}>
+                  <Icon /> {humanize(t)}
+                  {isSpec && <span className="flex items-center gap-0.5 text-[10px] uppercase tracking-wide"><Lock className="size-3" /> Spec</span>}
+                </TabsTrigger>
+              )
+            })}
+          </TabsList>
+        </Tabs>
+        {spec.length > 0 && (
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <Lock className="size-3.5 shrink-0" />
+            {spec.map((t) => humanize(t)).join(" and ")} {spec.length > 1 ? "are spec parts" : "is a spec part"} in this championship:
+            every team runs the supplier's part, so {spec.length > 1 ? "they" : "it"} can't be designed or improved.
+          </p>
+        )}
+      </div>
 
       {base && result && (
         <div className="grid gap-3 md:grid-cols-2">
@@ -469,6 +490,7 @@ function PartCard({ type, parts, priv, team, own }: { type: string; parts: Part[
   const sorted = [...parts].sort((a, b) => (a.fittedToCar ?? 9) - (b.fittedToCar ?? 9) || (b.stat ?? 0) - (a.stat ?? 0))
   const best = Math.max(...parts.map((x) => x.stat ?? 0))
   const Icon = partIcon(type)
+  const isSpec = (priv.design?.specParts ?? []).includes(type)
   const run = async (key: string, fn: () => Promise<void>) => {
     setBusy(key); setError(null)
     try { await fn() } catch (e) { setError((e as Error).message) } finally { setBusy(null) }
@@ -487,8 +509,14 @@ function PartCard({ type, parts, priv, team, own }: { type: string; parts: Part[
   return (
     <Card size="sm">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2"><Icon className="size-4" /> {humanize(type)}</CardTitle>
-        <CardDescription>{parts.length} in inventory · best {fmtNum(best)}</CardDescription>
+        <CardTitle className="flex items-center gap-2">
+          <Icon className="size-4" /> {humanize(type)}
+          {isSpec && <Badge variant="outline" className="gap-1 text-[10px] uppercase"><Lock className="size-3" /> Spec</Badge>}
+        </CardTitle>
+        <CardDescription>
+          {parts.length} in inventory · best {fmtNum(best)}
+          {isSpec && " · supplied part: can't be designed or improved"}
+        </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-2">
         {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
@@ -554,8 +582,8 @@ function PartCard({ type, parts, priv, team, own }: { type: string; parts: Part[
                           return (
                             <Button
                               key={list} size="sm" variant={on ? "default" : "outline"} className="size-6 p-0"
-                              disabled={ai || busy != null || (!on && (full || done))}
-                              title={`${name}${done && !on ? ": already at its max" : full ? `: list full (${imp.slots})` : ""}`}
+                              disabled={ai || isSpec || busy != null || (!on && (full || done))}
+                              title={`${name}${isSpec ? ": spec part, can't be improved" : done && !on ? ": already at its max" : full ? `: list full (${imp.slots})` : ""}`}
                               aria-label={name}
                               onClick={() => void toggleImprove(list, part.guid)}
                             >

@@ -187,6 +187,7 @@ function designBase(save: Save, team: Obj, type: PartType, ctx: DesignContext): 
 export function teamDesign(save: Save, team: Obj): TeamDesign {
   const g = save.g;
   const types: TeamDesign["types"] = {};
+  const specParts = (Object.keys(COMPONENT_LISTS) as PartType[]).filter((type) => isSpecPart(save, team, type));
   for (const type of Object.keys(COMPONENT_LISTS) as PartType[]) {
     if (!save.parts(team, type).length || isSpecPart(save, team, type)) continue;
     const o = designOptions(save, team, type);
@@ -201,6 +202,7 @@ export function teamDesign(save: Save, team: Obj): TeamDesign {
   };
   return {
     types,
+    specParts,
     current: part ? {
       type: String(part.$type).replace(/Part$/, ""),
       components: componentIds(save, part),
