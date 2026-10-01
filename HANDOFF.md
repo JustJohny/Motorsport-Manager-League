@@ -287,6 +287,17 @@ A member invests in their own engine programme, becomes an engine supplier, and 
 - **Customers: members only, at a price the owner sets.** AI teams keep MM's suppliers.
 - **Switching supplier: between seasons only**, as in MM.
 
+**Illegal engine tech (agreed 2026-10-01):**
+- **How an engine becomes illegal:** some R&D research projects are illegal. They give a bigger gain, with a detection chance per race that grows each race the device runs (rivals and stewards catch on).
+- **League scrutineering, not MM's:** MM only checks car parts with `rulesRisk`, and a works engine's gain sits in the supplier, which has none. So the toolkit rolls the check after each race. Plan: at `pull`, with a seeded roll that is logged publicly for fairness. The result goes in the public Stewards' decisions log.
+- **When busted:**
+  - The engine is **forced back to its legal state** for the rest of the season: the illegal gain is stripped from the supplier stats, and the legal part of the programme still counts. The member may try again next season.
+  - The team **loses that race's points** (driver and team) and pays a fine scaled to the illegal gain.
+- **Customers only ever get the legal spec:** illegal tech is works-only. Customers can't be caught and don't get the gain. So the owner's works supplier and the customer supplier are two `Supplier` objects (fits the customer-spec choice).
+- To research before building:
+  - removing one race's points from the save's championship standings (`mPoints` per race, positions, and results' `points`)
+  - whether a supplier's stats can be changed mid-season and take effect
+
 **What MM has (from Assembly-CSharp):**
 - `supplierManager.engineSuppliers`: `Supplier` objects with:
   - `name`, `mBasePrice`, `mTier`
