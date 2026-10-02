@@ -186,47 +186,69 @@ function PitBox({ people, roles, own, busy, onAssign }: {
   )
 }
 
-/** A 2016 F1 car from above (no halo, long nose, wide front wing), front at the top, in theme grays. */
+/** One side of the car (x <= 100), drawn once and mirrored for the other. */
+const CAR_SIDE = [
+  // Front wing: main plane, three flaps, endplate and footplate
+  "M100 30 Q60 26 12 30 L12 44 Q60 40 100 44",
+  "M100 47 Q60 44 14 47", "M100 51 Q60 48 16 51", "M97 55 Q60 52 18 55",
+  "M8 22 L14 22 L14 58 L8 58 Z", "M14 52 L24 57",
+  // Front suspension: wishbones, track rod, pushrod; brake duct
+  "M88 92 L46 98 L89 108", "M88 100 L46 104 L90 118", "M88 113 L46 111", "M47 101 L85 87",
+  "M44 90 L49 90 L49 112 L44 112 Z",
+  // Bargeboards and turning vane
+  "M70 148 Q62 170 64 198", "M76 152 Q70 172 72 198", "M66 136 Q74 140 80 150",
+  // Mirror
+  "M66 186 Q72 182 78 186 Q72 191 66 186 Z", "M78 187 L84 192",
+  // Sidepod: inlet, outline, undercut
+  "M83 200 L62 207 Q53 211 52 222 L50 290 Q53 330 78 372",
+  "M62 207 L62 226 Q68 231 83 229",
+  "M57 234 Q58 292 82 362",
+  // Floor edge
+  "M44 198 L42 330 Q44 346 52 352",
+  // Rear suspension: wishbones, driveshaft
+  "M92 368 L48 374 L92 386", "M92 378 L48 383 L94 395", "M90 383 L48 381",
+  // Diffuser strakes
+  "M80 404 L77 431", "M89 404 L88 431",
+  // Rear wing endplate
+  "M33 416 L40 416 L40 468 L33 468 Z",
+]
+/** Tyres (x, y, width, height): fronts, then the wider rears. */
+const CAR_TYRES = [[14, 70, 30, 60], [6, 346, 40, 72]] as const
+
+/** A 2016 F1 car from above as line art (no halo, long nose), front at the top, in theme grays. */
 function CarTopDown({ className }: { className?: string }) {
-  const tyre = "fill-zinc-900 stroke-foreground/55"
-  const body = "fill-foreground/20 stroke-foreground/45"
-  const dark = "fill-foreground/40"
+  const side = (
+    <>
+      {CAR_SIDE.map((d, i) => <path key={i} d={d} />)}
+      {CAR_TYRES.map(([x, y, w, h]) => (
+        <g key={y}>
+          <rect x={x} y={y} width={w} height={h} rx={7} className="fill-foreground/5" />
+          <rect x={x + 4} y={y + 9} width={w - 8} height={h - 18} rx={4} />
+          <path d={`M${x + 3} ${y + 5} L${x + w - 3} ${y + 5} M${x + 3} ${y + h - 5} L${x + w - 3} ${y + h - 5} M${x + w / 2} ${y + h / 2 - 4} L${x + w / 2} ${y + h / 2 + 4}`} />
+        </g>
+      ))}
+    </>
+  )
   return (
-    <svg viewBox="0 0 200 470" className={className} role="img" aria-label="Car from above, front at the top" strokeWidth={1.5} strokeLinejoin="round">
-      {/* Front wing: main plane, flaps and endplates */}
-      <path d="M8 22 Q100 10 192 22 L192 40 Q100 30 8 40 Z" className={body} />
-      <path d="M14 42 Q100 34 186 42 L186 48 Q100 41 14 48 Z" className={dark} />
-      <rect x="4" y="16" width="7" height="36" rx="2" className={dark} />
-      <rect x="189" y="16" width="7" height="36" rx="2" className={dark} />
-      {/* Nose and front suspension */}
-      <path d="M92 26 L108 26 L116 150 L84 150 Z" className={body} />
-      <path d="M86 92 L42 84 M86 104 L42 112 M114 92 L158 84 M114 104 L158 112" className="stroke-foreground/45" fill="none" />
-      {/* Front tyres */}
-      <rect x="12" y="66" width="32" height="64" rx="7" className={tyre} />
-      <path d="M18 82 L38 82 M18 98 L38 98 M18 114 L38 114" className="stroke-foreground/25" fill="none" />
-      <rect x="156" y="66" width="32" height="64" rx="7" className={tyre} />
-      <path d="M162 82 L182 82 M162 98 L182 98 M162 114 L182 114" className="stroke-foreground/25" fill="none" />
-      {/* Sidepods and floor */}
-      <path d="M70 196 Q40 206 36 240 L32 336 Q40 362 76 372 L124 372 Q160 362 168 336 L164 240 Q160 206 130 196 Z" className={body} />
-      <path d="M44 214 L68 206 L68 226 L42 232 Z M156 214 L132 206 L132 226 L158 232 Z" className={dark} />
-      {/* Chassis, cockpit, airbox and engine cover */}
-      <path d="M84 148 L116 148 L124 250 L118 400 L82 400 L76 250 Z" className={body} />
-      <ellipse cx="100" cy="212" rx="14" ry="30" className={dark} />
-      <circle cx="100" cy="206" r="7" className="fill-foreground/60" />
-      <path d="M92 250 L108 250 L106 268 L94 268 Z" className={dark} />
-      <path d="M100 270 L100 396" className="stroke-foreground/35" fill="none" />
-      {/* Rear suspension and tyres (wider than the fronts) */}
-      <path d="M118 372 L158 366 M118 388 L158 394 M82 372 L42 366 M82 388 L42 394" className="stroke-foreground/45" fill="none" />
-      <rect x="4" y="340" width="40" height="70" rx="8" className={tyre} />
-      <path d="M10 357.5 L38 357.5 M10 375 L38 375 M10 392.5 L38 392.5" className="stroke-foreground/25" fill="none" />
-      <rect x="156" y="340" width="40" height="70" rx="8" className={tyre} />
-      <path d="M162 357.5 L190 357.5 M162 375 L190 375 M162 392.5 L190 392.5" className="stroke-foreground/25" fill="none" />
-      {/* Rear wing and endplates, diffuser */}
-      <path d="M80 400 L120 400 L126 424 L74 424 Z" className={dark} />
-      <rect x="40" y="426" width="120" height="16" rx="2" className={body} />
-      <rect x="44" y="444" width="112" height="9" rx="2" className={dark} />
-      <rect x="36" y="420" width="7" height="38" rx="2" className={dark} />
-      <rect x="157" y="420" width="7" height="38" rx="2" className={dark} />
+    <svg viewBox="0 0 200 480" className={cn("fill-none stroke-foreground/65", className)} strokeWidth={1.2} strokeLinejoin="round" strokeLinecap="round"
+      role="img" aria-label="Car from above, front at the top">
+      {side}
+      <g transform="matrix(-1 0 0 1 200 0)">{side}</g>
+      {/* Centre line: nose, chassis, cockpit with the driver's helmet, airbox, engine cover, crash structure, rear wing */}
+      <path d="M95 34 Q100 28 105 34 L112 128 Q116 160 118 196 M95 34 L88 128 Q84 160 82 196" />
+      <path d="M96 44 L96 60 M104 44 L104 60" />
+      <path d="M90 196 Q100 186 110 196 L112 236 Q100 244 88 236 Z" />
+      <circle cx={100} cy={213} r={7} />
+      <path d="M100 206 L100 220" />
+      <path d="M88 240 Q86 300 92 400 L108 400 Q114 300 112 240" />
+      <ellipse cx={100} cy={250} rx={7} ry={5} />
+      <path d="M100 258 L100 396" />
+      <path d="M70 398 L130 398 L134 432 L66 432 Z" />
+      <path d="M95 400 L95 436 L105 436 L105 400" />
+      <circle cx={100} cy={405} r={2.5} />
+      <rect x={40} y={428} width={120} height={13} rx={2} />
+      <rect x={40} y={444} width={120} height={8} rx={2} />
+      <path d="M58 458 L142 458 M100 441 L100 458" />
     </svg>
   )
 }
