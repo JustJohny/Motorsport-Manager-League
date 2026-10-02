@@ -189,9 +189,9 @@ function PitBox({ people, roles, own, busy, onAssign }: {
 /** One side of the car (x <= 100), drawn once and mirrored for the other. */
 const CAR_SIDE = [
   // Front wing: main plane, three flaps, endplate and footplate
-  "M100 30 Q60 26 12 30 L12 44 Q60 40 100 44",
-  "M100 47 Q60 44 14 47", "M100 51 Q60 48 16 51", "M97 55 Q60 52 18 55",
-  "M8 22 L14 22 L14 58 L8 58 Z", "M14 52 L24 57",
+  "M100 26 Q58 30 12 42 L12 54 Q58 42 100 38",
+  "M100 41 Q58 45 14 57", "M100 45 Q58 49 16 61", "M97 49 Q58 53 18 64",
+  "M8 34 L14 34 L14 68 L8 68 Z", "M14 62 L24 66",
   // Front suspension: wishbones, track rod, pushrod; brake duct
   "M88 92 L46 98 L89 108", "M88 100 L46 104 L90 118", "M88 113 L46 111", "M47 101 L85 87",
   "M44 90 L49 90 L49 112 L44 112 Z",
