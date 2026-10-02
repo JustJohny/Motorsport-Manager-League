@@ -220,8 +220,17 @@ export function teamDesign(save: Save, team: Obj): TeamDesign {
       split: num(pi.mNormalizedMechanicDistribution ?? 0.5),
       slots: improvementSlots(save, team),
       mechanics: Number(findBuilding(save, team, BUILDING.Factory).mStaffNumber ?? 0),
+      chiefPerformance: chiefStat(save, pi.mechanicOnPerformance, "performance"),
+      chiefReliability: chiefStat(save, pi.mechanicOnReliability, "reliability"),
     },
   };
+}
+
+/** The chief mechanic's stat that speeds up one improvement list (PartImprovement.GetChiefMechanicWorkRate). */
+function chiefStat(save: Save, mechanic: Json, stat: "performance" | "reliability"): number {
+  if (!mechanic) return 0;
+  const m = save.g.deref<Obj>(mechanic);
+  return num(save.g.deref<Obj>(m.mStats ?? m.stats)[stat] ?? 0);
 }
 
 /** A C# TimeSpan as FullSerializer writes it ("1.00:00:00" or "00:00:00") in days. */

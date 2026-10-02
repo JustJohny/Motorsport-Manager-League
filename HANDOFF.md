@@ -559,6 +559,12 @@ A member invests in their own engine programme, becomes an engine supplier, and 
 - Money moves customer → owner at the season change.
 - Before building, test a season change in game with the toolkit: how suppliers are chosen for member (AI-run) teams at the season end, and when chassis stats pick up supplier effects.
 
+## Quality-of-life: times and building info (built 2026-10-02, user request)
+- **Part improvement time:** the Mechanics card shows when each list is done (game days and date), live with the slider and the lists. `src/part-improvement.ts` is MM's exact formula (see docs/save-schema.md, "Part design and improvement"); the extract adds `improvement.chiefPerformance` / `chiefReliability`. **Needs a republish**; older snapshots show "appear after the next publish".
+- **Part design time:** the running design shows days left, the queued one and the designer show "N days to design".
+- **HQ:** buildings under construction show weeks left (days under a week). Every building shows MM's UI name (the "missing" Forecasting Centre was the save's "Logistics Centre") and an info icon with MM's description and effects on hover (`src/hq-info.ts`). Tooltips are hover-only, so they don't open on phones.
+- **Calendar:** each remaining race shows "in N days" from the published game date ("this weekend" on race day).
+
 ## Working notes for the assistant
 - The user plays MM under Wine on Linux (CachyOS). They test in game and report back, so give them concrete things to check.
 - Never overwrite the user's own saves. Write new `SaveLeague Test N.sav` files.

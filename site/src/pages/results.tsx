@@ -1,5 +1,6 @@
 import { ChevronRight, Flame, Siren, Timer } from "lucide-react"
 import { useSearchParams } from "react-router"
+import { daysBetween } from "../../../src/part-improvement.ts"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -9,6 +10,11 @@ import { fmtDate, fmtMoney, fmtTime } from "@/lib/format"
 import { useLeague } from "@/lib/league"
 import type { PitStopRound, SessionResult } from "@/lib/types"
 import { cn } from "@/lib/utils"
+
+/** Game days until a race, from the published game date. */
+function inDays(days: number) {
+  return days <= 0 ? "this weekend" : days === 1 ? "in 1 day" : `in ${days} days`
+}
 
 export function ResultsPage() {
   const { me, league } = useLeague()
@@ -53,7 +59,10 @@ export function ResultsPage() {
                 >
                   <span className="w-5 text-right tabular-nums">{e.round}</span>
                   <span className="flex-1 font-medium">{e.circuit}</span>
-                  <span className="text-xs">{fmtDate(e.date)}</span>
+                  <span className="flex flex-col items-end text-xs leading-tight">
+                    {fmtDate(e.date)}
+                    {!e.ended && <span className="tabular-nums text-muted-foreground">{inDays(daysBetween(league.snapshot.gameDate, e.date))}</span>}
+                  </span>
                   {breaches.some((b) => b.round === e.round) && <Siren className="size-3.5 text-destructive" aria-label="A part was caught" />}
                   {e === next && <Badge>Next</Badge>}
                   {hasResults && <ChevronRight className={cn("size-3.5", selected ? "text-foreground" : "text-muted-foreground/50")} />}

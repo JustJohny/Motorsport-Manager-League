@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react"
+import { hqName } from "../../../src/hq-info.ts"
 import { useLeague } from "./league"
 import { nextHqStep, unorderedProject } from "./rules"
 import { demoMode, supabase, watchTable } from "./supabase"
@@ -77,8 +78,8 @@ export function HqOrdersProvider({ children }: { children: ReactNode }) {
         const b = league.privateTeams[me.team]?.hq.find((x) => x.type === buildingType)
         const step = b && nextHqStep(b, unorderedProject(b, [], leagueStart))
         if (!b || !step) throw new Error("Can't order that")
-        if (orders.some((o) => o.building_type === buildingType)) throw new Error(`${b.name} already has a queued order`)
-        setOrders((os) => [...os, { id: Date.now(), team: me.team, building_type: buildingType, building_name: b.name, to_level: step.toLevel, cost: step.cost, weeks: step.weeks, status: "queued", created_at: new Date().toISOString() }])
+        if (orders.some((o) => o.building_type === buildingType)) throw new Error(`${hqName(b.type, b.name)} already has a queued order`)
+        setOrders((os) => [...os, { id: Date.now(), team: me.team, building_type: buildingType, building_name: hqName(b.type, b.name), to_level: step.toLevel, cost: step.cost, weeks: step.weeks, status: "queued", created_at: new Date().toISOString() }])
         return
       }
       await check(supabase!.rpc("order_hq", { building_type: buildingType }))

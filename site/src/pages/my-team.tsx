@@ -1,4 +1,6 @@
-import { Loader2, Lock } from "lucide-react"
+import { Info, Loader2, Lock } from "lucide-react"
+import { HQ_INFO, hqName } from "../../../src/hq-info.ts"
+import { daysBetween } from "../../../src/part-improvement.ts"
 import { SUPPLIER_STATS } from "../../../src/supplier-rules.ts"
 import { useState } from "react"
 import { Link, useParams } from "react-router"
@@ -9,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { PageHeader } from "@/components/page-header"
 import { PartsTab } from "@/components/parts-tab"
 import { PitCrewTab } from "@/components/pit-crew-tab"
@@ -112,6 +115,36 @@ const STATE_LABEL: Record<Building["state"], string> = {
   NotBuilt: "Not built", BuildingInProgress: "Under construction", Constructed: "Built", Upgrading: "Upgrading",
 }
 
+/** Game time left on a construction, in weeks as MM's HQ screen counts build time. */
+function weeksLeft(now: string, end: string) {
+  const days = Math.max(0, daysBetween(now, end))
+  if (days < 7) return `${days} day${days === 1 ? "" : "s"} left`
+  const weeks = Math.ceil(days / 7)
+  return `${weeks} week${weeks === 1 ? "" : "s"} left`
+}
+
+/** An info icon that shows what the building does, in MM's own words. */
+function BuildingInfo({ type }: { type: number }) {
+  const info = HQ_INFO[type]
+  if (!info) return null
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button type="button" className="text-muted-foreground hover:text-foreground" aria-label={`What the ${info.name} does`}>
+          <Info className="size-3.5" />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="right" className="flex-col items-start gap-1.5 py-2 font-normal">
+        <span className="font-medium">{info.name}</span>
+        <span>{info.description}</span>
+        <ul className="list-disc pl-4">
+          {info.effects.map((e) => <li key={e}>{e}</li>)}
+        </ul>
+      </TooltipContent>
+    </Tooltip>
+  )
+}
+
 /** Level as the member owns it: a building under construction isn't usable yet. */
 const ownedLevel = (b: Building) => (b.state === "BuildingInProgress" ? 0 : b.level)
 
@@ -178,13 +211,19 @@ function HqTable({ hq, own, team }: { hq: TeamPrivate["hq"]; own: boolean; team:
                 const inProgress = b.state === "BuildingInProgress" || b.state === "Upgrading"
                 return (
                   <TableRow key={b.type} className={cn(order && "bg-primary/10 hover:bg-primary/15")}>
-                    <TableCell className="font-medium">{b.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <span className="inline-flex items-center gap-1.5">{hqName(b.type, b.name)}<BuildingInfo type={b.type} /></span>
+                    </TableCell>
                     <TableCell>
                       <Badge variant={b.state === "Constructed" ? "secondary" : b.state === "NotBuilt" ? "outline" : "default"}>
                         {STATE_LABEL[b.state]}
                         {inProgress && b.progress != null && ` ${fmtPct(b.progress)}`}
                       </Badge>
-                      {inProgress && !aiProject && <div className="mt-0.5 text-xs text-muted-foreground">done {fmtDate(b.progressEnd)}</div>}
+                      {inProgress && !aiProject && (
+                        <div className="mt-0.5 text-xs text-muted-foreground">
+                          done {fmtDate(b.progressEnd)}{b.progressEnd && ` · ${weeksLeft(league.snapshot.gameDate, b.progressEnd)}`}
+                        </div>
+                      )}
                       {aiProject && (
                         <div className="mt-0.5 text-xs text-amber-600 dark:text-amber-400" title="The in-game AI started this with the team's money. It's cancelled and refunded before the next race.">
                           AI project · cancelled at next apply
@@ -206,7 +245,7 @@ function HqTable({ hq, own, team }: { hq: TeamPrivate["hq"]; own: boolean; team:
                         const met = !missing.includes(d)
                         return (
                           <span key={d.buildingType} className={met ? "text-muted-foreground" : "text-destructive"}>
-                            {req?.name ?? `#${d.buildingType}`} {d.requiredLevel}
+                            {hqName(d.buildingType, req?.name)} {d.requiredLevel}
                             <br />
                           </span>
                         )

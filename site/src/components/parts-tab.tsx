@@ -4,6 +4,8 @@ import {
   WindArrowDown, Wrench, type LucideIcon,
 } from "lucide-react"
 import { Fragment, useMemo, useState, type ReactNode } from "react"
+import { hqName } from "../../../src/hq-info.ts"
+import { daysBetween, improvementEstimate, type ListEstimate } from "../../../src/part-improvement.ts"
 import { bustChance, carBustChance, nextBustPenalty, planDesign, predictPart, type DesignPlan } from "../../../src/part-design.ts"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -192,6 +194,10 @@ function DesignCard({ priv, team, own }: { priv: TeamPrivate; team: string; own:
     try { await fn() } catch (e) { setError((e as Error).message) } finally { setBusy(false) }
   }
   const comps = (type: string, ids: number[]) => ids.map((id) => design.types[type]?.components.find((c) => c.id === id)).filter(Boolean) as DesignComponent[]
+  const { league } = useLeague()
+  const left = current ? Math.max(0, daysBetween(league.snapshot.gameDate, current.end)) : 0
+  const queuedCtx = queued && design.types[queued.part_type]?.ctx
+  const queuedDays = queued && queuedCtx ? planDesign(queuedCtx, comps(queued.part_type, queued.components)).days : null
 
   return (
     <Card>
@@ -209,7 +215,7 @@ function DesignCard({ priv, team, own }: { priv: TeamPrivate; team: string; own:
             type={current.type}
             components={comps(current.type, current.components)}
             badge={aiCurrent ? <Badge variant="outline" className="gap-1"><Bot className="size-3" /> AI design</Badge> : <Badge className="gap-1"><Hammer className="size-3" /> In production</Badge>}
-            extra={<span className="flex items-center gap-1 text-muted-foreground"><Clock className="size-3.5" /> done {fmtDate(current.end)}</span>}
+            extra={<span className="flex items-center gap-1 tabular-nums text-muted-foreground"><Clock className="size-3.5" /> done {fmtDate(current.end)} · {left} day{left === 1 ? "" : "s"} left</span>}
             className={aiCurrent ? "border-amber-500/50" : undefined}
             note={aiCurrent ? "The in-game AI started this with your money. It's cancelled and refunded at the next apply, so you can order your own." : undefined}
           />
@@ -219,7 +225,12 @@ function DesignCard({ priv, team, own }: { priv: TeamPrivate; team: string; own:
             type={queued.part_type}
             components={comps(queued.part_type, queued.components)}
             badge={<Badge className="gap-1"><Clock className="size-3" /> Queued</Badge>}
-            extra={<span className="flex items-center gap-1 tabular-nums text-muted-foreground"><Coins className="size-3.5" /> {fmtMoney(queued.cost)}</span>}
+            extra={
+              <>
+                <span className="flex items-center gap-1 tabular-nums text-muted-foreground"><Coins className="size-3.5" /> {fmtMoney(queued.cost)}</span>
+                {queuedDays != null && <span className="flex items-center gap-1 tabular-nums text-muted-foreground"><Clock className="size-3.5" /> {fmtDays(queuedDays)} to design</span>}
+              </>
+            }
             action={own && <Button size="sm" variant="ghost" className="ml-auto" disabled={busy} onClick={() => void run(() => p.cancelDesign(queued.id))}>Cancel</Button>}
             className="border-primary/40 bg-primary/5"
             note="Started in game at the next apply."
@@ -279,7 +290,7 @@ function Designer({ priv, busy, onOrder }: { priv: TeamPrivate; busy: boolean; o
     try { planDesign(opts.ctx, [...chosen, c]); return null } catch (e) { return (e as Error).message }
   }
   const toggle = (id: number) => setPicked((ps) => (ps.includes(id) ? ps.filter((x) => x !== id) : [...ps, id]))
-  const buildingName = (t: number) => priv.hq.find((b) => b.type === t)?.name ?? `building #${t}`
+  const buildingName = (t: number) => hqName(t, priv.hq.find((b) => b.type === t)?.name)
   const base = opts.base
   const result = base ? predictPart(base, chosen) : null
   const owned = priv.parts[type] ?? []
@@ -413,14 +424,14 @@ function Designer({ priv, busy, onOrder }: { priv: TeamPrivate; busy: boolean; o
       <div className="flex flex-wrap items-center gap-x-6 gap-y-2 rounded-lg bg-muted/50 px-4 py-3 text-sm tabular-nums">
         {problem ? <span className="text-destructive">{problem}</span> : plan ? (
           <>
-            <span className="flex items-center gap-1.5"><Clock className="size-4 text-muted-foreground" /> {fmtDays(plan.days)}</span>
+            <span className="flex items-center gap-1.5"><Clock className="size-4 text-muted-foreground" /> {fmtDays(plan.days)} to design</span>
             {plan.extraCopies > 0 && <span className="flex items-center gap-1.5"><Package className="size-4 text-muted-foreground" /> {1 + plan.extraCopies} parts</span>}
             <span className="flex items-center gap-1.5 font-medium"><Coins className="size-4 text-muted-foreground" /> {fmtMoney(plan.cost)}</span>
           </>
         ) : (
           <span className="flex items-center gap-3 text-muted-foreground">
             <span className="flex items-center gap-1.5"><Coins className="size-4" /> from {fmtMoney(opts.ctx.settings.materialsCost)}</span>
-            <span className="flex items-center gap-1.5"><Clock className="size-4" /> {opts.ctx.settings.buildTimeDays} days base</span>
+            <span className="flex items-center gap-1.5"><Clock className="size-4" /> {opts.ctx.settings.buildTimeDays} days base design time</span>
             <span>Pick components to see the design.</span>
           </span>
         )}
@@ -517,6 +528,9 @@ function ImprovementCard({ priv, team, own }: { priv: TeamPrivate; team: string;
   // MM puts every mechanic on the only list that has parts.
   const forced = !cur.performance.length && cur.reliability.length ? 0 : cur.performance.length && !cur.reliability.length ? 1 : null
   const value = forced ?? shown
+  const { league } = useLeague()
+  const now = league.snapshot.gameDate
+  const eta = improvementEstimate(imp, Object.values(priv.parts).flat(), { performance: cur.performance, reliability: cur.reliability, split: value }, now)
   return (
     <Card size="sm">
       <CardHeader>
@@ -532,7 +546,21 @@ function ImprovementCard({ priv, team, own }: { priv: TeamPrivate; team: string;
         <div className="flex flex-wrap gap-2">
           <StatPill icon={Gauge} label="Improving performance">{cur.performance.length} / {imp.slots} parts</StatPill>
           <StatPill icon={ShieldCheck} label="Improving reliability">{cur.reliability.length} / {imp.slots} parts</StatPill>
+          {imp.chiefPerformance != null && (
+            <>
+              <StatPill icon={Timer} label="Performance done in"><Eta e={eta.performance} now={now} /></StatPill>
+              <StatPill icon={Timer} label="Reliability done in"><Eta e={eta.reliability} now={now} /></StatPill>
+            </>
+          )}
         </div>
+        {imp.chiefPerformance != null ? (
+          <p className="text-xs text-muted-foreground">
+            MM's own work rate: mechanics work weekdays 09:00 to 18:00, and every part in a list reaches its max on the same day.
+            Counted from the published game date; moving the slider or changing the lists updates it.
+          </p>
+        ) : (
+          <p className="text-xs text-muted-foreground">Improvement times appear after the organizer's next publish.</p>
+        )}
         <div className="flex items-center gap-3 text-sm">
           <span className="flex w-36 items-center justify-end gap-1.5 text-muted-foreground"><ShieldCheck className="size-4" /> Reliability {Math.round((1 - value) * 100)}%</span>
           <input
@@ -546,6 +574,19 @@ function ImprovementCard({ priv, team, own }: { priv: TeamPrivate; team: string;
         {forced != null && <p className="text-xs text-muted-foreground">With parts in only one list, MM puts every mechanic on it.</p>}
       </CardContent>
     </Card>
+  )
+}
+
+/** Game days until an improvement list is done, MM's way. */
+function Eta({ e, now }: { e: ListEstimate | null; now: string }) {
+  if (!e) return <span className="text-muted-foreground">No parts</span>
+  if (e.workDays === 0) return <>Done</>
+  if (!e.end) return <span className="text-destructive" title="No mechanics on this list">Never: 0 mechanics</span>
+  const days = Math.max(0, daysBetween(now, e.end))
+  return (
+    <span title={`${e.mechanics} mechanics · ${e.workDays!.toFixed(1)} working days`}>
+      {days} day{days === 1 ? "" : "s"} <span className="text-muted-foreground">· {fmtDate(e.end.toISOString())}</span>
+    </span>
   )
 }
 

@@ -351,6 +351,12 @@ export interface TeamDesign {
     /** Parts per list: 2/4/6/8 for Factory level 0-3. */
     slots: number;
     mechanics: number;
+    /**
+     * Stats of the chief mechanics on each list, which add to the work rate. Missing in snapshots
+     * published before 2026-10-02.
+     */
+    chiefPerformance?: number;
+    chiefReliability?: number;
   };
 }
 
