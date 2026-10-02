@@ -2,7 +2,7 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { applyChanges } from "../src/apply.ts";
-import { pack, parseLossless, stringifyLossless, unpack } from "../src/codec/sav.ts";
+import { num, pack, parseLossless, stringifyLossless, unpack } from "../src/codec/sav.ts";
 import { extractLeague } from "../src/extract.ts";
 import { Save } from "../src/model.ts";
 import { defaultSavesDir } from "../src/paths.ts";
@@ -381,6 +381,60 @@ describe.skipIf(!existsSync(SAVE))("operations on a real save", () => {
     }
     const ev = p.contract.mCalendarEvent && reloaded.g.deref<any>(p.contract.mCalendarEvent);
     if (ev) expect(ev.mDynamicDescription.translatedText.English).toContain("Kimi Räikkönen");
+  }, 120_000);
+
+  it("renames a team, keeping every reference to it", () => {
+    const save = Save.load(SAVE);
+    const id = save.team("Garuda Racing").teamID;
+    applyChanges(save, { changes: [{ op: "renameTeam", team: "Garuda Racing", name: "Scuderia Ferrari", shortName: "Ferrari" }] });
+    expect(() => applyChanges(save, { changes: [{ op: "renameTeam", team: "Octane Racing", name: "Scuderia Ferrari" }] })).toThrow();
+
+    const reloaded = reload(save);
+    expect(reloaded.g.validate()).toEqual([]);
+    const t = reloaded.team(id);
+    expect([t.name, t.mShortName]).toEqual(["Scuderia Ferrari", "Ferrari"]);
+    expect(reloaded.slots(t).some((s) => s.personHired)).toBe(true);
+  }, 120_000);
+
+  it("sets a team's licence and HQ countries", () => {
+    const save = Save.load(SAVE);
+    applyChanges(save, { changes: [{ op: "setTeamCountry", team: "Garuda Racing", nationality: "Austria", hqCountry: "UK" }] });
+    const reloaded = reload(save);
+    expect(reloaded.g.validate()).toEqual([]);
+    const t = reloaded.team("Garuda Racing");
+    expect(reloaded.g.deref<any>(t.nationality).mCountryKey).toBe("Austria");
+    const uk = [...reloaded.g.byId.values()].find((o: any) => o.mCountryKey === "UK" && o.mNationalityID) as any;
+    expect(t.locationID).toBe(uk.mCountryID);
+  }, 120_000);
+
+  it("renames an engine supplier and swaps it onto this season's cars", () => {
+    const save = Save.load(SAVE);
+    const team = save.team("Garuda Racing");
+    const cs = () => save.cars(team).map((c) => save.g.deref<any>(c.chassisStats));
+    const old = save.g.deref<any>(cs()[0].supplierEngine);
+    const other = save.g.list<any>(save.data.supplierManager.engineSuppliers).find((s) => s.id !== old.id && s.name !== old.name && s.mTier === old.mTier)!;
+    const statsOf = (s: any) => new Map((Array.isArray(s.supplierStats) ? s.supplierStats : []).map((e: any) => [e.Key, num(e.Value)]));
+    const diff = (k: number) => ((statsOf(other).get(k) as number) ?? 0) - ((statsOf(old).get(k) as number) ?? 0);
+    const before = num(cs()[0].mImprovability);
+    const otherName = other.name;
+    applyChanges(save, { changes: [
+      { op: "renameSupplier", type: "Engine", from: otherName, name: "Mercedes", worksTeam: "Garuda Racing" },
+      { op: "setCurrentSupplier", team: "Garuda Racing", type: "Engine", id: other.id },
+    ] });
+
+    const reloaded = reload(save);
+    expect(reloaded.g.validate()).toEqual([]);
+    expect(typeProblems(reloaded)).toEqual([]);
+    const engines = reloaded.g.list<any>(reloaded.data.supplierManager.engineSuppliers);
+    expect(engines.some((s) => s.name === otherName)).toBe(false);
+    const t = reloaded.team("Garuda Racing");
+    for (const c of reloaded.cars(t)) {
+      const chassis = reloaded.g.deref<any>(c.chassisStats);
+      const e = reloaded.g.deref<any>(chassis.supplierEngine);
+      expect(e.name).toBe("Mercedes");
+      expect(e.teamDiscounts.some((d: any) => d.Key === t.teamID && num(d.Value) === 50)).toBe(true);
+    }
+    expect(num(reloaded.g.deref<any>(reloaded.cars(t)[0].chassisStats).mImprovability)).toBe(before + diff(3));
   }, 120_000);
 });
 

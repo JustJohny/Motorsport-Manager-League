@@ -137,6 +137,12 @@ Steps 1–5 are done: Supabase is set up, Pages is deployed, and snapshots are p
 - `renamePerson` op (`src/ops/people.ts`): by team + slotID, it sets the name and optionally nationality, birth date and gender. See docs/save-schema.md, "Person names".
 - `examples/f1-2016-names.json` renames all 11 WMC teams in "SaveF1 League R1 Pre" (SPEC Racing, the user's spectator team, is left as is). It was applied to "SaveF1 League R1 2016" ("F1 League R1 2016" in MM's load menu). **Not yet loaded in game.**
 - Mapping: Steinmann = Mercedes, Rossini = Ferrari, Panther = Red Bull, Windsor = Williams, Kitano = McLaren, Van Dort = Force India, Rezzato = Toro Rosso, Thornton = Renault, Vélan = Sauber, Asia Road Racing = Haas, Cortossi = Manor.
+- **Team names, countries and engines (2026-10-02):** `examples/f1-2016-teams.json`, applied to "SaveF1 League R1 2016" → `SaveF1 League R1 2016 Teams.sav` ("F1 League R1 2016 Teams"). **Not yet loaded in game.**
+  - `renameTeam` (`src/ops/team.ts`): `name` + `mShortName`, e.g. "Scuderia Ferrari" / "Ferrari".
+  - `setTeamCountry`: licence flag (`nationality`) and HQ country (`locationID`), e.g. Red Bull = Austria / UK, Force India = India / UK, Haas = United States.
+  - `renameSupplier` (`src/ops/suppliers.ts`): every tier copy of a supplier, optional 50% works discount. Steinmann = Mercedes, Rossini = Ferrari, Kitano = Honda, Mersault = Renault (works discount for Renault), Hammer = "Ferrari 2015" (the user's pick for the fifth make).
+  - `setCurrentSupplier`: swaps the supplier on this season's cars and shifts chassis stats by the supplier-stat difference. Engine parts keep their stats (MM adds the engine level modifier only in `NextYearCarDesign.DesignCompleted`), and no money moves (this career has no supplier payments; MM charges at next year's design start). 2016 deals: Mercedes → Mercedes, Williams, Force India, Manor; Ferrari → Ferrari, Sauber, Haas; Honda → McLaren; Renault → Renault, Red Bull; Ferrari 2015 → Toro Rosso (and SPEC Racing, unchanged).
+  - Engine logos (`logoIndex`) are still MM's fictional ones. Next season MM's AI picks engines again.
 
 ## How to work with it
 ```sh

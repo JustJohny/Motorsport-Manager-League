@@ -3,7 +3,9 @@ import {
   cancelDesign, cancelUnorderedDesigns, removeUnorderedParts, setFitting, setImprovement, startDesign,
   type CancelDesignOp, type CancelUnorderedDesignsOp, type RemoveUnorderedPartsOp, type SetFittingOp, type SetImprovementOp, type StartDesignOp,
 } from "./ops/design.ts";
-import { setSuppliers, type SetSuppliersOp } from "./ops/suppliers.ts";
+import {
+  renameSupplier, setCurrentSupplier, setSuppliers, type RenameSupplierOp, type SetCurrentSupplierOp, type SetSuppliersOp,
+} from "./ops/suppliers.ts";
 import { concludeVote, setNextRule, type ConcludeVoteOp, type SetNextRuleOp } from "./ops/politics.ts";
 import { adjustBudget, setBudget, type AdjustBudgetOp, type SetBudgetOp } from "./ops/finance.ts";
 import {
@@ -13,13 +15,15 @@ import {
 import { addPart, fitPart, removePart, type AddPartOp, type FitPartOp, type RemovePartOp } from "./ops/parts.ts";
 import { hire, type HireOp } from "./ops/staff.ts";
 import { renamePerson, type RenamePersonOp } from "./ops/people.ts";
+import { renameTeam, setTeamCountry, type RenameTeamOp, type SetTeamCountryOp } from "./ops/team.ts";
 import { syncTeam, type SyncTeamOp } from "./ops/sync.ts";
 import { setPitCrew, type SetPitCrewOp } from "./ops/pit-crew.ts";
 import { equalizeTeams, type EqualizeOp } from "./ops/equalize.ts";
 
 export type Change = SetBuildingOp | StartBuildingOp | CancelBuildingOp | CancelUnorderedHqOp | SetBudgetOp | AdjustBudgetOp | AddPartOp | RemovePartOp | FitPartOp | HireOp | SyncTeamOp
   | StartDesignOp | CancelDesignOp | CancelUnorderedDesignsOp | RemoveUnorderedPartsOp | SetFittingOp | SetImprovementOp
-  | ConcludeVoteOp | SetNextRuleOp | SetSuppliersOp | RenamePersonOp | SetPitCrewOp | EqualizeOp;
+  | ConcludeVoteOp | SetNextRuleOp | SetSuppliersOp | RenamePersonOp | RenameTeamOp | SetTeamCountryOp
+  | SetCurrentSupplierOp | RenameSupplierOp | SetPitCrewOp | EqualizeOp;
 
 export interface ChangeSet {
   /** Optional note, e.g. "Before round 6 - Munich". */
@@ -54,6 +58,8 @@ function run(save: Save, c: Change): string | string[] {
     case "fitPart": return fitPart(save, c);
     case "hire": return hire(save, c);
     case "renamePerson": return renamePerson(save, c);
+    case "renameTeam": return renameTeam(save, c);
+    case "setTeamCountry": return setTeamCountry(save, c);
     case "syncTeam": return syncTeam(save, c);
     case "startDesign": return startDesign(save, c);
     case "cancelDesign": return cancelDesign(save, c);
@@ -64,6 +70,8 @@ function run(save: Save, c: Change): string | string[] {
     case "concludeVote": return concludeVote(save, c);
     case "setNextRule": return setNextRule(save, c);
     case "setSuppliers": return setSuppliers(save, c);
+    case "setCurrentSupplier": return setCurrentSupplier(save, c);
+    case "renameSupplier": return renameSupplier(save, c);
     case "setPitCrew": return setPitCrew(save, c);
     case "equalizeTeams": return equalizeTeams(save, c);
     default: throw new Error(`Unknown op ${(c as { op: string }).op}`);

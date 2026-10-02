@@ -159,13 +159,7 @@ export function setSuppliers(save: Save, op: SetSuppliersOp): string[] {
     if (!canBuy(chosen, team)) throw new Error(`${team.name} can't buy ${chosen.name}`);
     const old = cs[CHASSIS_FIELD[type]] ? g.deref<Obj>(cs[CHASSIS_FIELD[type]]) : null;
     if (old === chosen) continue;
-    const stats = (s: Obj | null) => new Map<number, number>(dictEntries(s?.supplierStats));
-    const before = stats(old), after = stats(chosen);
-    for (const k of new Set([...before.keys(), ...after.keys()])) {
-      const field = CHASSIS_STAT[k];
-      if (field && field in cs) cs[field] = float(num(cs[field]) + (after.get(k) ?? 0) - (before.get(k) ?? 0));
-    }
-    cs[CHASSIS_FIELD[type]] = g.ref(chosen);
+    putSupplier(save, cs, type, chosen);
     if (type === "Engine") ny.mEngineModifier = chosen.mRandomEngineLevelModifier ?? 0;
     const refund = old ? price(save, old, team) : 0;
     const cost = price(save, chosen, team);
@@ -174,4 +168,67 @@ export function setSuppliers(save: Save, op: SetSuppliersOp): string[] {
     log.push(adjustBudget(save, { op: "adjustBudget", team: team.name, delta: -cost, reason: `${chosen.name} ${type.toLowerCase()} supply` }));
   }
   return log.length ? log : [`${team.name}: suppliers unchanged`];
+}
+
+/** Put a supplier on a chassis, shifting its stats by the difference from the old one (CarChassisStats.ApplySupplierStats). */
+function putSupplier(save: Save, cs: Obj, type: SupplierType, chosen: Obj): void {
+  const old = cs[CHASSIS_FIELD[type]] ? save.g.deref<Obj>(cs[CHASSIS_FIELD[type]]) : null;
+  const stats = (s: Obj | null) => new Map<number, number>(dictEntries(s?.supplierStats));
+  const before = stats(old), after = stats(chosen);
+  for (const k of new Set([...before.keys(), ...after.keys()])) {
+    const field = CHASSIS_STAT[k];
+    if (field && field in cs) cs[field] = float(num(cs[field]) + (after.get(k) ?? 0) - (before.get(k) ?? 0));
+  }
+  cs[CHASSIS_FIELD[type]] = save.g.ref(chosen);
+}
+
+export interface SetCurrentSupplierOp {
+  op: "setCurrentSupplier";
+  team: string | number;
+  type: SupplierType;
+  /** Supplier id, e.g. 0–4 for the F1 engines. */
+  id: number;
+}
+
+/**
+ * Swap a supplier on this season's cars. The chassis stats move by the supplier stat difference.
+ * Engine parts keep their stats: MM adds the engine level modifier to them only when next year's
+ * design completes. No money moves; MM charges suppliers when next year's car design starts.
+ */
+export function setCurrentSupplier(save: Save, op: SetCurrentSupplierOp): string {
+  const team = save.team(op.team);
+  const chosen = findSupplier(save, op.type, op.id);
+  let old = "none";
+  for (const car of save.cars(team)) {
+    const cs = save.g.deref<Obj>(car.chassisStats);
+    const cur = cs[CHASSIS_FIELD[op.type]];
+    if (cur) old = save.g.deref<Obj>(cur).name;
+    putSupplier(save, cs, op.type, chosen);
+  }
+  return `${team.name}: ${op.type.toLowerCase()} ${old} → ${chosen.name}`;
+}
+
+export interface RenameSupplierOp {
+  op: "renameSupplier";
+  type: SupplierType;
+  /** Current name. MM keeps a copy of a supplier per championship tier, and every copy is renamed. */
+  from: string;
+  name: string;
+  /** Give this team MM's 50% works discount on it, as the other works teams have. */
+  worksTeam?: string | number;
+}
+
+export function renameSupplier(save: Save, op: RenameSupplierOp): string {
+  const all = save.g.list<Obj>(save.data.supplierManager[LIST_NAME[op.type]]);
+  const hits = all.filter((s) => s.name === op.from);
+  if (!hits.length) throw new Error(`No ${op.type} supplier called ${op.from}`);
+  if (all.some((s) => s.name === op.name)) throw new Error(`A ${op.type} supplier is already called ${op.name}`);
+  const works = op.worksTeam === undefined ? null : save.team(op.worksTeam);
+  for (const s of hits) {
+    s.name = op.name;
+    if (works && !dictEntries(s.teamDiscounts).some(([k]) => k === works.teamID)) {
+      s.teamDiscounts = [...(Array.isArray(s.teamDiscounts) ? s.teamDiscounts : []), { Key: works.teamID, Value: float(50) }];
+    }
+  }
+  return `${op.type} supplier ${op.from} → ${op.name} (${hits.length} cop${hits.length === 1 ? "y" : "ies"})${works ? `, works team ${works.name}` : ""}`;
 }

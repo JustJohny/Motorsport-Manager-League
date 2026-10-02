@@ -97,7 +97,7 @@ function renameKey(dict: Obj, from: string, to: string): Obj {
   return Object.fromEntries(Object.entries(dict).map(([k, v]) => [k === from ? to : k, v]));
 }
 
-function nationality(save: Save, key: string): Obj {
+export function nationality(save: Save, key: string): Obj {
   // Search the id index too: a nationality whose definition sat inside an earlier renamee's
   // old reference is no longer in the tree until the next write pulls it back in.
   let found = [...save.g.byId.values()].find((o) => o.mCountryKey === key && o.mNationalityID) ?? null;
