@@ -335,6 +335,17 @@ MM 1.53 (pit crew pack) gives every team ~15 crew: 10 positions (FrontJack, Rear
 
 **Next steps for the user:** run migration 014, publish (forms the member crews), then play one cycle and check in game that the apply's `setPitCrew` values hold through the race (MM rerolls AI crews only at race weekend end).
 
+## Equalize the field (built 2026-10-02; needs migration 015)
+The organizer can make every team in the championship (AI and members) equal, usually at the start of a league. Drivers keep their own stats.
+**The user's decisions:** the organizer sets the values (the form starts from the field's averages); "car" = parts only (suppliers stay); budgets equal too; a button on the Organizer page queues it and the next pull/apply writes it.
+- `src/ops/equalize.ts`, op `equalizeTeams` (settings `EqualizeSettings` in league-types): per team, constructions in progress are cancelled without refund and HQ levels set (`setBuilding`); a running design is cancelled without refund; every part of each designable, non-spec type gets the stat (performance 0), max performance, reliability, max reliability and level, and `seasonPartStartingStat` gets the stat so new designs start equal; every part development rate; the lead designer's `partContributionStats`; every mechanic's stats; AI crews' task values (MM rebuilds them from mechanics' Pit stops after each race, so the default skill = the mechanics' Pit stops) or the career team's crew skills; then `setBudget`.
+- `src/equalize.ts` `fieldDefaults`: the averages (fitted parts' stat + performance, HQ levels rounded, budget to $100K, staff stats to 0.1).
+- Migration `015_equalize.sql`: `equalize_orders` (organizer-only, one queued per series, in backups), `queue_equalize(settings)` (replaces a queued one), `cancel_equalize()`.
+- `pull` (`src/equalize-orders.ts`): after undoing the AI, before members' orders; member site-run crews restart as equal starting crews at the skill (names kept) and are saved with `--mark-applied`.
+- Site: Organizer page → "Equalize the field" (areas can be switched off, a per-team preview of budget, HQ levels, designer and mechanics averages).
+- Tests: `test/equalize.test.ts` (every team equal after a reload of League Test 10; drivers and spec parts untouched; organizer-only queue).
+- Not yet seen in game: an equalized save loading and racing.
+
 ## Bug fixes from user feedback (2026-10-02)
 - **"No illegal option when designing a part":** grey-area components (Risk +1/+2) only exist at levels 3-5, and most teams' HQ only opens levels 1-2, so the site showed none. `designOptions` now also returns `lockedComponents` (published as `PartDesignOptions.lockedComponents`). The designer shows them greyed under their tier with a lock, marks every risky component "Grey area", and a hint line says how many are available or locked and which building opens them. **Needs a republish** to show locked components.
 - Phone: the designer's part-type tabs overlapped the spec note. The tab list kept shadcn's fixed `h-8` (the `group-data-horizontal` variant beats a plain `h-auto`), so it now uses `h-auto!`.

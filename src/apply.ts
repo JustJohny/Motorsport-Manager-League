@@ -15,10 +15,11 @@ import { hire, type HireOp } from "./ops/staff.ts";
 import { renamePerson, type RenamePersonOp } from "./ops/people.ts";
 import { syncTeam, type SyncTeamOp } from "./ops/sync.ts";
 import { setPitCrew, type SetPitCrewOp } from "./ops/pit-crew.ts";
+import { equalizeTeams, type EqualizeOp } from "./ops/equalize.ts";
 
 export type Change = SetBuildingOp | StartBuildingOp | CancelBuildingOp | CancelUnorderedHqOp | SetBudgetOp | AdjustBudgetOp | AddPartOp | RemovePartOp | FitPartOp | HireOp | SyncTeamOp
   | StartDesignOp | CancelDesignOp | CancelUnorderedDesignsOp | RemoveUnorderedPartsOp | SetFittingOp | SetImprovementOp
-  | ConcludeVoteOp | SetNextRuleOp | SetSuppliersOp | RenamePersonOp | SetPitCrewOp;
+  | ConcludeVoteOp | SetNextRuleOp | SetSuppliersOp | RenamePersonOp | SetPitCrewOp | EqualizeOp;
 
 export interface ChangeSet {
   /** Optional note, e.g. "Before round 6 - Munich". */
@@ -64,6 +65,7 @@ function run(save: Save, c: Change): string | string[] {
     case "setNextRule": return setNextRule(save, c);
     case "setSuppliers": return setSuppliers(save, c);
     case "setPitCrew": return setPitCrew(save, c);
+    case "equalizeTeams": return equalizeTeams(save, c);
     default: throw new Error(`Unknown op ${(c as { op: string }).op}`);
   }
 }

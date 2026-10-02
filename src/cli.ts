@@ -15,6 +15,7 @@ import { choiceChanges, designChanges, fetchPartsContext, markDesignsApplied, un
 import { engineSpendChanges, fetchEngineSpend, fetchSupplierContext, markEngineSpendApplied, supplierChanges } from "./engine-orders.ts";
 import { crewChanges, crewSpendChanges, crewUpdates, fetchCrewContext, fetchCrewSpend, markCrewSpendApplied, saveCrewUpdates } from "./crew-orders.ts";
 import { crewNamePool } from "./ops/pit-crew.ts";
+import { equalizeChanges, fetchEqualize, markEqualizeApplied, resetCrews } from "./equalize-orders.ts";
 import { fetchRegulationContext, recordVoteResults, regulationChanges } from "./rule-votes.ts";
 import { rest, supabaseEnv, type SupabaseEnv } from "./supabase.ts";
 import { fetchWindow, markApplied, windowChanges, winners } from "./transfers.ts";
@@ -215,6 +216,15 @@ switch (cmd) {
     const parts = await fetchPartsContext(env);
     if (ctx.leagueStart && ctx.memberTeams.length) changes.push(...undoAiParts(ctx.memberTeams, parts.orders, ctx.leagueStart));
 
+    // The organizer's equalization: after undoing the AI, before members' own orders.
+    const eq = await fetchEqualize(env);
+    if (eq.row && eq.snapshot) {
+      const teams = eq.snapshot.teams.map((t) => t.name);
+      console.log(`Equalize the field: ${teams.length} teams (${Object.keys(eq.row.settings).join(", ")})`);
+      changes.push(...equalizeChanges(eq.row, teams));
+      notes.push("equalization");
+    }
+
     console.log(`HQ orders: ${orders.length}`);
     for (const o of orders) {
       console.log(`  ${o.team}: ${o.to_level === 1 ? "build" : "upgrade"} ${o.building_name}${o.to_level > 1 ? ` to level ${o.to_level}` : ""}`
@@ -263,7 +273,13 @@ switch (cmd) {
 
     // Member pit crews: their skills into MM's per-task values (a standing choice, re-applied every
     // time), then their wages, funding and sign-on fees.
-    const crewCtx = await fetchCrewContext(env);
+    let crewCtx = await fetchCrewContext(env);
+    // An equalization restarts member crews at its skill (saved below with --mark-applied).
+    const crewReset = eq.row?.settings.pitCrew && eq.snapshot ? resetCrews(crewCtx, env.series!, eq.snapshot, eq.row.settings.pitCrew.skill) : [];
+    if (crewReset.length) {
+      crewCtx = { ...crewCtx, crew: crewReset.flatMap((u) => u.crew.map((c) => ({ ...c, team: u.team }))) };
+      console.log(`  Pit crews reset: ${crewReset.map((u) => u.team).join(", ")}`);
+    }
     const crewOps = crewChanges(crewCtx, reg.snapshot?.championship.pitCrew?.roles ?? []);
     for (const c of crewOps) if (c.op === "setPitCrew") console.log(`  Pit crew ${c.team}: ${c.tasks.map((x) => `task ${x.target} ${x.stat}/${x.confidence}`).join(", ")}`);
     changes.push(...crewOps);
@@ -300,6 +316,10 @@ switch (cmd) {
       await recordVoteResults(env, voteResults);
       await markEngineSpendApplied(env, engineSpend.map((r) => r.id));
       await markCrewSpendApplied(env, crewSpend.map((r) => r.id));
+      if (eq.row) {
+        await saveCrewUpdates(env, crewReset);
+        await markEqualizeApplied(env, eq.row.id);
+      }
       if (windowDone && w) await markApplied(env, w.window.id);
       console.log(`marked as applied: ${notes.join(" + ") || "nothing"}`);
     }

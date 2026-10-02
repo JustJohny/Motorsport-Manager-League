@@ -133,6 +133,23 @@ export interface Championship {
   pitStops?: PitStopRound[];
 }
 
+/** What `equalizeTeams` sets on every team (anything left out is untouched). Drivers keep their stats. */
+export interface EqualizeSettings {
+  budget?: number;
+  /** Building name → level (0 = not built). */
+  hq?: Record<string, number>;
+  /** Designable part type → the stats every part of that type gets (spec parts are skipped). */
+  parts?: Record<string, { stat: number; maxPerformance: number; reliability: number; maxReliability: number; level?: number }>;
+  /** Every part type's development rate (component boosts are multiplied by it). */
+  developmentRate?: number;
+  /** The lead designer's part contributions (topSpeed, acceleration, braking, …Corners), 0..20. */
+  leadDesigner?: Record<string, number>;
+  /** Every mechanic's stats (reliability, performance, concentration, speed, pitStops, leadership), 0..20. */
+  mechanics?: Record<string, number>;
+  /** AI crews' task values; the career team's crew gets the skill on every stat; member crews restart at it. */
+  pitCrew?: { skill: number; confidence: number };
+}
+
 export interface PitCrewRules {
   /** ChampionshipRules.pitCrewSize. */
   size: "Small" | "Large" | "SemiSequential";

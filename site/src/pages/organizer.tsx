@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/page-header"
 import { Archive, Flag, Plus } from "lucide-react"
 import { CopyCommand, RaceCycle, seriesFiles } from "@/components/race-cycle"
 import { WindowControls } from "@/components/window-controls"
+import { EqualizeCard } from "@/components/equalize-card"
 import { fmtDate } from "@/lib/format"
 import { useLeague } from "@/lib/league"
 
@@ -45,6 +46,7 @@ export function OrganizerPage() {
           </CardContent>
         </Card>
       </div>
+      <EqualizeCard />
       <SeriesCard />
       <Card size="sm">
         <CardHeader><CardTitle>Members</CardTitle></CardHeader>
