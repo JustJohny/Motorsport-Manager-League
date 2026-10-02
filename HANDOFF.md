@@ -342,6 +342,7 @@ The organizer can make every team in the championship (AI and members) equal, us
 - `src/equalize.ts` `fieldDefaults`: the averages (fitted parts' stat + performance, HQ levels rounded, budget to $100K, staff stats to 0.1).
 - Migration `015_equalize.sql`: `equalize_orders` (organizer-only, one queued per series, in backups), `queue_equalize(settings)` (replaces a queued one), `cancel_equalize()`.
 - `pull` (`src/equalize-orders.ts`): after undoing the AI, before members' orders; member site-run crews restart as equal starting crews at the skill (names kept) and are saved with `--mark-applied`.
+- **Presets (user request, fixed values):** Low / Medium / High in `PRESETS` (`presetSettings`): budget $10M/$25M/$50M; HQ core buildings at 1 / half of each max / max; staff stats 6/10/15; pit crew 6@75 % / 10@85 % / 15@95 %; part reliability 60-65 / 75-80 / 90-95 %, max performance 10/20/30, level 1/2/3, development rate 0.6/0.75/0.9. Part performance can't be fixed across series (its scale differs), so it's the field average x 0.9 / 1 / 1.1.
 - Site: Organizer page → "Equalize the field" (areas can be switched off, a per-team preview of budget, HQ levels, designer and mechanics averages).
 - Tests: `test/equalize.test.ts` (every team equal after a reload of League Test 10; drivers and spec parts untouched; organizer-only queue).
 - Not yet seen in game: an equalized save loading and racing.

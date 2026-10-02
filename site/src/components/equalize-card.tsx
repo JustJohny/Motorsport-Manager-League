@@ -1,6 +1,6 @@
-import { Building2, Car, Coins, HardHat, Loader2, RotateCcw, Scale, Timer, User, Wrench, X, type LucideIcon } from "lucide-react"
+import { Building2, Car, Coins, HardHat, Loader2, RotateCcw, Scale, SignalHigh, SignalLow, SignalMedium, Timer, User, Wrench, X, type LucideIcon } from "lucide-react"
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react"
-import { fieldDefaults } from "../../../src/equalize.ts"
+import { fieldDefaults, presetSettings, type Preset } from "../../../src/equalize.ts"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -62,6 +62,7 @@ export function EqualizeCard() {
   const defaults = useMemo(() => fieldDefaults(teams, snap.championship.pitCrew?.aiLevel ?? 10), [teams, snap])
   const [s, setS] = useState<EqualizeSettings>(defaults)
   const [on, setOn] = useState<Record<Area, boolean>>({ budget: true, hq: true, parts: true, leadDesigner: true, mechanics: true, pitCrew: true })
+  const [preset, setPreset] = useState<Preset | "field" | null>("field")
   const [queued, setQueued] = useState<Queued | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -131,6 +132,17 @@ export function EqualizeCard() {
             <Button size="sm" variant="ghost" className="ml-auto" disabled={busy} onClick={() => void cancel()}><X /> Cancel</Button>
           </div>
         )}
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-sm text-muted-foreground">Start from</span>
+          {(["low", "medium", "high"] as Preset[]).map((p) => (
+            <Button key={p} size="sm" variant={preset === p ? "default" : "outline"} onClick={() => { setS(presetSettings(p, defaults, maxLevel)); setPreset(p) }}>
+              {p === "low" ? <SignalLow /> : p === "medium" ? <SignalMedium /> : <SignalHigh />} {p[0].toUpperCase() + p.slice(1)}
+            </Button>
+          ))}
+          <Button size="sm" variant={preset === "field" ? "default" : "outline"} onClick={() => { setS(defaults); setPreset("field") }}><RotateCcw /> Field averages</Button>
+          <span className="text-xs text-muted-foreground">then adjust any value.</span>
+        </div>
 
         <div className="grid gap-3 lg:grid-cols-2">
           <Section area={AREAS[0]} on={on.budget} onToggle={() => setOn((o) => ({ ...o, budget: !o.budget }))}>
@@ -226,7 +238,6 @@ export function EqualizeCard() {
           <Button disabled={busy || invalid} onClick={() => void queue()}>
             {busy ? <Loader2 className="animate-spin" /> : <Scale />} {queued ? "Replace the queued equalization" : "Queue for the next apply"}
           </Button>
-          <Button variant="ghost" disabled={busy} onClick={() => { setS(defaults); setError(null) }}><RotateCcw /> Field averages</Button>
           {invalid && <span className="text-xs text-destructive">Fill in every value of the areas you equalize.</span>}
         </div>
       </CardContent>

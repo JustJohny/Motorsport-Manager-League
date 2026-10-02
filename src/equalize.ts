@@ -51,3 +51,41 @@ export function fieldDefaults(teams: { pub: TeamPublic; priv: TeamPrivate | unde
     pitCrew: { skill: mechanics.pitStops || r1(aiPitLevel), confidence: 0.85 },
   };
 }
+
+export type Preset = "low" | "medium" | "high";
+
+/** The presets' fixed values (see presetSettings). */
+export const PRESETS: Record<Preset, {
+  budget: number; hq: number; staff: number; pit: { skill: number; confidence: number };
+  partStat: number; reliability: number; maxReliability: number; maxPerformance: number; level: number; developmentRate: number;
+}> = {
+  low: { budget: 10_000_000, hq: 0, staff: 6, pit: { skill: 6, confidence: 0.75 }, partStat: 0.9, reliability: 0.6, maxReliability: 0.65, maxPerformance: 10, level: 1, developmentRate: 0.6 },
+  medium: { budget: 25_000_000, hq: 0.5, staff: 10, pit: { skill: 10, confidence: 0.85 }, partStat: 1, reliability: 0.75, maxReliability: 0.8, maxPerformance: 20, level: 2, developmentRate: 0.75 },
+  high: { budget: 50_000_000, hq: 1, staff: 15, pit: { skill: 15, confidence: 0.95 }, partStat: 1.1, reliability: 0.9, maxReliability: 0.95, maxPerformance: 30, level: 3, developmentRate: 0.9 },
+};
+
+/** Buildings a team can't do without: Low keeps them at level 1. */
+const CORE_BUILDINGS = ["Design Centre", "Factory"];
+
+/**
+ * A preset as equalize settings, for the buildings and part types in `field` (the field averages).
+ * Everything is fixed except part performance: its scale depends on the series, so it's the
+ * field average x 0.9 / 1 / 1.1. HQ: Low = core buildings at 1, Medium = half of each building's
+ * max, High = max.
+ */
+export function presetSettings(preset: Preset, field: EqualizeSettings, maxLevel: (building: string) => number): EqualizeSettings {
+  const p = PRESETS[preset];
+  const stats = (keys: Record<string, number> | undefined) => Object.fromEntries(Object.keys(keys ?? {}).map((k) => [k, p.staff]));
+  return {
+    budget: p.budget,
+    hq: Object.fromEntries(Object.keys(field.hq ?? {}).map((b) => [b,
+      preset === "low" ? (CORE_BUILDINGS.includes(b) ? 1 : 0) : Math.round(maxLevel(b) * p.hq)])),
+    parts: Object.fromEntries(Object.entries(field.parts ?? {}).map(([type, v]) => [type, {
+      stat: r1(v.stat * p.partStat), maxPerformance: p.maxPerformance, reliability: p.reliability, maxReliability: p.maxReliability, level: p.level,
+    }])),
+    developmentRate: p.developmentRate,
+    leadDesigner: stats(field.leadDesigner),
+    mechanics: stats(field.mechanics),
+    pitCrew: { ...p.pit },
+  };
+}

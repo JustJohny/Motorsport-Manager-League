@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { applyChanges } from "../src/apply.ts";
 import { pack, parseLossless, stringifyLossless, unpack } from "../src/codec/sav.ts";
-import { fieldDefaults } from "../src/equalize.ts";
+import { fieldDefaults, presetSettings } from "../src/equalize.ts";
 import { extractLeague } from "../src/extract.ts";
 import { Save } from "../src/model.ts";
 import { carPartDesign } from "../src/ops/design.ts";
@@ -26,6 +26,23 @@ function reload(save: Save): Save {
   const raw = unpack(pack({ version: f.version, headerText: stringifyLossless(f.header), dataText: stringifyLossless(f.data) }));
   return new Save({ version: raw.version, header: parseLossless(raw.headerText), data: parseLossless(raw.dataText) });
 }
+
+describe("equalize presets", () => {
+  const field = {
+    hq: { "Design Centre": 1, Factory: 2, "Wind Tunnel": 0 },
+    parts: { FrontWing: { stat: 150, maxPerformance: 20, reliability: 0.6, maxReliability: 0.62, level: 2 } },
+    leadDesigner: { topSpeed: 9, braking: 8 }, mechanics: { pitStops: 10 },
+  };
+  const max = (b: string) => (b === "Wind Tunnel" ? 3 : 4);
+  it("uses fixed values, part performance scaled from the field", () => {
+    const low = presetSettings("low", field, max), high = presetSettings("high", field, max);
+    expect(low).toMatchObject({ budget: 10_000_000, hq: { "Design Centre": 1, Factory: 1, "Wind Tunnel": 0 }, leadDesigner: { topSpeed: 6, braking: 6 }, pitCrew: { skill: 6 } });
+    expect(presetSettings("medium", field, max).hq).toEqual({ "Design Centre": 2, Factory: 2, "Wind Tunnel": 2 });
+    expect(high).toMatchObject({ budget: 50_000_000, hq: { "Design Centre": 4, Factory: 4, "Wind Tunnel": 3 }, mechanics: { pitStops: 15 } });
+    expect(low.parts!.FrontWing).toEqual({ stat: 135, maxPerformance: 10, reliability: 0.6, maxReliability: 0.65, level: 1 });
+    expect(high.parts!.FrontWing.stat).toBe(165);
+  });
+});
 
 describe.skipIf(!existsSync(LT10))("equalizing the field", () => {
   it("makes every team's HQ, car, staff, crew and budget equal, drivers untouched", () => {
