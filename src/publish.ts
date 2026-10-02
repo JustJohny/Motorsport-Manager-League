@@ -11,9 +11,9 @@ export function splitSnapshot(state: LeagueState): SplitSnapshot {
       extractedAt: state.extractedAt,
       gameDate: state.gameDate,
       championship: state.championship,
-      teams: state.teams.map(({ budget, hq, parts, design, ...pub }) => pub),
+      teams: state.teams.map(({ budget, hq, parts, design, gameCrew, ...pub }) => pub),
     },
-    teams: state.teams.map(({ name, budget, hq, parts, design }) => ({ team: name, private: { budget, hq, parts, design } })),
+    teams: state.teams.map(({ name, budget, hq, parts, design, gameCrew }) => ({ team: name, private: { budget, hq, parts, design, gameCrew } })),
     freeAgents: state.freeAgents,
   };
 }

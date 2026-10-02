@@ -127,6 +127,50 @@ export interface Championship {
   rulesBreaches?: RulesBreach[];
   /** Rules and the season's votes. Missing in snapshots published before 2026-10-01. */
   regulations?: Regulations;
+  /** The series' pit crew rule. Missing in snapshots published before 2026-10-02. */
+  pitCrew?: PitCrewRules;
+  /** Every team's pit stops per finished round (MM's log), fastest first. Missing before 2026-10-02. */
+  pitStops?: PitStopRound[];
+}
+
+export interface PitCrewRules {
+  /** ChampionshipRules.pitCrewSize. */
+  size: "Small" | "Large" | "SemiSequential";
+  refuelling: boolean;
+  /** The positions (PitCrewRole 0..9) used in this series. */
+  roles: number[];
+  /** The field's average AI pit stop skill (mechanics' Pit stops stat): member crews start here. */
+  aiLevel: number;
+}
+
+export interface PitStopRound {
+  round: number;
+  teams: { team: string; stops: number; fastest: number; average: number; mistakes: number; catastrophic: number; fire: boolean }[];
+}
+
+/** One person of the career team's real MM crew (read-only on the site). */
+export interface GameCrewPerson {
+  name: string;
+  nationality: string | null;
+  birth: string;
+  /** PitCrewRole 0..9, 11 = reserve. */
+  role: number;
+  /** By PitCrewStatType: Tyres, FrontJack, RearJack, FixingParts, Refuelling. */
+  stats: number[];
+  confidence: number;
+  maxConfidence: number;
+  /** Per race. */
+  wage: number;
+  racesLeft: number;
+}
+
+/** The career team's crew, which MM runs (only the player's team has real crew people). */
+export interface GameCrew {
+  /** PitCrewController.PitCrewFunding: 0 Low, 1 Medium, 2 High. */
+  funding: number;
+  members: GameCrewPerson[];
+  /** racesLeft here is how long the application stays open. */
+  applicants: GameCrewPerson[];
 }
 
 export type BuildingState = "NotBuilt" | "BuildingInProgress" | "Constructed" | "Upgrading";
@@ -332,6 +376,8 @@ export interface TeamState {
   parts: Record<string, Part[]>;
   /** Part design, fitting and improvement (single-seater series only). */
   design: TeamDesign | null;
+  /** The career team's real MM crew; null for AI teams. Missing in snapshots published before 2026-10-02. */
+  gameCrew?: GameCrew | null;
   staff: StaffSlot[];
 }
 
@@ -347,8 +393,8 @@ export interface LeagueState {
  * What every league member may see about a team. Budget, HQ and parts stay private to the
  * team's member (and the organizer), as MM itself hides them for rival teams.
  */
-export type TeamPublic = Omit<TeamState, "budget" | "hq" | "parts" | "design">;
-export type TeamPrivate = Pick<TeamState, "budget" | "hq" | "parts" | "design">;
+export type TeamPublic = Omit<TeamState, "budget" | "hq" | "parts" | "design" | "gameCrew">;
+export type TeamPrivate = Pick<TeamState, "budget" | "hq" | "parts" | "design" | "gameCrew">;
 
 export interface PublicSnapshot {
   extractedAt: string;

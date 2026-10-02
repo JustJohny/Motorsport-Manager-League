@@ -3,6 +3,7 @@ import type {
   Building, CalendarEvent, Championship, LeagueConfig, LeagueState, Part, Person, RaceResults, RulesBreach, SessionResult, TeamDesign, TeamState,
 } from "./league-types.ts";
 import { teamDesign } from "./ops/design.ts";
+import { gameCrew, pitCrewRules, pitStopLog } from "./ops/pit-crew.ts";
 import { extractRegulations } from "./regulations.ts";
 import { currentSuppliers, nextCarSeason, nextYearDesignState, seasonOver, supplierOptions } from "./ops/suppliers.ts";
 import { BUILDING_STATES, JOBS, PART_TYPES, Save, numOrNull, personKind, personName, type PartType } from "./model.ts";
@@ -41,6 +42,8 @@ export function extractLeague(save: Save, cfg: LeagueConfig): LeagueState {
       races: raceResults(save, champ),
       rulesBreaches: rulesBreaches(save, champ).map(({ part: _p, partType: _t, ...b }) => b),
       regulations: extractRegulations(save, champ, new Set(memberTeams.map((m) => m.team.name as string))),
+      pitCrew: pitCrewRules(save, champ),
+      pitStops: pitStopLog(save, champ),
     },
     teams: teamsInChamp.map((t) => team(save, t, champ, memberOf.get(t) ?? null)),
     freeAgents: save.people().filter((p) => save.isFreeAgent(p)).map((p) => person(save, p)),
@@ -63,6 +66,7 @@ function team(save: Save, t: Obj, champ: Obj, member: string | null): TeamState 
     hq: save.buildings(t).map((b) => building(save, b)),
     parts: Object.fromEntries(partTypes.map((type) => [type, save.parts(t, type).map((p) => part(save, p))])),
     design: champ.series === 0 ? withRules(save, t, champ, teamDesign(save, t)) : null,
+    gameCrew: gameCrew(save, t),
     staff: save.slots(t).map((s) => {
       const p = s.personHired ? save.g.deref<Obj>(s.personHired) : null;
       return { slotID: s.slotID, job: JOBS[s.jobType] ?? String(s.jobType), person: p ? person(save, p) : null };

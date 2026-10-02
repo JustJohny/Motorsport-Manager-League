@@ -18,6 +18,7 @@ import { TransfersPage } from "@/pages/transfers"
 import { TransfersProvider } from "@/lib/transfers"
 import { HqOrdersProvider } from "@/lib/hq"
 import { PartsProvider } from "@/lib/parts"
+import { PitCrewProvider } from "@/lib/pit-crew"
 
 function Shell() {
   const { me, league } = useLeague()
@@ -62,7 +63,9 @@ export default function App() {
             <TransfersProvider>
               <HqOrdersProvider>
                 <PartsProvider>
-                  <Shell />
+                  <PitCrewProvider>
+                    <Shell />
+                  </PitCrewProvider>
                 </PartsProvider>
               </HqOrdersProvider>
             </TransfersProvider>

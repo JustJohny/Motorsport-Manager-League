@@ -13,6 +13,8 @@ import { cancelUnorderedChange, fetchHqContext, fetchQueuedOrders, hqChanges, ma
 import type { LeagueSettings } from "./league-rules.ts";
 import { choiceChanges, designChanges, fetchPartsContext, markDesignsApplied, undoAiParts } from "./part-orders.ts";
 import { engineSpendChanges, fetchEngineSpend, fetchSupplierContext, markEngineSpendApplied, supplierChanges } from "./engine-orders.ts";
+import { crewChanges, crewSpendChanges, crewUpdates, fetchCrewContext, fetchCrewSpend, markCrewSpendApplied, saveCrewUpdates } from "./crew-orders.ts";
+import { crewNamePool } from "./ops/pit-crew.ts";
 import { fetchRegulationContext, recordVoteResults, regulationChanges } from "./rule-votes.ts";
 import { rest, supabaseEnv, type SupabaseEnv } from "./supabase.ts";
 import { fetchWindow, markApplied, windowChanges, winners } from "./transfers.ts";
@@ -175,7 +177,8 @@ switch (cmd) {
     const input = savePath(args[0]);
     if (!opt.league) fail("publish needs --league league.json");
     const cfg = JSON.parse(readFileSync(opt.league, "utf8")) as LeagueConfig;
-    const state = extractLeague(Save.load(input), cfg);
+    const save = Save.load(input);
+    const state = extractLeague(save, cfg);
     const split = splitSnapshot(state);
     const members = memberRows(cfg, state);
     const ch = state.championship;
@@ -185,6 +188,13 @@ switch (cmd) {
     if (opt["dry-run"]) break;
     const env = seriesEnv(cfg);
     console.log(`published snapshot #${await publish(env, members, split, cfg.series?.name)} to series "${env.series}"`);
+    // Member pit crews: starting crews for new member teams, then every race since the last publish.
+    const crew = crewUpdates(state, await fetchCrewContext(env), env.series!, crewNamePool(save));
+    await saveCrewUpdates(env, crew);
+    for (const u of crew) {
+      const costs = u.spend.reduce((s, x) => s + x.amount, 0);
+      console.log(`  Pit crew ${u.team}: ${u.log.map((l) => l.message).join("; ") || "races processed"}${costs ? `, costs $${costs.toLocaleString()}` : ""}`);
+    }
     break;
   }
   case "pull": {
@@ -251,6 +261,18 @@ switch (cmd) {
       if (r.results.length) notes.push(`${r.results.length} rule vote${r.results.length > 1 ? "s" : ""}`);
     }
 
+    // Member pit crews: their skills into MM's per-task values (a standing choice, re-applied every
+    // time), then their wages, funding and sign-on fees.
+    const crewCtx = await fetchCrewContext(env);
+    const crewOps = crewChanges(crewCtx, reg.snapshot?.championship.pitCrew?.roles ?? []);
+    for (const c of crewOps) if (c.op === "setPitCrew") console.log(`  Pit crew ${c.team}: ${c.tasks.map((x) => `task ${x.target} ${x.stat}/${x.confidence}`).join(", ")}`);
+    changes.push(...crewOps);
+    const crewSpend = await fetchCrewSpend(env);
+    for (const r of crewSpend) console.log(`  Crew: ${r.team} ${r.description} $${Number(r.amount).toLocaleString()}`);
+    changes.push(...crewSpendChanges(crewSpend));
+    if (crewOps.length) notes.push(`${crewOps.length} pit crew${crewOps.length > 1 ? "s" : ""}`);
+    if (crewSpend.length) notes.push(`${crewSpend.length} crew payment${crewSpend.length > 1 ? "s" : ""}`);
+
     let windowDone = false;
     if (!w) console.log("Transfer window: none waiting");
     else if (new Date(w.window.closes_at) > new Date() && !opt.force) {
@@ -277,6 +299,7 @@ switch (cmd) {
       await markDesignsApplied(env, parts.queued.map((o) => o.id));
       await recordVoteResults(env, voteResults);
       await markEngineSpendApplied(env, engineSpend.map((r) => r.id));
+      await markCrewSpendApplied(env, crewSpend.map((r) => r.id));
       if (windowDone && w) await markApplied(env, w.window.id);
       console.log(`marked as applied: ${notes.join(" + ") || "nothing"}`);
     }

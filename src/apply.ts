@@ -14,10 +14,11 @@ import { addPart, fitPart, removePart, type AddPartOp, type FitPartOp, type Remo
 import { hire, type HireOp } from "./ops/staff.ts";
 import { renamePerson, type RenamePersonOp } from "./ops/people.ts";
 import { syncTeam, type SyncTeamOp } from "./ops/sync.ts";
+import { setPitCrew, type SetPitCrewOp } from "./ops/pit-crew.ts";
 
 export type Change = SetBuildingOp | StartBuildingOp | CancelBuildingOp | CancelUnorderedHqOp | SetBudgetOp | AdjustBudgetOp | AddPartOp | RemovePartOp | FitPartOp | HireOp | SyncTeamOp
   | StartDesignOp | CancelDesignOp | CancelUnorderedDesignsOp | RemoveUnorderedPartsOp | SetFittingOp | SetImprovementOp
-  | ConcludeVoteOp | SetNextRuleOp | SetSuppliersOp | RenamePersonOp;
+  | ConcludeVoteOp | SetNextRuleOp | SetSuppliersOp | RenamePersonOp | SetPitCrewOp;
 
 export interface ChangeSet {
   /** Optional note, e.g. "Before round 6 - Munich". */
@@ -62,6 +63,7 @@ function run(save: Save, c: Change): string | string[] {
     case "concludeVote": return concludeVote(save, c);
     case "setNextRule": return setNextRule(save, c);
     case "setSuppliers": return setSuppliers(save, c);
+    case "setPitCrew": return setPitCrew(save, c);
     default: throw new Error(`Unknown op ${(c as { op: string }).op}`);
   }
 }

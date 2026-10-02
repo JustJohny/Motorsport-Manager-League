@@ -118,7 +118,7 @@ export function RaceCycle() {
       <Badge variant="outline" className="gap-1"><PencilRuler className="size-3" /> {designs.length} part design{designs.length === 1 ? "" : "s"}</Badge>
       <Badge variant="outline" className="gap-1"><Hammer className="size-3" /> {hq.length} HQ order{hq.length === 1 ? "" : "s"}</Badge>
       <Badge variant="outline" className="gap-1"><Gavel className="size-3" /> {w && w.status !== "applied" ? `window #${w.id} ${t.isOpen ? "open" : "closed"}` : "no window"}</Badge>
-      <Badge variant="outline" className="gap-1"><Wrench className="size-3" /> fitting and improvement: always</Badge>
+      <Badge variant="outline" className="gap-1"><Wrench className="size-3" /> fitting, improvement and pit crews: always</Badge>
     </div>
   )
 
@@ -171,17 +171,18 @@ export function RaceCycle() {
               </Step>
               <Step n={2} icon={Upload} title="Publish it" done={current === "after"}>
                 <CopyCommand command={cmd.publish(post)} />
+                It also runs the race for member pit crews: wages and funding, training, contracts, confidence from MM's pit stop mistakes and new applicants.
                 {current === "after" && <span className="text-xs">{published}</span>}
               </Step>
               <Step n={3} icon={Gavel} title="Transfer window (optional)">
                 Open one with the controls on this page. Give it a deadline before step 5: bids are only pulled once it has passed.
               </Step>
               <Step n={4} icon={Users} title="Tell the members they can act">
-                Part designs, HQ orders, bids, fitting and improvement.
+                Part designs, HQ orders, bids, fitting and improvement, and their pit crews.
               </Step>
               <Step n={5} icon={Download} title="Pull their decisions">
                 <CopyCommand command={cmd.pull} />
-                It prints the designs, HQ orders, fitting and signings. The first changes undo what MM's AI did on member teams; that's expected.
+                It prints the designs, HQ orders, fitting, pit crews and signings. The first changes undo what MM's AI did on member teams; that's expected.
               </Step>
               <Step n={6} icon={Wrench} title="Apply them to the save you published">
                 <CopyCommand command={cmd.apply(post)} />
@@ -199,7 +200,8 @@ export function RaceCycle() {
                 {current === "before" && <span className="text-xs">{published}</span>}
               </Step>
               <Step n={2} icon={Users} title="Tell the members their new parts are in">
-                They fit them (car 1 / car 2) and pick improvements. New designs, HQ orders and bids placed now start at this apply.
+                They fit them (car 1 / car 2), pick improvements and set their pit crew. New designs, HQ orders and bids placed now start at this apply.
+                This apply writes each member crew into MM's pit stop tasks for the race, so don't skip it.
               </Step>
               <Step n={3} icon={Download} title="Pull their decisions">
                 <CopyCommand command={cmd.pull} />

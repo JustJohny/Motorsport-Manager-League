@@ -16,6 +16,7 @@ import { fmtDate, fmtMoney, fmtMoneyShort, fmtNum, fmtPct, humanize } from "@/li
 import { useHqOrders } from "@/lib/hq"
 import { useLeague } from "@/lib/league"
 import { effectiveFitting, isAiDesign, isAiPart, useParts } from "@/lib/parts"
+import { usePitCrew } from "@/lib/pit-crew"
 import { useTransfers } from "@/lib/transfers"
 import { cn } from "@/lib/utils"
 import type { DesignComponent, Part, PartDesignOptions, TeamPrivate } from "@/lib/types"
@@ -161,14 +162,16 @@ function BudgetStrip({ budget }: { budget: number }) {
   const { me } = useLeague()
   const hq = useHqOrders().committed(me.team)
   const parts = useParts().committed(me.team)
+  const crew = usePitCrew().committed(me.team)
   const bids = useTransfers().committed
   return (
     <div className="flex flex-wrap items-center gap-x-6 gap-y-1 rounded-lg bg-muted/50 px-4 py-2 text-sm tabular-nums">
       <span className="flex items-center gap-1.5"><Coins className="size-4 text-muted-foreground" /><span className="text-muted-foreground">Budget</span> {fmtMoneyShort(budget)}</span>
       {parts > 0 && <span><span className="text-muted-foreground">Queued design </span>−{fmtMoneyShort(parts)}</span>}
       {hq > 0 && <span><span className="text-muted-foreground">HQ orders </span>−{fmtMoneyShort(hq)}</span>}
+      {crew > 0 && <span><span className="text-muted-foreground">Crew costs </span>−{fmtMoneyShort(crew)}</span>}
       {bids > 0 && <span><span className="text-muted-foreground">Leading bids </span>−{fmtMoneyShort(bids)}</span>}
-      <span className="font-medium"><span className="text-muted-foreground">Available </span>{fmtMoneyShort(budget - hq - parts - bids)}</span>
+      <span className="font-medium"><span className="text-muted-foreground">Available </span>{fmtMoneyShort(budget - hq - parts - crew - bids)}</span>
     </div>
   )
 }

@@ -1,5 +1,5 @@
 import type { ChangeSet } from "./apply.ts";
-import type { Regulations } from "./league-types.ts";
+import type { PitCrewRules, Regulations } from "./league-types.ts";
 import { castVotes, tallyVote, votesClosingNow, type OverrideRow, type RuleVoteRow, type VoteResultRow } from "./politics.ts";
 import { rest, type SupabaseEnv } from "./supabase.ts";
 
@@ -30,7 +30,7 @@ export function regulationChanges(
 
 export async function fetchRegulationContext(env: SupabaseEnv) {
   const [[snap], rows, overrides, decided] = await Promise.all([
-    rest<{ public: { gameDate: string; championship: { id: number; calendar: { date: string; ended: boolean }[]; regulations?: Regulations } } }[]>(
+    rest<{ public: { gameDate: string; championship: { id: number; calendar: { date: string; ended: boolean }[]; regulations?: Regulations; pitCrew?: PitCrewRules } } }[]>(
       env, "GET", "snapshots?select=public&order=id.desc&limit=1"),
     rest<RuleVoteRow[]>(env, "GET", "rule_votes?select=*"),
     rest<OverrideRow[]>(env, "GET", "next_rule_overrides?select=*"),

@@ -1,4 +1,4 @@
-import { ChevronRight, Siren } from "lucide-react"
+import { ChevronRight, Flame, Siren, Timer } from "lucide-react"
 import { useSearchParams } from "react-router"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -7,7 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/page-header"
 import { fmtDate, fmtMoney, fmtTime } from "@/lib/format"
 import { useLeague } from "@/lib/league"
-import type { SessionResult } from "@/lib/types"
+import type { PitStopRound, SessionResult } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
 export function ResultsPage() {
@@ -77,12 +77,16 @@ export function ResultsPage() {
                 <TabsList>
                   <TabsTrigger value="race">Race</TabsTrigger>
                   <TabsTrigger value="qualifying">Grid</TabsTrigger>
+                  <TabsTrigger value="pits">Pit stops</TabsTrigger>
                 </TabsList>
                 <TabsContent value="race">
                   <ResultTable rows={race.race} myTeam={me.team} kind="race" />
                 </TabsContent>
                 <TabsContent value="qualifying">
                   <ResultTable rows={qualifying} myTeam={me.team} kind="grid" />
+                </TabsContent>
+                <TabsContent value="pits">
+                  <PitStopTable round={race.round} rounds={ch.pitStops} myTeam={me.team} />
                 </TabsContent>
               </Tabs>
             </CardContent>
@@ -172,5 +176,49 @@ function ResultTable({ rows, myTeam, kind }: { rows: SessionResult[]; myTeam: st
         ))}
       </TableBody>
     </Table>
+  )
+}
+
+/** MM's pit stop log for a round: every team's fastest and average stop, and its mistakes. */
+function PitStopTable({ round, rounds, myTeam }: { round: number; rounds?: PitStopRound[]; myTeam: string }) {
+  if (!rounds) return <p className="py-2 text-sm text-muted-foreground">Pit stop times appear after the organizer's next publish.</p>
+  const rows = rounds.find((r) => r.round === round)?.teams ?? []
+  const best = rounds.flatMap((r) => r.teams.map((t) => ({ ...t, round: r.round }))).sort((a, b) => a.fastest - b.fastest)[0]
+  if (!rows.length) return <p className="py-2 text-sm text-muted-foreground">No pit stops were made in this race.</p>
+  return (
+    <div className="flex flex-col gap-2">
+      {best && (
+        <p className="flex items-center gap-1.5 pt-1 text-xs text-muted-foreground">
+          <Timer className="size-3.5" /> Season's fastest stop: <strong className="font-medium text-foreground">{best.fastest.toFixed(2)} s</strong> by {best.team} (round {best.round})
+        </p>
+      )}
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-10">#</TableHead>
+            <TableHead>Team</TableHead>
+            <TableHead className="text-right">Fastest</TableHead>
+            <TableHead className="text-right">Average</TableHead>
+            <TableHead className="text-right">Stops</TableHead>
+            <TableHead className="text-right">Mistakes</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {rows.map((r, i) => (
+            <TableRow key={r.team} className={cn(r.team === myTeam && "bg-primary/10")}>
+              <TableCell className="tabular-nums">{i + 1}</TableCell>
+              <TableCell className="font-medium">{r.team}</TableCell>
+              <TableCell className="text-right tabular-nums">{r.fastest.toFixed(2)} s</TableCell>
+              <TableCell className="text-right tabular-nums">{r.average.toFixed(2)} s</TableCell>
+              <TableCell className="text-right tabular-nums">{r.stops}</TableCell>
+              <TableCell className="text-right tabular-nums">
+                {r.mistakes || "—"}
+                {r.fire && <Flame className="ml-1 inline size-3.5 text-destructive" aria-label="Fire in the pit box" />}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   )
 }

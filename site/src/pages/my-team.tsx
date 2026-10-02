@@ -10,10 +10,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/page-header"
 import { PartsTab } from "@/components/parts-tab"
+import { PitCrewTab } from "@/components/pit-crew-tab"
 import { PersonCard } from "@/components/person-card"
 import { fmtDate, fmtMoney, fmtMoneyShort, fmtPct } from "@/lib/format"
 import { useHqOrders } from "@/lib/hq"
 import { useParts } from "@/lib/parts"
+import { usePitCrew } from "@/lib/pit-crew"
 import { nextHqStep, unorderedProject } from "@/lib/rules"
 import { useTransfers } from "@/lib/transfers"
 import { cn } from "@/lib/utils"
@@ -63,12 +65,14 @@ export function MyTeamPage() {
           <TabsTrigger value="staff">Staff</TabsTrigger>
           <TabsTrigger value="hq">HQ</TabsTrigger>
           <TabsTrigger value="parts">Parts</TabsTrigger>
+          <TabsTrigger value="crew">Pit crew</TabsTrigger>
         </TabsList>
         <TabsContent value="staff" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {people.map((s) => <PersonCard key={s.slotID} person={s.person!} role={s.job} gameDate={league.snapshot.gameDate} />)}
         </TabsContent>
         <TabsContent value="hq">{priv ? <HqTable hq={priv.hq} own={name === me.team} team={name} /> : <PrivateNote />}</TabsContent>
         <TabsContent value="parts">{priv ? <PartsTab priv={priv} team={name} own={name === me.team} /> : <PrivateNote />}</TabsContent>
+        <TabsContent value="crew">{priv ? <PitCrewTab priv={priv} team={name} own={name === me.team} /> : <PrivateNote />}</TabsContent>
       </Tabs>
     </>
   )
@@ -115,7 +119,8 @@ function HqTable({ hq, own, team }: { hq: TeamPrivate["hq"]; own: boolean; team:
   const budget = league.privateTeams[me.team]?.budget ?? 0
   const hqCommitted = h.committed(me.team)
   const designCommitted = useParts().committed(me.team)
-  const available = budget - hqCommitted - designCommitted - t.committed
+  const crewCommitted = usePitCrew().committed(me.team)
+  const available = budget - hqCommitted - designCommitted - crewCommitted - t.committed
   const speed = Number(t.settings.hq_speed ?? 1)
   const days = (weeks: number) => weeks * 7 * speed
   // Races are about four weeks apart.
@@ -132,6 +137,7 @@ function HqTable({ hq, own, team }: { hq: TeamPrivate["hq"]; own: boolean; team:
           <span><span className="text-muted-foreground">Budget </span>{fmtMoneyShort(budget)}</span>
           <span><span className="text-muted-foreground">Queued HQ orders </span>−{fmtMoneyShort(hqCommitted)}</span>
           {designCommitted > 0 && <span><span className="text-muted-foreground">Queued design </span>−{fmtMoneyShort(designCommitted)}</span>}
+          {crewCommitted > 0 && <span><span className="text-muted-foreground">Crew costs </span>−{fmtMoneyShort(crewCommitted)}</span>}
           {t.committed > 0 && <span><span className="text-muted-foreground">Leading bids </span>−{fmtMoneyShort(t.committed)}</span>}
           <span className="font-medium"><span className="text-muted-foreground">Available </span>{fmtMoneyShort(available)}</span>
           <span className="text-xs text-muted-foreground">Orders are paid and started in game before the next race; building takes MM's own time.</span>
