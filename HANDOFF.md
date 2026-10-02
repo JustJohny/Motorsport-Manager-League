@@ -312,6 +312,7 @@ npx tsx src/cli.ts validate "<save>"
 - **"No illegal option when designing a part":** grey-area components (Risk +1/+2) only exist at levels 3-5, and most teams' HQ only opens levels 1-2, so the site showed none. `designOptions` now also returns `lockedComponents` (published as `PartDesignOptions.lockedComponents`). The designer shows them greyed under their tier with a lock, marks every risky component "Grey area", and a hint line says how many are available or locked and which building opens them. **Needs a republish** to show locked components.
 - Phone: the designer's part-type tabs overlapped the spec note. The tab list kept shadcn's fixed `h-8` (the `group-data-horizontal` variant beats a plain `h-auto`), so it now uses `h-auto!`.
 - Every `Select` now opens downward (`position="popper"`, `align="start"` by default in `ui/select.tsx`); `item-aligned` put the selected team over the trigger, so the team list grew upward.
+- Phone sidebar: closes when a page or series is picked (`setOpenMobile(false)` in `app-sidebar.tsx`), and its close button shows again (`ui/sidebar.tsx` had hidden it with `[&>button]:hidden`).
 - Regulations page: "Regulations" and "Votes" sub-tabs, with the open vote count on the Votes tab.
 - Checked in demo mode with headless Chromium (phone and desktop, no console errors); `npm test` passes.
 

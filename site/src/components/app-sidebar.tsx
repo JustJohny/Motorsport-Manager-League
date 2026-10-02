@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent, SidebarGroupLabel, SidebarHeader,
-  SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem,
+  SidebarMenu, SidebarMenuBadge, SidebarMenuButton, SidebarMenuItem, useSidebar,
 } from "@/components/ui/sidebar"
 import { useLeague, useLeagueContext } from "@/lib/league"
 import { demoMode } from "@/lib/supabase"
@@ -29,6 +29,9 @@ export function AppSidebar() {
   const { theme, toggle } = useTheme()
   const { pathname } = useLocation()
   const transfers = useTransfers()
+  // On phones the sidebar is a sheet over the page: close it once something is picked.
+  const { isMobile, setOpenMobile } = useSidebar()
+  const closeMobile = () => isMobile && setOpenMobile(false)
   const ch = league.snapshot.championship
   const meta = session?.user.user_metadata ?? {}
   const displayName = (meta.custom_claims?.global_name as string | undefined) ?? me.discord_username
@@ -36,7 +39,7 @@ export function AppSidebar() {
 
   return (
     <Sidebar>
-      <SidebarHeader>
+      <SidebarHeader className={isMobile ? "pr-10" : undefined}>
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
@@ -58,7 +61,7 @@ export function AppSidebar() {
               <DropdownMenuContent align="start" className="w-(--radix-dropdown-menu-trigger-width) min-w-56">
                 <DropdownMenuLabel>Your series</DropdownMenuLabel>
                 {series.map((s) => (
-                  <DropdownMenuItem key={s.id} onSelect={() => s.id !== current.id && switchSeries(s.id)}>
+                  <DropdownMenuItem key={s.id} onSelect={() => { closeMobile(); if (s.id !== current.id) switchSeries(s.id) }}>
                     <Flag />
                     <div className="min-w-0 flex-1 leading-tight">
                       <div className="truncate">{s.name}</div>
@@ -80,7 +83,7 @@ export function AppSidebar() {
               {nav.map((n) => (
                 <SidebarMenuItem key={n.to}>
                   <SidebarMenuButton asChild isActive={pathname === n.to}>
-                    <NavLink to={n.to}>
+                    <NavLink to={n.to} onClick={closeMobile}>
                       <n.icon />
                       <span>{n.label}</span>
                     </NavLink>
