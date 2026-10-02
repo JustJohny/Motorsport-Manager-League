@@ -1,5 +1,5 @@
 import {
-  Bot, CalendarClock, Car, ChevronsUp, Gavel, Clock, Coins, Cog, Disc3, Fan, Fuel, Gauge, Hammer, HeartPulse, Layers, Loader2, Lock,
+  Bot, CalendarClock, Car, ChevronsUp, Gavel, Clock, Coins, Cog, Disc3, Eye, Fan, Fuel, Gauge, Hammer, HeartPulse, Layers, Loader2, Lock,
   Package, PencilRuler, Settings2, ShieldCheck, ShieldPlus, Siren, Sparkles, Star, Timer, TriangleAlert, User, Waves, Wind,
   WindArrowDown, Wrench, type LucideIcon,
 } from "lucide-react"
@@ -117,7 +117,14 @@ export function PartsTab({ priv, team, own }: { priv: TeamPrivate; team: string;
   const design = priv.design ?? null
   return (
     <div className="flex flex-col gap-4">
-      {own && <BudgetStrip budget={priv.budget ?? 0} />}
+      {own ? <BudgetStrip budget={priv.budget ?? 0} /> : (
+        <Alert>
+          <Eye />
+          <AlertDescription>
+            You're viewing {team}'s parts. Only its manager can order designs, fit parts or set improvements; switch to your own team to make changes.
+          </AlertDescription>
+        </Alert>
+      )}
       <Tabs defaultValue="design">
         <TabsList variant="line" className="h-auto! max-w-full flex-wrap justify-start gap-y-2">
           <TabsTrigger value="design"><PencilRuler /> Design a new part</TabsTrigger>
