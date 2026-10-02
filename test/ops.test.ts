@@ -383,6 +383,26 @@ describe.skipIf(!existsSync(SAVE))("operations on a real save", () => {
     if (ev) expect(ev.mDynamicDescription.translatedText.English).toContain("Kimi Räikkönen");
   }, 120_000);
 
+  it("renames free agents by name or GUID and adds a nationality only the game knows", () => {
+    const save = Save.load(SAVE);
+    const [a, b] = save.people().filter((p) => save.isFreeAgent(p) && save.g.list(save.data.driverManager.mEntities).includes(p));
+    expect(save.g.byId.size && [...save.g.byId.values()].some((o) => o.mCountryKey === "Monaco")).toBe(false);
+    applyChanges(save, { changes: [
+      { op: "renamePerson", person: a.name, firstName: "Charles", lastName: "Leclerc", nationality: "Monaco", dateOfBirth: "1997-10-16" },
+      { op: "renamePerson", person: b.id, firstName: "Stefano", lastName: "Coletti", nationality: "Monaco" },
+    ] });
+    expect(() => applyChanges(save, { changes: [{ op: "renamePerson", person: "Nobody Atall", firstName: "X", lastName: "Y" }] })).toThrow();
+
+    const reloaded = reload(save);
+    expect(reloaded.g.validate()).toEqual([]);
+    expect(typeProblems(reloaded)).toEqual([]);
+    const [ra, rb] = [reloaded.person(a.id), reloaded.person(b.id)];
+    expect([ra.name, rb.name]).toEqual(["Charles Leclerc", "Stefano Coletti"]);
+    expect(reloaded.g.deref<any>(ra.nationality)).toMatchObject({ mCountryKey: "Monaco", mCountryID: "PSG_10000999", mNationalityID: "PSG_10001195" });
+    // One shared country object, as MM itself stores them.
+    expect(reloaded.g.idOf(ra.nationality)).toBe(reloaded.g.idOf(rb.nationality));
+  }, 120_000);
+
   it("renames a team, keeping every reference to it", () => {
     const save = Save.load(SAVE);
     const id = save.team("Garuda Racing").teamID;

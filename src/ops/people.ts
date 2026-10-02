@@ -4,16 +4,19 @@ import { JOB, JOBS, NULL_DATE, personName, type Save } from "../model.ts";
 
 export interface RenamePersonOp {
   op: "renamePerson";
-  team: string | number;
+  /** With `slotID`: the team and seat of the person. */
+  team?: string | number;
   /** The team slot holding the person: drivers 0–2, lead designer 6, mechanics 7–8, scout 9, chairman 10, assistant 11, principal 12. */
-  slotID: number;
+  slotID?: number;
+  /** Instead of team + slot (e.g. for free agents): the driver, engineer or mechanic's current full name or GUID. */
+  person?: string;
   firstName: string;
   lastName: string;
   /** Defaults to "F. Last". */
   shortName?: string;
   /** Defaults to the first three letters of the last name, as MM writes them ("Ham"). */
   threeLetterName?: string;
-  /** A country key already used in the save, e.g. "UK", "Germany", "RussianFederation". */
+  /** A country key, e.g. "UK", "Germany", "RussianFederation": one in the save, or one of `GAME_COUNTRIES`. */
   nationality?: string;
   /** "YYYY-MM-DD". The peak-age date moves by the same amount, so the career curve keeps its shape. */
   dateOfBirth?: string;
@@ -28,15 +31,12 @@ const GENDER = { male: 0, female: 1 } as const;
  */
 export function renamePerson(save: Save, op: RenamePersonOp): string {
   const g = save.g;
-  const team = save.team(op.team);
-  const slot = save.slots(team).find((s) => s.slotID === op.slotID);
-  if (!slot?.personHired) throw new Error(`${team.name}: slot ${op.slotID} is empty`);
-  const p = g.deref<Obj>(slot.personHired);
+  const { p, where, isDriver } = findPerson(save, op);
   const oldName = p.name as string;
   const oldFull = personName(p);
   const name = `${op.firstName} ${op.lastName}`;
 
-  if (slot.jobType === JOB.Driver && name !== oldName) {
+  if (isDriver && name !== oldName) {
     const clash = g.list(save.data.driverManager.mEntities).find((d) => d !== p && d.name === name);
     if (clash) throw new Error(`Another driver is already called ${name}; mechanics key relationships by driver name`);
   }
@@ -47,7 +47,7 @@ export function renamePerson(save: Save, op: RenamePersonOp): string {
   p.mThreeLetterName = op.threeLetterName ?? threeLetters(op.lastName);
   p.name = name;
 
-  if (slot.jobType === JOB.Driver) {
+  if (isDriver) {
     for (const m of g.list(save.data.mechanicManager.mEntities)) {
       for (const key of ["mDictDriversRelationships", "mDictRelationshipModificationHistory"]) {
         if (m[key] && oldName in m[key]) m[key] = renameKey(m[key], oldName, name);
@@ -84,7 +84,22 @@ export function renamePerson(save: Save, op: RenamePersonOp): string {
     if (donor) p.portrait = { ...donor.portrait };
   }
 
-  return `${team.name}: ${JOBS[slot.jobType as number] ?? slot.jobType} ${oldName} → ${name}`;
+  return `${where} ${oldName} → ${name}`;
+}
+
+function findPerson(save: Save, op: RenamePersonOp): { p: Obj; where: string; isDriver: boolean } {
+  if (op.person != null) {
+    const matches = save.people().filter((x) => x.id === op.person || x.name === op.person || personName(x) === op.person);
+    if (matches.length !== 1) throw new Error(`${matches.length ? "Several people" : "Nobody"} called ${op.person}; use team + slotID or the GUID`);
+    const p = matches[0];
+    const isDriver = save.g.list(save.data.driverManager.mEntities).includes(p);
+    return { p, where: `${save.isFreeAgent(p) ? "free agent" : "person"}:`, isDriver };
+  }
+  if (op.team == null || op.slotID == null) throw new Error("renamePerson needs team + slotID, or person");
+  const team = save.team(op.team);
+  const slot = save.slots(team).find((s) => s.slotID === op.slotID);
+  if (!slot?.personHired) throw new Error(`${team.name}: slot ${op.slotID} is empty`);
+  return { p: save.g.deref<Obj>(slot.personHired), where: `${team.name}: ${JOBS[slot.jobType as number] ?? slot.jobType}`, isDriver: slot.jobType === JOB.Driver };
 }
 
 function threeLetters(lastName: string): string {
@@ -97,6 +112,14 @@ function renameKey(dict: Obj, from: string, to: string): Obj {
   return Object.fromEntries(Object.entries(dict).map(([k, v]) => [k === from ? to : k, v]));
 }
 
+/**
+ * Countries MM knows (its localisation has the country and nationality text) that a save may not
+ * hold yet; `nationality` adds one on first use. Continents follow MM's `Nationality.Continent`.
+ */
+export const GAME_COUNTRIES: Record<string, { continent: number; countryID: string; nationalityID: string }> = {
+  Monaco: { continent: 2, countryID: "PSG_10000999", nationalityID: "PSG_10001195" },
+};
+
 export function nationality(save: Save, key: string): Obj {
   // Search the id index too: a nationality whose definition sat inside an earlier renamee's
   // old reference is no longer in the tree until the next write pulls it back in.
@@ -104,8 +127,20 @@ export function nationality(save: Save, key: string): Obj {
   if (!found) walk(save.data, (o) => {
     if (!found && o.mCountryKey === key && o.mNationalityID) found = o;
   });
+  if (!found && GAME_COUNTRIES[key]) found = addNationality(save, key);
   if (!found) throw new Error(`No nationality "${key}" in the save`);
   return found;
+}
+
+/** A new nationality object, typed like the save's own ones. */
+function addNationality(save: Save, key: string): Obj {
+  const c = GAME_COUNTRIES[key];
+  const template = [...save.g.byId.values()].find((o) => o.mCountryKey && o.mNationalityID);
+  if (!template) throw new Error("No nationality in the save to copy");
+  const o: Obj = { mContinent: c.continent, mCountryKey: key, mCountryID: c.countryID, mNationalityID: c.nationalityID, $version: template.$version };
+  const runtime = save.types.runtime.get(template);
+  if (runtime) save.types.runtime.set(o, runtime);
+  return o;
 }
 
 /** Someone of `p`'s (new) gender and kind, picked by name so reruns choose the same face. */
