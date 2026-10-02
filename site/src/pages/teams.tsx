@@ -1,3 +1,4 @@
+import { Fan } from "lucide-react"
 import { Link } from "react-router"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,7 +15,7 @@ export function TeamsPage() {
 
   return (
     <>
-      <PageHeader title="Teams" description="Every team's line-up. HQ, parts and budget stay private." />
+      <PageHeader title="Teams" description="Every team's engine and line-up. HQ, parts and budget stay private." />
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {sorted.map((t) => {
           const s = byTeam.get(t.teamID)
@@ -34,6 +35,12 @@ export function TeamsPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="flex flex-col gap-1 text-sm">
+                {t.engine && (
+                  <div className="flex items-center justify-between gap-2 border-b pb-1">
+                    <span className="flex items-center gap-1.5 text-muted-foreground"><Fan className="size-3.5" /> Engine</span>
+                    <span className="truncate">{t.engine.name}</span>
+                  </div>
+                )}
                 {t.staff.filter((x) => x.person).map((x) => (
                   <div key={x.slotID} className="flex items-center justify-between gap-2">
                     <span className="truncate">

@@ -67,11 +67,17 @@ function team(save: Save, t: Obj, champ: Obj, member: string | null): TeamState 
     parts: Object.fromEntries(partTypes.map((type) => [type, save.parts(t, type).map((p) => part(save, p))])),
     design: champ.series === 0 ? withRules(save, t, champ, teamDesign(save, t)) : null,
     gameCrew: gameCrew(save, t),
+    engine: engineOf(save, t),
     staff: save.slots(t).map((s) => {
       const p = s.personHired ? save.g.deref<Obj>(s.personHired) : null;
       return { slotID: s.slotID, job: JOBS[s.jobType] ?? String(s.jobType), person: p ? person(save, p) : null };
     }).filter((s) => ["Driver", "EngineerLead", "Mechanic"].includes(s.job as string)),
   };
+}
+
+function engineOf(save: Save, t: Obj): TeamState["engine"] {
+  const e = currentSuppliers(save, t).Engine;
+  return e ? { name: e.name, stats: e.stats } : null;
 }
 
 function building(save: Save, b: Obj): Building {

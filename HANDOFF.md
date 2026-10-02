@@ -143,6 +143,7 @@ Steps 1–5 are done: Supabase is set up, Pages is deployed, and snapshots are p
   - `renameSupplier` (`src/ops/suppliers.ts`): every tier copy of a supplier, optional 50% works discount. Steinmann = Mercedes, Rossini = Ferrari, Kitano = Honda, Mersault = Renault (works discount for Renault), Hammer = "Ferrari 2015" (the user's pick for the fifth make).
   - `setCurrentSupplier`: swaps the supplier on this season's cars and shifts chassis stats by the supplier-stat difference. Engine parts keep their stats (MM adds the engine level modifier only in `NextYearCarDesign.DesignCompleted`), and no money moves (this career has no supplier payments; MM charges at next year's design start). 2016 deals: Mercedes → Mercedes, Williams, Force India, Manor; Ferrari → Ferrari, Sauber, Haas; Honda → McLaren; Renault → Renault, Red Bull; Ferrari 2015 → Toro Rosso (and SPEC Racing, unchanged).
   - Engine logos (`logoIndex`) are still MM's fictional ones. Next season MM's AI picks engines again.
+- **Engine shown on the site (2026-10-02):** the extract adds a public `engine` (this season's supplier name and stats) to every team. The Teams page lists it on each card, and the team page has an "Engine" stat with the supplier's stats. Read only. Needs a new `publish` to appear.
 
 ## How to work with it
 ```sh

@@ -1,4 +1,5 @@
 import { Loader2, Lock } from "lucide-react"
+import { SUPPLIER_STATS } from "../../../src/supplier-rules.ts"
 import { useState } from "react"
 import { Link, useParams } from "react-router"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
@@ -53,11 +54,12 @@ export function MyTeamPage() {
         }
       />
 
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
         <Stat label="Budget" value={priv ? fmtMoneyShort(priv.budget) : "Private"} hint={priv ? fmtMoney(priv.budget) : undefined} />
         <Stat label="Championship" value={standing ? `P${standing.position}` : "—"} hint={standing ? `${standing.points} pts` : undefined} />
         <Stat label="Wins · podiums" value={standing ? `${standing.wins} · ${standing.podiums}` : "—"} hint={standing ? `${standing.dnfs} DNFs` : undefined} />
         <Stat label="HQ buildings" value={priv ? String(built) : "Private"} hint={priv ? `of ${priv.hq.length}` : undefined} />
+        <Stat label="Engine" value={team.engine?.name ?? "—"} hint={team.engine ? engineHint(team.engine.stats) : undefined} />
       </div>
 
       <Tabs defaultValue="staff">
@@ -88,6 +90,12 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
       </CardHeader>
     </Card>
   )
+}
+
+/** The supplier's stats as MM's car screen lists them (only those it has). */
+function engineHint(stats: Record<number, number>) {
+  return Object.entries(stats).filter(([, v]) => v)
+    .map(([k, v]) => `${SUPPLIER_STATS[Number(k)] ?? `Stat ${k}`} ${v > 0 ? "+" : "−"}${Math.abs(v)}`).join(" · ") || "No stat bonuses"
 }
 
 function PrivateNote() {

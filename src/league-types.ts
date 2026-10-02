@@ -395,6 +395,11 @@ export interface TeamState {
   design: TeamDesign | null;
   /** The career team's real MM crew; null for AI teams. Missing in snapshots published before 2026-10-02. */
   gameCrew?: GameCrew | null;
+  /**
+   * This season's engine supplier on the team's cars. Public, as in MM's team screens. Missing in
+   * snapshots published before 2026-10-02.
+   */
+  engine?: { name: string; stats: Record<number, number> } | null;
   staff: StaffSlot[];
 }
 
