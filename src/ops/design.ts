@@ -89,6 +89,8 @@ export interface DesignOptions {
   /** Highest component level the team's HQ allows (1..5). */
   maxLevel: number;
   locked: { level: number; buildingType: number; buildingLevel: number }[];
+  /** This season's components the HQ doesn't open yet (shown greyed on the site; can't be ordered). */
+  lockedComponents: DesignComponent[];
 }
 
 /**
@@ -114,19 +116,21 @@ export function designOptions(save: Save, team: Obj, type: PartType): DesignOpti
   const engineerComps: Json[] = engineer?.availableComponents ?? [];
 
   const available: DesignOptions["available"] = [];
+  const lockedComponents: DesignComponent[] = [];
   let maxLevel = 0;
   for (const entry of cpd[COMPONENT_LISTS[type]!] as Obj[]) {
     const i = entry.Key as number;
-    if (!levelOpen(i)) continue;
-    maxLevel = Math.max(maxLevel, i + 1);
     const list = [...g.list<Obj>(entry.Value)];
     if (engineerComps[i]) list.unshift(g.deref<Obj>(engineerComps[i]));
+    if (levelOpen(i)) maxLevel = Math.max(maxLevel, i + 1);
     for (const obj of list) {
-      if (!obj || (obj.unlockRequirements ?? []).some((r: Json) => isLocked(save, team, r))) continue;
+      if (!obj) continue;
       // An engineer's component is offered with level i, but its own level must be open too:
       // a Great component needs the level-3 facility like every other Great one.
-      if (obj.level - 1 !== i && !levelOpen(obj.level - 1)) continue;
-      available.push({ component: toDesignComponent(save, obj), obj });
+      const open = levelOpen(i) && levelOpen(obj.level - 1)
+        && !(obj.unlockRequirements ?? []).some((r: Json) => isLocked(save, team, r));
+      if (open) available.push({ component: toDesignComponent(save, obj), obj });
+      else lockedComponents.push(toDesignComponent(save, obj));
     }
   }
 
@@ -154,7 +158,7 @@ export function designOptions(save: Save, team: Obj, type: PartType): DesignOpti
   const locked = unlocks.map((r, i) => ({ r: g.deref<Obj>(r), level: i + 1 }))
     .filter(({ r, level }) => r && "buildingType" in r && !levelOpen(level - 1))
     .map(({ r, level }) => ({ level, buildingType: r.buildingType as number, buildingLevel: (r.buildingLevel as number) + 1 }));
-  return { ctx, base, available, maxLevel, locked };
+  return { ctx, base, available, maxLevel, locked, lockedComponents };
 }
 
 const STAT_KEYS = ["topSpeed", "acceleration", "braking", "lowSpeedCorners", "mediumSpeedCorners", "highSpeedCorners"];
@@ -191,7 +195,7 @@ export function teamDesign(save: Save, team: Obj): TeamDesign {
   for (const type of Object.keys(COMPONENT_LISTS) as PartType[]) {
     if (!save.parts(team, type).length || isSpecPart(save, team, type)) continue;
     const o = designOptions(save, team, type);
-    types[type] = { ctx: o.ctx, base: o.base, components: o.available.map((a) => a.component), maxLevel: o.maxLevel, locked: o.locked };
+    types[type] = { ctx: o.ctx, base: o.base, components: o.available.map((a) => a.component), maxLevel: o.maxLevel, locked: o.locked, lockedComponents: o.lockedComponents };
   }
   const cpd = carPartDesign(save, team);
   const part = cpd.mStage === STAGE.Designing && cpd.mCarPart ? g.deref<Obj>(cpd.mCarPart) : null;

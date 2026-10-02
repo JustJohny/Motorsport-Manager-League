@@ -279,7 +279,7 @@ function Designer({ priv, busy, onOrder }: { priv: TeamPrivate; busy: boolean; o
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-1.5">
         <Tabs value={type} onValueChange={(v) => { setType(v); setPicked([]) }}>
-          <TabsList className="h-auto flex-wrap">
+          <TabsList className="h-auto! max-w-full flex-wrap justify-start">
             {PART_ORDER.filter((t) => t in design.types || spec.includes(t)).map((t) => {
               const Icon = partIcon(t)
               const isSpec = spec.includes(t)
@@ -345,18 +345,21 @@ function Designer({ priv, busy, onOrder }: { priv: TeamPrivate; busy: boolean; o
         </div>
       </div>
 
+      <RiskyHint opts={opts} buildingName={buildingName} />
+
       <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
         {[1, 2, 3, 4, 5].map((level) => {
           const list = opts.components.filter((c) => c.level === level)
+          const lockedList = (opts.lockedComponents ?? []).filter((c) => c.level === level)
           const lock = opts.locked.find((l) => l.level === level)
-          if (!list.length && !lock) return null
+          if (!list.length && !lockedList.length && !lock) return null
           return (
             <div key={level} className="flex flex-col gap-2">
               <div className="flex flex-wrap items-center gap-2 text-xs font-medium text-muted-foreground">
                 <Tier level={level} label />
                 {lock && <span className="flex items-center gap-1 font-normal"><Lock className="size-3" /> needs {buildingName(lock.buildingType)} level {lock.buildingLevel}</span>}
               </div>
-              {lock && !list.length && (
+              {lock && !list.length && !lockedList.length && (
                 <div className="flex items-center gap-2 rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
                   <Lock className="size-4" /> Locked until your HQ has the building.
                 </div>
@@ -373,17 +376,25 @@ function Designer({ priv, busy, onOrder }: { priv: TeamPrivate; busy: boolean; o
                     onClick={() => toggle(c.id)}
                     className={cn(
                       "flex items-start justify-between gap-2 rounded-lg border p-2 text-left transition-colors hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-transparent",
+                      c.risk > 0 && "border-amber-500/50",
                       on && "border-primary bg-primary/10 hover:bg-primary/15",
                     )}
                   >
                     <Summary text={c.summary} />
-                    <div className="flex shrink-0 flex-col items-end gap-1">
-                      {c.engineer && <Badge variant="secondary" className="text-[10px]">Engineer</Badge>}
-                      <span className="flex items-center gap-1 text-xs tabular-nums text-muted-foreground"><Coins className="size-3" />{fmtMoneyShort(componentPrice(c, opts))}</span>
-                    </div>
+                    <ComponentTags c={c} price={componentPrice(c, opts)} />
                   </button>
                 )
               })}
+              {lockedList.map((c) => (
+                <div
+                  key={c.id}
+                  title={lock ? `Locked: needs ${buildingName(lock.buildingType)} level ${lock.buildingLevel}` : "Locked by your HQ"}
+                  className={cn("flex items-start justify-between gap-2 rounded-lg border border-dashed p-2 opacity-50", c.risk > 0 && "border-amber-500/60")}
+                >
+                  <Summary text={c.summary} />
+                  <ComponentTags c={c} price={componentPrice(c, opts)} locked />
+                </div>
+              ))}
             </div>
           )
         })}
@@ -408,6 +419,47 @@ function Designer({ priv, busy, onOrder }: { priv: TeamPrivate; busy: boolean; o
         </Button>
       </div>
     </div>
+  )
+}
+
+function ComponentTags({ c, price, locked }: { c: DesignComponent; price: number; locked?: boolean }) {
+  return (
+    <div className="flex shrink-0 flex-col items-end gap-1">
+      {locked && <span className="flex items-center gap-1 text-[10px] uppercase tracking-wide text-muted-foreground"><Lock className="size-3" /> Locked</span>}
+      {c.risk > 0 && (
+        <span className="inline-flex items-center gap-0.5 rounded bg-amber-500/15 px-1 text-[10px] font-medium text-amber-600 dark:text-amber-400" title={`Grey-area component: rules risk +${c.risk}`}>
+          <TriangleAlert className="size-3" /> Grey area
+        </span>
+      )}
+      {c.engineer && <Badge variant="secondary" className="text-[10px]">Engineer</Badge>}
+      <span className="flex items-center gap-1 text-xs tabular-nums text-muted-foreground"><Coins className="size-3" />{fmtMoneyShort(price)}</span>
+    </div>
+  )
+}
+
+/** Where this season's grey-area (Risk) components are, so members know the option exists. */
+function RiskyHint({ opts, buildingName }: { opts: PartDesignOptions; buildingName: (t: number) => string }) {
+  const open = opts.components.filter((c) => c.risk > 0)
+  const shut = (opts.lockedComponents ?? []).filter((c) => c.risk > 0)
+  if (!open.length && !shut.length) {
+    if (!opts.lockedComponents) return null // older snapshot: locked levels unknown
+    return (
+      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+        <TriangleAlert className="size-3.5 shrink-0" /> No grey-area (rules risk) components for this part this season.
+      </p>
+    )
+  }
+  const lowest = Math.min(...shut.map((c) => c.level))
+  const lock = opts.locked.find((l) => l.level === lowest)
+  return (
+    <p className="flex items-start gap-1.5 text-xs text-muted-foreground">
+      <TriangleAlert className="mt-px size-3.5 shrink-0 text-amber-500" />
+      <span>
+        Grey-area components (marked <strong className="font-medium">Grey area</strong>) give more performance but risk a bust by the scrutineers after each race.
+        {open.length > 0 && ` ${open.length} available now.`}
+        {shut.length > 0 && ` ${shut.length} more locked${lock ? ` until ${buildingName(lock.buildingType)} level ${lock.buildingLevel}` : ""}.`}
+      </span>
+    </p>
   )
 }
 

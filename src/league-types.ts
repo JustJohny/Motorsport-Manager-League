@@ -244,6 +244,12 @@ export interface PartDesignOptions {
   maxLevel: number;
   /** What opens the next levels: building type and the level it must reach (as shown in game). */
   locked: { level: number; buildingType: number; buildingLevel: number }[];
+  /**
+   * This season's components at levels the HQ doesn't open yet, shown greyed so members can see
+   * what an upgrade unlocks (grey-area "Risk" components are only at levels 3-5). Missing in
+   * snapshots published before 2026-10-02.
+   */
+  lockedComponents?: DesignComponent[];
 }
 
 export interface TeamDesign {

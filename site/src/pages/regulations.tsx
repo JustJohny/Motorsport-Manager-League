@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/page-header"
 import { fmtDate, humanize } from "@/lib/format"
 import { useLeague } from "@/lib/league"
@@ -63,6 +64,7 @@ export function RegulationsPage() {
   const nextRace = ch.calendar.find((e) => !e.ended)?.date ?? null
   const closingNow = new Set(votesClosingNow(regs.votes, league.snapshot.gameDate, nextRace).map((v) => v.ruleId))
   const myTeam = regs.teams.find((t) => t.team === me.team)
+  const openVotes = regs.votes.filter((v) => v.status === "upcoming" && !p.results.some((r) => r.season === regs.season && r.rule_id === v.ruleId)).length
 
   return (
     <>
@@ -70,10 +72,23 @@ export function RegulationsPage() {
         title="Regulations"
         description={<>{ch.name} · {regs.season} season. Rule votes are held here; the league's result replaces MM's own vote.</>}
       />
-      <VotesCard regs={regs} rows={p.rows} results={p.results} closingNow={closingNow} myTeam={myTeam} onVoted={p.reload}
-        setDemoRows={p.setRows} />
-      <RulesCard regs={regs} overrides={p.overrides} results={p.results} organizer={me.role === "organizer"}
-        onChanged={p.reload} setDemoOverrides={p.setOverrides} />
+      <Tabs defaultValue="rules">
+        <TabsList variant="line">
+          <TabsTrigger value="rules"><ScrollText /> Regulations</TabsTrigger>
+          <TabsTrigger value="votes">
+            <Vote /> Votes
+            {openVotes > 0 && <Badge variant="secondary" className="h-4 px-1.5 text-[10px] tabular-nums">{openVotes}</Badge>}
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="rules" className="pt-2">
+          <RulesCard regs={regs} overrides={p.overrides} results={p.results} organizer={me.role === "organizer"}
+            onChanged={p.reload} setDemoOverrides={p.setOverrides} />
+        </TabsContent>
+        <TabsContent value="votes" className="pt-2">
+          <VotesCard regs={regs} rows={p.rows} results={p.results} closingNow={closingNow} myTeam={myTeam} onVoted={p.reload}
+            setDemoRows={p.setRows} />
+        </TabsContent>
+      </Tabs>
     </>
   )
 }

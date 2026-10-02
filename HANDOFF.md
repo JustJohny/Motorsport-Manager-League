@@ -308,6 +308,13 @@ npx tsx src/cli.ts validate "<save>"
 3. Publish.
 4. To end the test league: `archive --league league-main.json --end`.
 
+## Bug fixes from user feedback (2026-10-02)
+- **"No illegal option when designing a part":** grey-area components (Risk +1/+2) only exist at levels 3-5, and most teams' HQ only opens levels 1-2, so the site showed none. `designOptions` now also returns `lockedComponents` (published as `PartDesignOptions.lockedComponents`). The designer shows them greyed under their tier with a lock, marks every risky component "Grey area", and a hint line says how many are available or locked and which building opens them. **Needs a republish** to show locked components.
+- Phone: the designer's part-type tabs overlapped the spec note. The tab list kept shadcn's fixed `h-8` (the `group-data-horizontal` variant beats a plain `h-auto`), so it now uses `h-auto!`.
+- Every `Select` now opens downward (`position="popper"`, `align="start"` by default in `ui/select.tsx`); `item-aligned` put the selected team over the trigger, so the team list grew upward.
+- Regulations page: "Regulations" and "Votes" sub-tabs, with the open vote count on the Votes tab.
+- Checked in demo mode with headless Chromium (phone and desktop, no console errors); `npm test` passes.
+
 ## Calendar & results: every round clickable (2026-10-01, user request)
 - MM keeps every finished round's results on its calendar event (race, qualifying, practice), so the extract now publishes `championship.races` (all finished rounds; `lastRace` stays, as the last of them). About 10 KB per round, public.
 - `site/src/pages/results.tsx`: calendar rows with results are buttons; the chosen round is in the URL (`#/results?round=2`), and the latest race is the default. The Race/Grid tab stays when switching rounds. Older snapshots only have the latest race and say so.
