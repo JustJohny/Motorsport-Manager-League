@@ -136,8 +136,8 @@ function PitBox({ people, roles, own, busy, onAssign }: {
 }) {
   return (
     <div className="grid max-w-3xl grid-cols-3 grid-rows-[auto_auto_auto_auto_auto] gap-2 sm:gap-3">
-      <div className="col-start-2 row-span-3 row-start-2 flex items-center justify-center rounded-xl border border-dashed text-[10px] uppercase tracking-wide text-muted-foreground">
-        Car
+      <div className="col-start-2 row-span-3 row-start-2 flex items-center justify-center py-1">
+        <CarTopDown className="h-full max-h-80 w-auto max-w-full" />
       </div>
       {ROLE_NAMES.map((_, role) => {
         const holder = people.find((p) => p.role === role)
@@ -183,6 +183,51 @@ function PitBox({ people, roles, own, busy, onAssign }: {
         )
       })}
     </div>
+  )
+}
+
+/** A 2016 F1 car from above (no halo, long nose, wide front wing), front at the top, in theme grays. */
+function CarTopDown({ className }: { className?: string }) {
+  const tyre = "fill-zinc-900 stroke-foreground/55"
+  const body = "fill-foreground/20 stroke-foreground/45"
+  const dark = "fill-foreground/40"
+  return (
+    <svg viewBox="0 0 200 470" className={className} role="img" aria-label="Car from above, front at the top" strokeWidth={1.5} strokeLinejoin="round">
+      {/* Front wing: main plane, flaps and endplates */}
+      <path d="M8 22 Q100 10 192 22 L192 40 Q100 30 8 40 Z" className={body} />
+      <path d="M14 42 Q100 34 186 42 L186 48 Q100 41 14 48 Z" className={dark} />
+      <rect x="4" y="16" width="7" height="36" rx="2" className={dark} />
+      <rect x="189" y="16" width="7" height="36" rx="2" className={dark} />
+      {/* Nose and front suspension */}
+      <path d="M92 26 L108 26 L116 150 L84 150 Z" className={body} />
+      <path d="M86 92 L42 84 M86 104 L42 112 M114 92 L158 84 M114 104 L158 112" className="stroke-foreground/45" fill="none" />
+      {/* Front tyres */}
+      <rect x="12" y="66" width="32" height="64" rx="7" className={tyre} />
+      <path d="M18 82 L38 82 M18 98 L38 98 M18 114 L38 114" className="stroke-foreground/25" fill="none" />
+      <rect x="156" y="66" width="32" height="64" rx="7" className={tyre} />
+      <path d="M162 82 L182 82 M162 98 L182 98 M162 114 L182 114" className="stroke-foreground/25" fill="none" />
+      {/* Sidepods and floor */}
+      <path d="M70 196 Q40 206 36 240 L32 336 Q40 362 76 372 L124 372 Q160 362 168 336 L164 240 Q160 206 130 196 Z" className={body} />
+      <path d="M44 214 L68 206 L68 226 L42 232 Z M156 214 L132 206 L132 226 L158 232 Z" className={dark} />
+      {/* Chassis, cockpit, airbox and engine cover */}
+      <path d="M84 148 L116 148 L124 250 L118 400 L82 400 L76 250 Z" className={body} />
+      <ellipse cx="100" cy="212" rx="14" ry="30" className={dark} />
+      <circle cx="100" cy="206" r="7" className="fill-foreground/60" />
+      <path d="M92 250 L108 250 L106 268 L94 268 Z" className={dark} />
+      <path d="M100 270 L100 396" className="stroke-foreground/35" fill="none" />
+      {/* Rear suspension and tyres (wider than the fronts) */}
+      <path d="M118 372 L158 366 M118 388 L158 394 M82 372 L42 366 M82 388 L42 394" className="stroke-foreground/45" fill="none" />
+      <rect x="4" y="340" width="40" height="70" rx="8" className={tyre} />
+      <path d="M10 357.5 L38 357.5 M10 375 L38 375 M10 392.5 L38 392.5" className="stroke-foreground/25" fill="none" />
+      <rect x="156" y="340" width="40" height="70" rx="8" className={tyre} />
+      <path d="M162 357.5 L190 357.5 M162 375 L190 375 M162 392.5 L190 392.5" className="stroke-foreground/25" fill="none" />
+      {/* Rear wing and endplates, diffuser */}
+      <path d="M80 400 L120 400 L126 424 L74 424 Z" className={dark} />
+      <rect x="40" y="426" width="120" height="16" rx="2" className={body} />
+      <rect x="44" y="444" width="112" height="9" rx="2" className={dark} />
+      <rect x="36" y="420" width="7" height="38" rx="2" className={dark} />
+      <rect x="157" y="420" width="7" height="38" rx="2" className={dark} />
+    </svg>
   )
 }
 
