@@ -197,7 +197,13 @@ function DesignCard({ priv, team, own }: { priv: TeamPrivate; team: string; own:
   const { league } = useLeague()
   const left = current ? Math.max(0, daysBetween(league.snapshot.gameDate, current.end)) : 0
   const queuedCtx = queued && design.types[queued.part_type]?.ctx
-  const queuedDays = queued && queuedCtx ? planDesign(queuedCtx, comps(queued.part_type, queued.components)).days : null
+  // A queued design can stop fitting when a new snapshot changes the team's slots (e.g. a
+  // lower Design Centre); show that instead of failing the whole tab.
+  let queuedDays: number | null = null
+  let queuedProblem: string | null = null
+  if (queued && queuedCtx) {
+    try { queuedDays = planDesign(queuedCtx, comps(queued.part_type, queued.components)).days } catch (e) { queuedProblem = (e as Error).message }
+  }
 
   return (
     <Card>
@@ -232,8 +238,8 @@ function DesignCard({ priv, team, own }: { priv: TeamPrivate; team: string; own:
               </>
             }
             action={own && <Button size="sm" variant="ghost" className="ml-auto" disabled={busy} onClick={() => void run(() => p.cancelDesign(queued.id))}>Cancel</Button>}
-            className="border-primary/40 bg-primary/5"
-            note="Started in game at the next apply."
+            className={queuedProblem ? "border-destructive/50" : "border-primary/40 bg-primary/5"}
+            note={queuedProblem ? `This design no longer fits your team's slots (${queuedProblem}). Cancel it and order again.` : "Started in game at the next apply."}
           />
         ) : current && !aiCurrent ? null : own ? (
           <Designer priv={priv} busy={busy} onOrder={(type, ids) => run(() => p.orderDesign(type, ids))} />
