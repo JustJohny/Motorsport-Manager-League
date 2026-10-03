@@ -4,6 +4,7 @@ import {
 } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 import { SUPPLIER_STATS, supplierWindow } from "../../../src/supplier-rules.ts"
+import { CarDesignCard } from "@/components/car-design-card"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -146,6 +147,9 @@ function SupplierChoices({ priv, team, own, calendar }: { priv: TeamPrivate; tea
           </section>
         )
       })}
+
+      <CarDesignCard car={car} team={team} own={own} editable={editable}
+        suppliers={(types.length ? types : Object.keys(car.current)).map((t) => (car.options[t] ? picked(t) : null) ?? car.pending?.[t] ?? car.current[t]).filter((x): x is SupplierOffer => !!x)} />
     </div>
   )
 }

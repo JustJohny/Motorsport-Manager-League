@@ -1,3 +1,4 @@
+import { chassisStats, clampSlider, sliderRange } from "../chassis.ts";
 import { float, num } from "../codec/sav.ts";
 import type { Obj } from "../graph.ts";
 import type { Save } from "../model.ts";
@@ -24,6 +25,9 @@ export interface SupplierOption {
   /** CarChassisStats.Stats index → value. */
   stats: Record<number, number>;
   engineLevel?: [number, number];
+  /** Supplier.CarAspect (0 rear package, 1 nose height) → how far it narrows MM's design sliders from each end. */
+  minBound?: Record<number, number>;
+  maxBound?: Record<number, number>;
 }
 
 /** A C# Dictionary as FullSerializer writes it: a [{Key, Value}] list, or an object (empty or string keys). */
@@ -52,6 +56,8 @@ function toOption(save: Save, s: Obj, team: Obj): SupplierOption {
   return {
     id: s.id, type: SUPPLIER_TYPES[s.supplierType], name: s.name, tier: s.mTier, price: price(save, s, team),
     stats: Object.fromEntries(dictEntries(s.supplierStats)),
+    minBound: Object.fromEntries(dictEntries(s.carAspectMinBoundary)),
+    maxBound: Object.fromEntries(dictEntries(s.carAspectMaxBoundary)),
     ...(s.supplierType === 0 ? { engineLevel: [s.minEngineLevelModifier, s.maxEngineLevelModifier] as [number, number] } : {}),
   };
 }
@@ -104,6 +110,18 @@ export function seasonOver(save: Save, team: Obj): boolean {
 /** The suppliers on the team's current car. */
 export function currentSuppliers(save: Save, team: Obj): Partial<Record<SupplierType, SupplierOption>> {
   const cs = save.g.deref<Obj>(save.cars(team)[0]?.chassisStats);
+  const out: Partial<Record<SupplierType, SupplierOption>> = {};
+  for (const t of SUPPLIER_TYPES) {
+    const s = cs?.[CHASSIS_FIELD[t]] ? save.g.deref<Obj>(cs[CHASSIS_FIELD[t]]) : null;
+    if (s && s.name) out[t] = toOption(save, s, team);
+  }
+  return out;
+}
+
+/** The suppliers MM's AI put on next year's pending chassis (while it designs the car). */
+export function pendingSuppliers(save: Save, team: Obj): Partial<Record<SupplierType, SupplierOption>> {
+  const ny = save.g.deref<Obj>(save.g.deref<Obj>(team.carManager).nextYearCarDesign);
+  const cs = ny?.mChassisStats ? save.g.deref<Obj>(ny.mChassisStats) : null;
   const out: Partial<Record<SupplierType, SupplierOption>> = {};
   for (const t of SUPPLIER_TYPES) {
     const s = cs?.[CHASSIS_FIELD[t]] ? save.g.deref<Obj>(cs[CHASSIS_FIELD[t]]) : null;
@@ -231,4 +249,78 @@ export function renameSupplier(save: Save, op: RenameSupplierOp): string {
     }
   }
   return `${op.type} supplier ${op.from} → ${op.name} (${hits.length} cop${hits.length === 1 ? "y" : "ies"})${works ? `, works team ${works.name}` : ""}`;
+}
+
+/** MM's design sliders exist only in the main (top single-seater) championship. */
+export function hasChassisDesign(save: Save, team: Obj): boolean {
+  const ch = save.championship(team);
+  return ch.series === 0 && ch.championshipID === 0;
+}
+
+/** TeamFinanceController.GetCarDevCost: a year's car fund by championship id, per level (paid monthly). */
+const CAR_DEV_COST: number[][] = [
+  [12e6, 8.4e6, 6e6, 8.4e6, 3.6e6, 12e6, 4.8e6],
+  [18e6, 13.2e6, 8.4e6, 13.2e6, 7.2e6, 15.6e6, 8.4e6],
+  [24e6, 18e6, 12e6, 18e6, 10.8e6, 21.6e6, 12e6],
+];
+
+/** The team's car fund: level 0 Low / 1 Medium / 2 High, the monthly amount per level, and what's saved so far. */
+export function carInvestment(save: Save, team: Obj) {
+  const fin = save.g.deref<Obj>(team.financeController);
+  const id = save.championship(team).championshipID as number;
+  return {
+    level: (fin.mInvestement ?? 1) as number,
+    monthly: CAR_DEV_COST.map((row) => Math.round((row[id] ?? row[0]) / 12 / 1000) * 1000),
+    fund: num(fin.moneyForCarDev ?? 0),
+  };
+}
+
+export interface SetCarInvestmentOp {
+  op: "setCarInvestment";
+  team: string | number;
+  /** 0 Low, 1 Medium, 2 High. */
+  level: number;
+}
+
+/** TeamFinanceController.SetCarInvestement: how much goes into next year's car fund each month. */
+export function setCarInvestment(save: Save, op: SetCarInvestmentOp): string {
+  const team = save.team(op.team);
+  if (![0, 1, 2].includes(op.level)) throw new Error("Investment level is 0 (Low), 1 (Medium) or 2 (High)");
+  save.g.deref<Obj>(team.financeController).mInvestement = op.level;
+  return `${team.name}: next year's car investment ${["Low", "Medium", "High"][op.level]}`;
+}
+
+export interface SetChassisOp {
+  op: "setChassis";
+  team: string | number;
+  /** MM's nose height slider, 0..1: fuel efficiency (1) ↔ tyre wear (0). */
+  nose: number;
+  /** Rear package, 0..1: improvability (1) ↔ tyre heating (0). */
+  rear: number;
+}
+
+/**
+ * The member's design sliders on next year's car: the pending chassis' four stats are rebuilt from
+ * the sliders (kept within its suppliers' bounds) and its suppliers, as MM's design screen does.
+ * Run after setSuppliers. Only while MM designs the car (pre-season), only in the main championship.
+ */
+export function setChassis(save: Save, op: SetChassisOp): string {
+  const g = save.g;
+  const team = save.team(op.team);
+  if (!hasChassisDesign(save, team)) throw new Error(`${team.name}: MM's design sliders are only in the main championship`);
+  const ny = g.deref<Obj>(g.deref<Obj>(team.carManager).nextYearCarDesign);
+  if (ny.state !== NEXT_YEAR_STATE.Designing || !ny.mChassisStats) {
+    throw new Error(`${team.name}: next year's car isn't being designed (MM starts it when pre-season starts)`);
+  }
+  const cs = g.deref<Obj>(ny.mChassisStats);
+  const sups = SUPPLIER_TYPES.flatMap((t) => (cs[CHASSIS_FIELD[t]] ? [toOption(save, g.deref<Obj>(cs[CHASSIS_FIELD[t]]), team)] : []));
+  const range = sliderRange(sups);
+  const nose = clampSlider(op.nose, range.nose), rear = clampSlider(op.rear, range.rear);
+  const r = chassisStats(sups, nose, rear);
+  cs.mTyreWear = float(r.tyreWear);
+  cs.mTyreHeating = float(r.tyreHeating);
+  cs.mFuelEfficiency = float(r.fuelEfficiency);
+  cs.mImprovability = float(r.improvability);
+  const f = (v: number) => Math.round(v * 10) / 10;
+  return `${team.name}: next year's chassis nose ${nose.toFixed(2)}, rear ${rear.toFixed(2)} → tyre wear ${f(r.tyreWear)}, tyre heating ${f(r.tyreHeating)}, fuel efficiency ${f(r.fuelEfficiency)}, improvability ${f(r.improvability)}`;
 }

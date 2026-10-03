@@ -1,4 +1,5 @@
 import type { ChangeSet } from "../apply.ts";
+import { carChanges, fetchCarChoices } from "../car-orders.ts";
 import { crewChanges, crewSpendChanges, fetchCrewContext, fetchCrewSpend, markCrewSpendApplied, saveCrewUpdates } from "../crew-orders.ts";
 import { engineSpendChanges, fetchEngineSpend, fetchSupplierContext, markEngineSpendApplied, supplierChanges } from "../engine-orders.ts";
 import { equalizeChanges, fetchEqualize, markEqualizeApplied, resetCrews } from "../equalize-orders.ts";
@@ -98,6 +99,19 @@ export async function pullDecisions(env: SupabaseEnv, opts: { force?: boolean },
   }
   for (const u of sc.unavailable) say(`  WARNING: supplier no longer on offer, keeping current: ${u}`);
   if (sc.changes.length) notes.push(`next season's suppliers for ${sc.changes.length} team${sc.changes.length === 1 ? "" : "s"}`);
+
+  // Next year's car: fund levels (every pull) and, at pre-season, chassis sliders (after the suppliers).
+  const carCtx = await fetchCarChoices(env);
+  const cc = carChanges(carCtx.chassis, carCtx.investment, suppliers.cars, ctx.memberTeams);
+  section("Next season's car", cc.changes.length);
+  if (carCtx.missing) say("  WARNING: no chassis_choices / car_investment tables on the site yet (run migration 017_chassis_investment.sql); skipped");
+  for (const c of cc.changes) {
+    if (c.op === "setCarInvestment") say(`  ${c.team}: car fund ${["Low", "Medium", "High"][c.level]}`);
+    if (c.op === "setChassis") say(`  ${c.team}: chassis nose ${c.nose.toFixed(2)}, rear ${c.rear.toFixed(2)}`);
+  }
+  if (cc.waiting.length) say(`  Chassis waiting for pre-season: ${cc.waiting.join(", ")}`);
+  changes.push(...cc.changes);
+  if (cc.changes.some((c) => c.op === "setChassis")) notes.push("chassis designs");
 
   // Rule votes due before the next checkpoint, settled with the league's result instead of MM's;
   // then the organizer's choices for next season.

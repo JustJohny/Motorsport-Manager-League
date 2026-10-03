@@ -4,7 +4,8 @@ import {
   type CancelDesignOp, type CancelUnorderedDesignsOp, type RemoveUnorderedPartsOp, type SetFittingOp, type SetImprovementOp, type StartDesignOp,
 } from "./ops/design.ts";
 import {
-  renameSupplier, setCurrentSupplier, setSuppliers, type RenameSupplierOp, type SetCurrentSupplierOp, type SetSuppliersOp,
+  renameSupplier, setCarInvestment, setChassis, setCurrentSupplier, setSuppliers,
+  type RenameSupplierOp, type SetCarInvestmentOp, type SetChassisOp, type SetCurrentSupplierOp, type SetSuppliersOp,
 } from "./ops/suppliers.ts";
 import { concludeVote, setNextRule, type ConcludeVoteOp, type SetNextRuleOp } from "./ops/politics.ts";
 import { adjustBudget, setBudget, type AdjustBudgetOp, type SetBudgetOp } from "./ops/finance.ts";
@@ -24,7 +25,7 @@ import { dropSponsor, signSponsor, type DropSponsorOp, type SignSponsorOp } from
 export type Change = SetBuildingOp | StartBuildingOp | CancelBuildingOp | CancelUnorderedHqOp | SetBudgetOp | AdjustBudgetOp | AddPartOp | RemovePartOp | FitPartOp | HireOp | SyncTeamOp
   | StartDesignOp | CancelDesignOp | CancelUnorderedDesignsOp | RemoveUnorderedPartsOp | SetFittingOp | SetImprovementOp
   | ConcludeVoteOp | SetNextRuleOp | SetSuppliersOp | RenamePersonOp | RenameTeamOp | SetTeamCountryOp
-  | SetCurrentSupplierOp | RenameSupplierOp | SetPitCrewOp | EqualizeOp | SignSponsorOp | DropSponsorOp;
+  | SetCurrentSupplierOp | RenameSupplierOp | SetPitCrewOp | EqualizeOp | SignSponsorOp | DropSponsorOp | SetChassisOp | SetCarInvestmentOp;
 
 export interface ChangeSet {
   /** Optional note, e.g. "Before round 6 - Munich". */
@@ -77,6 +78,8 @@ function run(save: Save, c: Change): string | string[] {
     case "equalizeTeams": return equalizeTeams(save, c);
     case "signSponsor": return signSponsor(save, c);
     case "dropSponsor": return dropSponsor(save, c);
+    case "setChassis": return setChassis(save, c);
+    case "setCarInvestment": return setCarInvestment(save, c);
     default: throw new Error(`Unknown op ${(c as { op: string }).op}`);
   }
 }

@@ -295,6 +295,9 @@ export interface SupplierOffer {
   /** CarChassisStats.Stats index (0 tyre wear, 1 tyre heating, 2 fuel efficiency, 3 improvability…) → value. */
   stats: Record<number, number>;
   engineLevel?: [number, number];
+  /** Supplier.CarAspect (0 rear package, 1 nose height) → how far it narrows MM's design sliders from each end. */
+  minBound?: Record<number, number>;
+  maxBound?: Record<number, number>;
 }
 
 export interface PartDesignOptions {
@@ -332,6 +335,12 @@ export interface TeamDesign {
     season: number;
     current: Record<string, SupplierOffer>;
     options: Record<string, SupplierOffer[]>;
+    /** MM's design sliders are open to this team (main championship only). Missing before 2026-10-03. */
+    chassisDesign?: boolean;
+    /** While MM designs the car: the suppliers its AI put on the pending chassis. */
+    pending?: Record<string, SupplierOffer>;
+    /** The car fund: level 0 Low / 1 Medium / 2 High, the monthly amount per level, saved so far. */
+    investment?: { level: number; monthly: number[]; fund: number };
   };
   /** MM's scrutineering for this team (missing in snapshots published before 2026-10-01). */
   rules?: {

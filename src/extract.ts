@@ -6,7 +6,7 @@ import { teamDesign } from "./ops/design.ts";
 import { gameCrew, pitCrewRules, pitStopLog } from "./ops/pit-crew.ts";
 import { teamSponsors } from "./ops/sponsors.ts";
 import { extractRegulations } from "./regulations.ts";
-import { currentSuppliers, nextCarSeason, nextYearDesignState, seasonOver, supplierOptions } from "./ops/suppliers.ts";
+import { carInvestment, currentSuppliers, hasChassisDesign, nextCarSeason, nextYearDesignState, pendingSuppliers, seasonOver, supplierOptions } from "./ops/suppliers.ts";
 import { BUILDING_STATES, JOBS, PART_TYPES, Save, numOrNull, personKind, personName, type PartType } from "./model.ts";
 
 export type { LeagueConfig, LeagueState, TeamState } from "./league-types.ts";
@@ -263,6 +263,9 @@ function withRules(save: Save, t: Obj, champ: Obj, design: TeamDesign): TeamDesi
       // drawn for, so it only counts once the season is over or MM is designing the car.
       options: (nextYearDesignState(save, t) === "designing" || (nextYearDesignState(save, t) === "waiting" && seasonOver(save, t))
         ? supplierOptions(save, t) : {}) as Record<string, never>,
+      chassisDesign: hasChassisDesign(save, t),
+      pending: (nextYearDesignState(save, t) === "designing" ? pendingSuppliers(save, t) : undefined) as Record<string, never> | undefined,
+      investment: carInvestment(save, t),
     },
     rules: {
       brokenThisSeason: t.rulesBrokenThisSeason ?? 0,
