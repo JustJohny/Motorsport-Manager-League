@@ -90,7 +90,7 @@ After the deadline: `mmsave pull -o changes.json --mark-applied`, then `mmsave a
 The Regulations page shows this season's and next season's rules and holds MM's rule votes on the site. Members vote with MM's vote power, and AI teams' votes are predicted with MM's logic (`src/politics.ts`) and published. At the checkpoint before a vote's game date, `pull` settles it with the league's result instead of MM's own vote (`concludeVote`). The organizer can set any rule group for next season (`setNextRule`, migration 008).
 
 ## Next season's suppliers
-On Parts → Next season's car, members choose next year's engine, brakes, fuel and materials suppliers (battery and ERS too, in hybrid series) from the deals MM draws for the championship after the final race (about 4 engines, 6 brakes, 5 fuel and 4 materials deals), as MM's car design screen offers them, at MM's price for the team. The window opens when a published save has that draw (`src/supplier-rules.ts`). `mmsave suppliers <save> --league league.json` prints what a save would offer each member team, to check before publishing. No choice keeps this season's supplier if MM offers it again. Choices are private and stored against the season the car is for (migrations 010–012: `choose_supplier`, `clear_supplier_choice`). MM only designs next year's car at pre-season, so `pull` emits `setSuppliers` for member teams once their snapshot shows MM designing it, and repeats it on every pull until the car is built.
+On Parts → Next season's car, members choose next year's engine, brakes, fuel and materials suppliers (battery and ERS too, in hybrid series) from the deals MM draws for the championship when pre-season starts (a few per type; the ERS 2017 draw had 1 engine, 4 brakes, 3 fuel and 4 materials deals), as MM's car design screen offers them, at MM's price for the team. The window opens when a published save has that draw (`src/supplier-rules.ts`). `mmsave suppliers <save> --league league.json` prints what a save would offer each member team, to check before publishing. No choice keeps this season's supplier if MM offers it again. Choices are private and stored against the season the car is for (migrations 010–012: `choose_supplier`, `clear_supplier_choice`). MM only designs next year's car at pre-season, so `pull` emits `setSuppliers` for member teams once their snapshot shows MM designing it, and repeats it on every pull until the car is built.
 
 ### Series: several saves on one site
 Each series is one MM save (e.g. an open-wheel and an endurance league at the same time) with its own teams, members, snapshots, orders, bids, votes, engines and supplier choices. Members log in once and switch series at the top of the sidebar; one Discord account can run a different team in each series.
@@ -109,14 +109,14 @@ npx tsx tools/gen-schema.ts "<game>/MM_Data/Managed/Assembly-CSharp.dll" schema/
 ```
 
 ## Status
-- ✅ The codec round-trips all tested saves byte-for-byte (JSON identical).
-- ✅ All operations apply, validate, and survive a write and reload (`test/ops.test.ts`).
-- ✅ Fixed the first in-game load failure (missing `$type` on moved objects). Every written save is now type-checked against the game schema.
-- ✅ **Verified in game:** an applied save plays a full race weekend and advances to the next one. HQ, budget, parts and hires all persist through the game's own saves. See `docs/save-schema.md`.
-- ✅ League website v1 (read only) builds and renders real save data in demo mode. Supabase RLS was tested locally in PGlite.
-- ✅ Website deployed on GitHub Pages with Supabase and Discord login (verified by the user).
-- ✅ Staff auction built: database rules tested in PGlite (`test/db.test.ts`), including pull → apply on a real save. The UI was checked in demo mode.
-- ✅ Auction verified in game (a free-agent signing, and an AI driver bought out with a swap).
-- ✅ HQ orders built: `startBuilding` op + migration 003 + site HQ tab, covered by tests on the real save.
-- ✅ AI HQ projects on member teams are cancelled and refunded at apply (tested on the real save).
-- Next: run migrations 003 + 004, publish again (the snapshot needs the new `buildWeeks`/`upgradeWeeks`/`progressStart`), and check in game that a started building progresses and completes.
+**Database:** run every file in `supabase/migrations/` in order (001 to 018) in the Supabase SQL editor. Each one runs in a transaction and can be run again safely. `pull` skips a feature with a warning while its migration is missing.
+
+**Verified in game:**
+- The save codec round-trips every tested save byte-for-byte, and every written save is type-checked against the game schema.
+- Applied saves play full race weekends; HQ, budget, parts and hires persist through the game's own saves.
+- Staff auction (free-agent signings, AI drivers bought out with a swap), HQ orders, part design, fitting and improvement.
+- Pre-season (ERS saves, Dec 2016): next season's suppliers, chassis sliders and car fund on the pending design, and promotion/relegation held for the league's championship.
+
+**Built, tested on real saves, not yet seen in a league cycle:** sponsors, pit crews, field equalization, regulations and rule votes, works engine programmes (site only), contract renewals (migration 018).
+
+**Next:** what MM does when contracts end on 31 December (needs a January save), non-renewed staff into the transfer window, and the engine programmes' season step. `HANDOFF.md` has the details.
