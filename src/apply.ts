@@ -19,11 +19,12 @@ import { renameTeam, setTeamCountry, type RenameTeamOp, type SetTeamCountryOp } 
 import { syncTeam, type SyncTeamOp } from "./ops/sync.ts";
 import { setPitCrew, type SetPitCrewOp } from "./ops/pit-crew.ts";
 import { equalizeTeams, type EqualizeOp } from "./ops/equalize.ts";
+import { dropSponsor, signSponsor, type DropSponsorOp, type SignSponsorOp } from "./ops/sponsors.ts";
 
 export type Change = SetBuildingOp | StartBuildingOp | CancelBuildingOp | CancelUnorderedHqOp | SetBudgetOp | AdjustBudgetOp | AddPartOp | RemovePartOp | FitPartOp | HireOp | SyncTeamOp
   | StartDesignOp | CancelDesignOp | CancelUnorderedDesignsOp | RemoveUnorderedPartsOp | SetFittingOp | SetImprovementOp
   | ConcludeVoteOp | SetNextRuleOp | SetSuppliersOp | RenamePersonOp | RenameTeamOp | SetTeamCountryOp
-  | SetCurrentSupplierOp | RenameSupplierOp | SetPitCrewOp | EqualizeOp;
+  | SetCurrentSupplierOp | RenameSupplierOp | SetPitCrewOp | EqualizeOp | SignSponsorOp | DropSponsorOp;
 
 export interface ChangeSet {
   /** Optional note, e.g. "Before round 6 - Munich". */
@@ -74,6 +75,8 @@ function run(save: Save, c: Change): string | string[] {
     case "renameSupplier": return renameSupplier(save, c);
     case "setPitCrew": return setPitCrew(save, c);
     case "equalizeTeams": return equalizeTeams(save, c);
+    case "signSponsor": return signSponsor(save, c);
+    case "dropSponsor": return dropSponsor(save, c);
     default: throw new Error(`Unknown op ${(c as { op: string }).op}`);
   }
 }

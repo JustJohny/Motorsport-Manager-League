@@ -14,6 +14,7 @@ import type { LeagueSettings } from "./league-rules.ts";
 import { choiceChanges, designChanges, fetchPartsContext, markDesignsApplied, undoAiParts } from "./part-orders.ts";
 import { engineSpendChanges, fetchEngineSpend, fetchSupplierContext, markEngineSpendApplied, supplierChanges } from "./engine-orders.ts";
 import { crewChanges, crewSpendChanges, crewUpdates, fetchCrewContext, fetchCrewSpend, markCrewSpendApplied, saveCrewUpdates } from "./crew-orders.ts";
+import { fetchSponsorOrders, markSponsorOrders, sponsorChanges } from "./sponsor-orders.ts";
 import { crewNamePool } from "./ops/pit-crew.ts";
 import { equalizeChanges, fetchEqualize, markEqualizeApplied, resetCrews } from "./equalize-orders.ts";
 import { fetchRegulationContext, recordVoteResults, regulationChanges } from "./rule-votes.ts";
@@ -289,6 +290,16 @@ switch (cmd) {
     if (crewOps.length) notes.push(`${crewOps.length} pit crew${crewOps.length > 1 ? "s" : ""}`);
     if (crewSpend.length) notes.push(`${crewSpend.length} crew payment${crewSpend.length > 1 ? "s" : ""}`);
 
+    // Sponsors: AI deals members dropped (upfront paid back), then the offers they signed.
+    const sponsorCtx = await fetchSponsorOrders(env);
+    const sponsors = sponsorChanges(sponsorCtx.orders, sponsorCtx.gameDate);
+    for (const o of sponsors.applied) {
+      console.log(`  Sponsor: ${o.team} ${o.kind === "sign" ? "signs" : "drops"} ${o.sponsor_name} (slot ${o.slot})${Number(o.amount) ? `, upfront $${Number(o.amount).toLocaleString()}${o.kind === "drop" ? " paid back" : ""}` : ""}`);
+    }
+    for (const o of sponsors.expired) console.log(`  WARNING: ${o.team}'s offer from ${o.sponsor_name} lapsed on ${o.expires?.slice(0, 10)}; left out`);
+    changes.push(...sponsors.changes);
+    if (sponsors.applied.length) notes.push(`${sponsors.applied.length} sponsor choice${sponsors.applied.length > 1 ? "s" : ""}`);
+
     let windowDone = false;
     if (!w) console.log("Transfer window: none waiting");
     else if (new Date(w.window.closes_at) > new Date() && !opt.force) {
@@ -316,6 +327,7 @@ switch (cmd) {
       await recordVoteResults(env, voteResults);
       await markEngineSpendApplied(env, engineSpend.map((r) => r.id));
       await markCrewSpendApplied(env, crewSpend.map((r) => r.id));
+      await markSponsorOrders(env, sponsors.applied.map((o) => o.id), sponsors.expired.map((o) => o.id));
       if (eq.row) {
         await saveCrewUpdates(env, crewReset);
         await markEqualizeApplied(env, eq.row.id);

@@ -19,6 +19,7 @@ import { TransfersProvider } from "@/lib/transfers"
 import { HqOrdersProvider } from "@/lib/hq"
 import { PartsProvider } from "@/lib/parts"
 import { PitCrewProvider } from "@/lib/pit-crew"
+import { SponsorsProvider } from "@/lib/sponsors"
 
 function Shell() {
   const { me, league } = useLeague()
@@ -64,7 +65,9 @@ export default function App() {
               <HqOrdersProvider>
                 <PartsProvider>
                   <PitCrewProvider>
-                    <Shell />
+                    <SponsorsProvider>
+                      <Shell />
+                    </SponsorsProvider>
                   </PitCrewProvider>
                 </PartsProvider>
               </HqOrdersProvider>

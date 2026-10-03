@@ -8,6 +8,7 @@ import { Save } from "../src/model.ts";
 import { defaultSavesDir } from "../src/paths.ts";
 import { typeMismatches } from "../src/schema.ts";
 import { carPartDesign, designOptions, improvementSlots, previewDesign } from "../src/ops/design.ts";
+import { teamSponsors } from "../src/ops/sponsors.ts";
 
 // Uses a real mid-season save (ERS, round 6). Set MM_TEST_SAVE to point at your own.
 const SAVE = process.env.MM_TEST_SAVE ?? join(defaultSavesDir(), "SaveJonatan Sulik - Tatra Racing 2 (3).sav");
@@ -455,6 +456,42 @@ describe.skipIf(!existsSync(SAVE))("operations on a real save", () => {
       expect(e.teamDiscounts.some((d: any) => d.Key === t.teamID && num(d.Value) === 50)).toBe(true);
     }
     expect(num(reloaded.g.deref<any>(reloaded.cars(t)[0].chassisStats).mImprovability)).toBe(before + diff(3));
+  }, 120_000);
+
+  it("signs a sponsor offer and drops a deal the way MM's SponsorController does", () => {
+    const save = Save.load(SAVE);
+    // A team with an offer for a free slot, and a team with a running deal.
+    const withOffer = save.teams().find((t) => teamSponsors(save, t)?.sponsorship.offers.length);
+    const withDeal = save.teams().find((t) => t !== withOffer && teamSponsors(save, t)?.sponsorship.deals.length);
+    expect(withOffer && withDeal).toBeTruthy();
+    const offer = teamSponsors(save, withOffer!)!.sponsorship.offers[0];
+    const deal = teamSponsors(save, withDeal!)!.sponsorship.deals[0];
+    const offerTeam = withOffer!.name as string;
+    const dealTeam = withDeal!.name as string;
+    applyChanges(save, { changes: [
+      { op: "signSponsor", team: offerTeam, slot: offer.slot, sponsorId: offer.sponsorId },
+      { op: "dropSponsor", team: dealTeam, slot: deal.slot, sponsorId: deal.sponsorId },
+    ] });
+    expect(() => applyChanges(save, { changes: [{ op: "signSponsor", team: offerTeam, slot: offer.slot, sponsorId: offer.sponsorId }] }))
+      .toThrow(/already has a sponsor/);
+
+    const reloaded = reload(save);
+    expect(reloaded.g.validate()).toEqual([]);
+    expect(typeProblems(reloaded)).toEqual([]);
+    const signed = teamSponsors(reloaded, reloaded.team(offerTeam))!;
+    const d = signed.sponsorship.deals.find((x) => x.slot === offer.slot)!;
+    expect(d.sponsorId).toBe(offer.sponsorId);
+    expect(d.left).toBe(offer.length);
+    expect(d.earned).toBe(offer.upfront);
+    expect(d.end > reloaded.now).toBe(true);
+    // Every offer for that slot is gone, and the signed sponsor now ignores the team for its cooldown.
+    expect(signed.sponsorship.offers.filter((o) => o.slot === offer.slot)).toEqual([]);
+    const sponsor = reloaded.g.list<any>(reloaded.data.sponsorManager.mEntities).find((s) => s.id === offer.sponsorId);
+    expect(sponsor.mTeamsIgnored.some((e: any) => reloaded.g.same(e.Key, reloaded.team(offerTeam)))).toBe(true);
+    // The new deal has MM's "deal ends" event in the calendar queue.
+    const queued = reloaded.g.list<any>(reloaded.data.calendar.mDelayedEvents);
+    expect(queued.some((e) => e.mDynamicDescription?.translatedText?.English === `Sponsorship Deal Ends With ${offer.sponsor}`)).toBe(true);
+    expect(teamSponsors(reloaded, reloaded.team(dealTeam))!.sponsorship.deals.some((x) => x.slot === deal.slot)).toBe(false);
   }, 120_000);
 });
 

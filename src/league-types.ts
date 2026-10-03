@@ -406,7 +406,62 @@ export interface TeamState {
    * snapshots published before 2026-10-02.
    */
   engine?: { name: string; stats: Record<number, number> } | null;
+  /** Sponsors on the car, by slot. Public, as rival cars show them in game. Missing before 2026-10-03. */
+  sponsors?: SponsorOnCar[];
+  /** Deals with their money terms, and MM's offers. Private. Missing before 2026-10-03. */
+  sponsorship?: TeamSponsorship | null;
   staff: StaffSlot[];
+}
+
+/** MM's SponsorSlot.SlotType, in slot order. */
+export const SPONSOR_SLOTS = ["Rear Wing", "Front Wing", "Nose", "Side Pods", "End Plate", "Air Intake"] as const;
+
+export interface SponsorOnCar {
+  /** 0..5, see SPONSOR_SLOTS. */
+  slot: number;
+  sponsor: string;
+  category: string;
+  /** 1..5 stars. */
+  prestige: number;
+}
+
+/** Terms shared by a running deal and an offer (ContractSponsor). */
+export interface SponsorTerms extends SponsorOnCar {
+  /** Sponsor entity GUID: identifies the sponsor across snapshots. */
+  sponsorId: string;
+  upfront: number;
+  /** Paid after every race (MM shows either this or a race bonus). */
+  perRace: number;
+  /** Paid when a car finishes at or above `bonusTarget`. */
+  bonus: number;
+  bonusTarget: number;
+  /** Home race bonus multiplier (> 1 means the bonus is bigger at the sponsor's home race). */
+  homeBonus: number;
+  /** MM calls them races, but counts one off on the 1st of every month. */
+  length: number;
+  /** When MM made the offer ("0001-..." for deals from the career start). */
+  offerDate: string;
+}
+
+export interface SponsorDeal extends SponsorTerms {
+  /** Months left (MM's contractRacesLeft). */
+  left: number;
+  /** MM's end date for the deal (from the race calendar; the real end follows `left`). */
+  end: string;
+  /** Upfront plus per-race money and bonuses received so far. */
+  earned: number;
+}
+
+export interface SponsorOffer extends SponsorTerms {
+  /** Days until MM withdraws the offer (MM's offerRacesLeft counts down daily). */
+  daysLeft: number;
+  /** Game date the offer lapses: the snapshot date plus `daysLeft`. */
+  expires: string;
+}
+
+export interface TeamSponsorship {
+  deals: SponsorDeal[];
+  offers: SponsorOffer[];
 }
 
 export interface LeagueState {
@@ -421,8 +476,8 @@ export interface LeagueState {
  * What every league member may see about a team. Budget, HQ and parts stay private to the
  * team's member (and the organizer), as MM itself hides them for rival teams.
  */
-export type TeamPublic = Omit<TeamState, "budget" | "hq" | "parts" | "design" | "gameCrew">;
-export type TeamPrivate = Pick<TeamState, "budget" | "hq" | "parts" | "design" | "gameCrew">;
+export type TeamPublic = Omit<TeamState, "budget" | "hq" | "parts" | "design" | "gameCrew" | "sponsorship">;
+export type TeamPrivate = Pick<TeamState, "budget" | "hq" | "parts" | "design" | "gameCrew" | "sponsorship">;
 
 export interface PublicSnapshot {
   extractedAt: string;

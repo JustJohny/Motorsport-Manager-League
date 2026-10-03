@@ -1,5 +1,5 @@
 import {
-  ArrowRight, Check, ChevronDown, Copy, Download, Flag, Gamepad2, Gavel, Hammer, LifeBuoy, PencilRuler, ShieldAlert,
+  ArrowRight, Check, ChevronDown, Copy, Download, Flag, Gamepad2, Gavel, Hammer, Handshake, LifeBuoy, PencilRuler, ShieldAlert,
   Settings2, Upload, Users, Wrench, type LucideIcon,
 } from "lucide-react"
 import { useState, type ReactNode } from "react"
@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { fmtDate } from "@/lib/format"
 import { useHqOrders } from "@/lib/hq"
+import { useSponsors } from "@/lib/sponsors"
 import { useLeague } from "@/lib/league"
 import { useParts } from "@/lib/parts"
 import { useTransfers } from "@/lib/transfers"
@@ -94,6 +95,7 @@ export function RaceCycle() {
   const [tab, setTab] = useState<Checkpoint>(current)
   const hq = useHqOrders().orders
   const designs = useParts().orders.filter((o) => o.status === "queued")
+  const sponsorChoices = useSponsors().orders.filter((o) => o.status === "queued")
   const t = useTransfers()
   const w = t.transferWindow
 
@@ -117,6 +119,7 @@ export function RaceCycle() {
     <div className="flex flex-wrap gap-2">
       <Badge variant="outline" className="gap-1"><PencilRuler className="size-3" /> {designs.length} part design{designs.length === 1 ? "" : "s"}</Badge>
       <Badge variant="outline" className="gap-1"><Hammer className="size-3" /> {hq.length} HQ order{hq.length === 1 ? "" : "s"}</Badge>
+      <Badge variant="outline" className="gap-1"><Handshake className="size-3" /> {sponsorChoices.length} sponsor choice{sponsorChoices.length === 1 ? "" : "s"}</Badge>
       <Badge variant="outline" className="gap-1"><Gavel className="size-3" /> {w && w.status !== "applied" ? `window #${w.id} ${t.isOpen ? "open" : "closed"}` : "no window"}</Badge>
       <Badge variant="outline" className="gap-1"><Wrench className="size-3" /> fitting, improvement and pit crews: always</Badge>
     </div>
@@ -178,11 +181,11 @@ export function RaceCycle() {
                 Open one with the controls on this page. Give it a deadline before step 5: bids are only pulled once it has passed.
               </Step>
               <Step n={4} icon={Users} title="Tell the members they can act">
-                Part designs, HQ orders, bids, fitting and improvement, and their pit crews.
+                Part designs, HQ orders, bids, fitting and improvement, their pit crews and sponsors.
               </Step>
               <Step n={5} icon={Download} title="Pull their decisions">
                 <CopyCommand command={cmd.pull} />
-                It prints the designs, HQ orders, fitting, pit crews and signings. The first changes undo what MM's AI did on member teams; that's expected.
+                It prints the designs, HQ orders, fitting, pit crews, sponsor deals and signings. The first changes undo what MM's AI did on member teams; that's expected. Sponsor deals MM's AI signed stay unless the member dropped them.
               </Step>
               <Step n={6} icon={Wrench} title="Apply them to the save you published">
                 <CopyCommand command={cmd.apply(post)} />

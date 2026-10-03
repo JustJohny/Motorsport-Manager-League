@@ -1,6 +1,6 @@
 # Handoff: MM League Toolkit
 
-_Last updated 2026-10-02 (pit crews built; auction, HQ orders, part development, organizer race guide and grey-area parts live; regulations, engine programmes and illegal engines designed, not built). Read this first in a new session, then `README.md` and `docs/save-schema.md`._
+_Last updated 2026-10-03 (sponsors built; pit crews built; auction, HQ orders, part development, organizer race guide and grey-area parts live; regulations, engine programmes and illegal engines designed, not built). Read this first in a new session, then `README.md` and `docs/save-schema.md`._
 
 ## The goal
 Run a **Motorsport Manager 1 (v1.53)** online league the way F1 Manager 24 community leagues run:
@@ -571,6 +571,25 @@ A member invests in their own engine programme, becomes an engine supplier, and 
 - **Part design time:** the running design shows days left, the queued one and the designer show "N days to design".
 - **HQ:** buildings under construction show weeks left (days under a week). Every building shows MM's UI name (the "missing" Forecasting Centre was the save's "Logistics Centre") and an info icon with MM's description and effects on hover (`src/hq-info.ts`). Tooltips are hover-only, so they don't open on phones.
 - **Calendar:** each remaining race shows "in N days" from the published game date ("this weekend" on race day).
+
+## Sponsors (built 2026-10-03; needs migration 016, a publish, and an in-game check)
+**The user's rules (2026-10-03):**
+- Offers = **MM's own offers** from the save, no site-generated offers.
+- **No exclusivity:** several teams can sign the same sponsor, as in MM.
+- Signing any time before the organizer's next pull; the apply writes the deal (like HQ/parts).
+- **AI deals:** deals MM's AI signed on a member team since the league began (offer date ≥ `league_start()`, no league sign order) are flagged; **the member keeps or drops** each one. Doing nothing keeps it. Dropping pays the upfront money back (my proposal in the discussion; the user said go ahead without objecting; easy to change in `drop_sponsor` and `sponsorChanges`).
+- **No early exit** from other deals; only empty (or being-freed) slots take a new deal.
+- **Visibility:** what's on the car is public (`TeamPublic.sponsors`); terms and offers private (`TeamPrivate.sponsorship`).
+- **Expiry:** MM's own: an offer lapses after `offerRacesLeft` days (see docs/save-schema.md, "Sponsors"). The site warns at 7 days or less; `pull` leaves out and marks `expired` a sign whose offer lapsed by the latest snapshot's game date.
+- The career team signs its sponsors in game (RPCs refuse it; the tab shows it read-only). The weekend objective sponsor isn't offered: the AI re-picks it at every event.
+
+**Built:**
+- `src/ops/sponsors.ts`: `teamSponsors` (extract), ops `signSponsor` and `dropSponsor`, mirroring `SponsorController.AddSponsor` / `RemoveSponsorshipDeal` (see docs/save-schema.md, "Sponsors"). Test in `test/ops.test.ts` (sign + drop, reload, validate, types, end event).
+- Extract/publish: `sponsors` public, `sponsorship` private (`SponsorDeal`, `SponsorOffer` in `src/league-types.ts`).
+- Migration `016_sponsors.sql`: `sponsor_orders` (kind sign / drop / keep; status queued / applied / cancelled / expired / kept), RPCs `sign_sponsor(slot, sponsor_id)`, `drop_sponsor(slot)` (budget check, counts in `hq_committed`), `keep_sponsor(slot)`, `cancel_sponsor_order(id)`; included in archive/restore. Tests in `test/db-sponsors.test.ts`.
+- `src/sponsor-orders.ts` + `pull`: drops (with `adjustBudget` −upfront) before signs (+upfront), marks applied/expired with `--mark-applied`.
+- Site: My team → **Sponsors** tab (6 slots "On the car" with Keep/Drop on AI deals and pending states; "Offers" table with upfront, income, length, guaranteed value, lapse date, Sign); rivals see only the sponsors on the car. Budget strips and the bid dialog count pay-backs. The organizer's race guide lists sponsor choices. Checked in demo mode with headless Chromium (playwright-core from the scratchpad).
+- Not verified in game yet. To check: sign an offer and drop an AI deal on a member team via the site, pull + apply, load in MM, advance past a race and save; then `mmsave extract` (or publish) should still show the deal, with per-race money added to its `earned`, and the dropped sponsor gone.
 
 ## Working notes for the assistant
 - The user plays MM under Wine on Linux (CachyOS). They test in game and report back, so give them concrete things to check.
