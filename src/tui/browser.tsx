@@ -7,6 +7,7 @@ import type { Save } from "../model.ts";
 import type { Shell } from "./app.tsx";
 import { Field, Hints } from "./components.tsx";
 import { loadSave } from "./data.ts";
+import { TeamList, useTeamRows, type TeamRow } from "./teams.tsx";
 import { C, fit, gameDate, money, moneyShort, S } from "./theme.ts";
 
 interface ScreenProps { shell: Shell; active: boolean; height: number; width: number }
@@ -14,8 +15,6 @@ interface ScreenProps { shell: Shell; active: boolean; height: number; width: nu
 const TABS = ["Overview", "HQ", "Parts", "Staff", "Sponsors"] as const;
 type Tab = (typeof TABS)[number];
 const TAB_ICONS: Record<Tab, string> = { Overview: S.team, HQ: S.hq, Parts: S.part, Staff: S.crew, Sponsors: S.sponsor };
-
-interface TeamRow { t: Obj; id: number; name: string; champ: string; member: string | null; player: boolean }
 
 /** Every team of the selected save by championship, and one team's HQ, parts, staff and sponsors. */
 export function Browser({ shell, active, height, width }: ScreenProps) {
@@ -37,14 +36,7 @@ export function Browser({ shell, active, height, width }: ScreenProps) {
 }
 
 function Loaded({ shell, save, active, height, width }: ScreenProps & { save: Save }) {
-  const members = useMemo(() => new Map((shell.series?.cfg.members ?? []).map((m) => [m.team, m.member])), [shell.series]);
-  const rows = useMemo<TeamRow[]>(() => {
-    const player = save.data.player?.mPlayerTeam;
-    return save.teams().filter((t) => t.championship).map((t) => ({
-      t, id: t.teamID as number, name: t.name as string, champ: save.championshipName(save.championship(t)),
-      member: members.get(t.name as string) ?? null, player: save.g.same(player, t),
-    }));
-  }, [save, members]);
+  const rows = useTeamRows(save, shell.series);
   const [filter, setFilter] = useState("");
   const shown = rows.filter((r) => !filter || `${r.name} ${r.champ}`.toLowerCase().includes(filter.toLowerCase()));
   const [sel, setSel] = useState(() => Math.max(0, shown.findIndex((r) => r.member)));
@@ -80,15 +72,6 @@ function Loaded({ shell, save, active, height, width }: ScreenProps & { save: Sa
 
   const listW = 34;
   const listH = height - 4; // the box borders, the title line and the key hints
-  // The team list with championship headings; the window keeps the selection in view.
-  const lines: { text: string; head?: boolean; row?: TeamRow; index?: number }[] = [];
-  shown.forEach((r, i) => {
-    if (i === 0 || shown[i - 1].champ !== r.champ) lines.push({ text: r.champ, head: true });
-    lines.push({ text: r.name, row: r, index: i });
-  });
-  const selLine = lines.findIndex((l) => l.index === sel);
-  const start = Math.max(0, Math.min(selLine - Math.floor(listH / 2), lines.length - listH));
-
   return (
     <Box flexDirection="column" height={height}>
       <Text wrap="truncate-end">
@@ -96,16 +79,7 @@ function Loaded({ shell, save, active, height, width }: ScreenProps & { save: Sa
         <Text color={C.dim}> · {shell.save?.shown} · {gameDate(save.now)} · {rows.length} teams{filter ? ` · filter "${filter}" (${shown.length})` : ""}</Text>
       </Text>
       <Box flexGrow={1}>
-        <Box flexDirection="column" width={listW} flexShrink={0} borderStyle="round" borderColor={C.border} paddingX={1} overflow="hidden">
-          {lines.slice(start, start + listH).map((l, i) => l.head ? (
-            <Text key={i} color={C.accent2} bold wrap="truncate-end">{l.text}</Text>
-          ) : (
-            <Text key={i} wrap="truncate-end" inverse={l.index === sel} color={l.row!.member ? C.accent : undefined}>
-              {l.index === sel ? S.pointer : " "} {l.row!.player ? S.star : l.row!.member ? S.dot : " "} {l.text}
-            </Text>
-          ))}
-          {!lines.length && <Text color={C.dim}>No team matches.</Text>}
-        </Box>
+        <TeamList rows={shown} sel={sel} height={listH} width={listW} focused={false} />
         <Box flexDirection="column" flexGrow={1} borderStyle="round" borderColor={active ? C.focus : C.border} paddingX={1} overflow="hidden">
           <Box columnGap={2} flexShrink={0}>
             {TABS.map((t) => <Text key={t} bold={t === tab} inverse={t === tab} color={t === tab ? C.accent : C.dim}> {TAB_ICONS[t]} {t} </Text>)}
