@@ -29,7 +29,9 @@ A full-screen dashboard for the organizer, run in the toolkit folder (Ink; plain
 - **Race cycle:** where the series stands (checkpoint A after a race or B before the next), the selected save next to the website's latest snapshot, the race guide's steps, and members' queued decisions (a read-only pull, refreshed with `r`).
 - `p` publishes the selected save after showing what goes up. `u` pulls members' decisions into a review by area (HQ, parts, crews, sponsors, window…) with the change counts; from there `a` applies them to a **new** save you name (it refuses names that exist), writes `changes-<series>.json`, and then asks whether to mark the decisions applied on the site.
 - **Saves** (`2`): the Wine saves folder, newest first, with each save's game date. **Series** (`3`): the `league-*.json` files and their members.
-- Keys: `Tab` menu/screen, `1`–`3` screens, `l` bigger log, `q` quit. The save browser, a command launcher and a save editor are planned (see HANDOFF.md).
+- **Save browser** (`4`): every team of the selected save by championship (`●` member teams, `★` the career team; `m` jumps to the next member team, `/` filters), with tabs (`←→`) for the overview, HQ, parts, staff and sponsors (deals and offers).
+- **Compare saves** (`5`): the selected save against another, older first. "Per team" lists what changed in plain words (budget, standings, HQ, the design, parts, staff, sponsors); "Every field" is the full diff as a tree, one branch per team, person and championship, then the rest of the save (`→` open, `←` close, `e` open all below).
+- Keys: `Tab` menu/screen, `1`–`5` screens, `l` bigger log, `q` quit. A command launcher and a save editor are planned (see HANDOFF.md).
 - The CLI's publish, pull and apply live in `src/commands/` and are shared by both.
 
 ## Changes (`changes.json`)

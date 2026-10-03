@@ -591,7 +591,7 @@ A member invests in their own engine programme, becomes an engine supplier, and 
 - Site: My team → **Sponsors** tab (6 slots "On the car" with Keep/Drop on AI deals and pending states; "Offers" table with upfront, income, length, guaranteed value, lapse date, Sign); rivals see only the sponsors on the car. Budget strips and the bid dialog count pay-backs. The organizer's race guide lists sponsor choices. Checked in demo mode with headless Chromium (playwright-core from the scratchpad).
 - Not verified in game yet. To check: sign an offer and drop an AI deal on a member team via the site, pull + apply, load in MM, advance past a race and save; then `mmsave extract` (or publish) should still show the deal, with per-race money added to its `earned`, and the dropped sponsor gone.
 
-## TUI (designed 2026-10-03 with the user; phase 1 built the same day)
+## TUI (designed 2026-10-03 with the user; phases 1 and 2 built the same day)
 **The user's choices:** all four areas (race cycle cockpit, save browser + diff, command launcher, save editor), built in that order; **Ink** (React for the terminal); a full-screen, game-like dashboard (sidebar of screens, panels, colours, keyboard navigation); **plain Unicode symbols** (the user isn't sure their terminal has a Nerd Font); offline save features always, website features with the CLI's own `.env` credentials; every write **previews a diff, asks, and writes a new save name** (never overwrites, through `Save.write()`).
 
 **Plan:**
@@ -604,6 +604,13 @@ A member invests in their own engine programme, becomes an engine supplier, and 
 - Dialogs are overlays (absolute `Box` with a background) so the screen under them keeps its state; blocking work (loading, writing saves) runs behind a "Working…" dialog.
 - The F1 series is named "Formula 1", so the race guide's save names are "Formula 1 R1 Post", but the user's saves are "F1 League …": the save list falls back to all saves and the steps show the selected save's name. Renaming the series (or the saves) would line them up.
 - Found while testing: `startDesign` needed a design already running somewhere to copy its calendar event; the F1 save has none (the equalization cancelled them), so the real apply failed. It now builds the event from any queued event (same `CalendarEvent_v1` + `MMAction` shape). Test in `test/ops.test.ts`. Also `pull` now skips sponsors with a warning while migration 016 hasn't been run (it failed before).
+
+**Phase 2 built (2026-10-03):** screens 4 and 5.
+- **Save browser** (`src/tui/browser.tsx`): teams by championship, a team's overview, HQ, parts, staff and sponsors via the extract's own `team()` (now exported, with `building`, `part`, `person`).
+- **Compare saves** (`src/tui/compare.tsx`): picks the other save, orders them by game date then file time. "Per team" = `compareSaves` (`src/save-compare.ts`: budget, standings, HQ, design, parts by GUID with values rounded as MM shows them, staff by slot, sponsors by slot). "Every field" = `diffSaves` (`src/diff.ts`): teams first, then people ("Person <name>"), championships, then "save"; each team's branch stops at other teams, people and championships, so it holds only that team's own data. Up to 200,000 fields (a race apart is about 50,000+).
+- Loaded saves are cached (two at most, about 340 MB each; `loadSave` in `src/tui/data.ts`) and shared by the cockpit, browser and compare; apply always loads its own copy.
+- Fixed in the diff (CLI too): an object compared with a missing value was printed whole before being cut to 120 characters, which with a deep `--depth` ran out of memory (4 GB); objects are now described (`{TeamDisplayEffect}`, `[3 items]`). 50,000 fields take about 0.6–1.5 s.
+- Tests: `test/compare.test.ts` (League Test 3 → 4). Checked in the pseudo-terminal at 140×40.
 
 ## Working notes for the assistant
 - The user plays MM under Wine on Linux (CachyOS). They test in game and report back, so give them concrete things to check.

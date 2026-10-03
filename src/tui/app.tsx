@@ -1,19 +1,22 @@
 import { Box, Text, useApp, useInput, useWindowSize } from "ink";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { LeagueState } from "../league-types.ts";
+import { Browser } from "./browser.tsx";
 import { Cockpit } from "./cockpit.tsx";
+import { Compare } from "./compare.tsx";
 import { Hints, Modal, type ModalSpec } from "./components.tsx";
 import { defaultSeries, fetchSite, loadState, readSaves, readSeries, savesOf, seriesSaves, type SaveEntry, type SeriesEntry, type SiteStatus } from "./data.ts";
 import { SavePicker, SeriesPicker } from "./pickers.tsx";
 import { C, gameDate, S } from "./theme.ts";
 
-export type ScreenId = "cockpit" | "saves" | "series" | "browser" | "launcher" | "editor";
+export type ScreenId = "cockpit" | "saves" | "series" | "browser" | "compare" | "launcher" | "editor";
 
 const SCREENS: { id: ScreenId; icon: string; label: string; soon?: string }[] = [
   { id: "cockpit", icon: S.flag, label: "Race cycle" },
   { id: "saves", icon: S.save, label: "Saves" },
   { id: "series", icon: S.series, label: "Series" },
-  { id: "browser", icon: S.team, label: "Save browser", soon: "phase 2" },
+  { id: "browser", icon: S.team, label: "Save browser" },
+  { id: "compare", icon: S.window, label: "Compare saves" },
   { id: "launcher", icon: S.gear, label: "Commands", soon: "phase 3" },
   { id: "editor", icon: S.part, label: "Editor", soon: "phase 4" },
 ];
@@ -91,7 +94,7 @@ export function App() {
     setState(null); setStateError(null);
     if (!save || !series) return;
     const t = setTimeout(() => {
-      try { setState(loadState(save.path, series.cfg)); } catch (e) { setStateError((e as Error).message); }
+      try { setState(loadState(save.path, save.modified, series.cfg)); } catch (e) { setStateError((e as Error).message); }
     }, 60);
     return () => clearTimeout(t);
   }, [save?.path, save?.modified.getTime(), series?.file]);
@@ -121,7 +124,7 @@ export function App() {
     if (input === "q") return exit();
     if (key.tab) return setFocus((f) => (f === "nav" ? "main" : "nav"));
     if (input === "l") return setLogBig((b) => !b);
-    if (/^[1-6]$/.test(input)) {
+    if (/^[1-7]$/.test(input)) {
       const s = SCREENS[Number(input) - 1];
       if (!s.soon) shell.go(s.id);
       return;
@@ -147,6 +150,8 @@ export function App() {
       case "cockpit": return <Cockpit {...props} />;
       case "saves": return <SavePicker {...props} />;
       case "series": return <SeriesPicker {...props} />;
+      case "browser": return <Browser {...props} />;
+      case "compare": return <Compare {...props} />;
       default: return <Text color={C.dim}>Coming in a later phase.</Text>;
     }
   }, [screen, shell, mainActive, bodyHeight, mainWidth]);
@@ -212,7 +217,7 @@ export function App() {
 
       {/* Footer */}
       <Box paddingX={1} height={1} flexShrink={0}>
-        <Hints items={[["Tab", focus === "nav" ? "to screen" : "to menu"], ["1-3", "screens"], ["l", "log"], ["q", "quit"]]} />
+        <Hints items={[["Tab", focus === "nav" ? "to screen" : "to menu"], ["1-5", "screens"], ["l", "log"], ["q", "quit"]]} />
       </Box>
     </Box>
   );

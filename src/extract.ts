@@ -51,7 +51,8 @@ export function extractLeague(save: Save, cfg: LeagueConfig): LeagueState {
   };
 }
 
-function team(save: Save, t: Obj, champ: Obj, member: string | null): TeamState {
+/** One team as the site sees it (also used by the TUI's save browser for any team). */
+export function team(save: Save, t: Obj, champ: Obj, member: string | null): TeamState {
   const fin = save.finance(t);
   const partTypes = SERIES_PART_TYPES[champ.series as number] ?? SERIES_PART_TYPES[0];
   const sponsors = teamSponsors(save, t);
@@ -84,7 +85,7 @@ function engineOf(save: Save, t: Obj): TeamState["engine"] {
   return e ? { name: e.name, stats: e.stats } : null;
 }
 
-function building(save: Save, b: Obj): Building {
+export function building(save: Save, b: Obj): Building {
   const info = save.buildingInfo(b);
   const built = b.state !== 0;
   return {
@@ -105,7 +106,7 @@ function building(save: Save, b: Obj): Building {
   };
 }
 
-function part(save: Save, p: Obj): Part {
+export function part(save: Save, p: Obj): Part {
   const s = p.mStats;
   const fittedCar = p.fittedCar ? save.g.deref<Obj>(p.fittedCar) : null;
   return {
@@ -127,7 +128,7 @@ function part(save: Save, p: Obj): Part {
   };
 }
 
-function person(save: Save, p: Obj): Person {
+export function person(save: Save, p: Obj): Person {
   const c = save.contract(p);
   const kind = personKind(p);
   const stats = save.g.deref<Obj>(p.mStats ?? p.stats);

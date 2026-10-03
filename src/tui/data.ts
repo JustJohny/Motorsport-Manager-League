@@ -62,9 +62,28 @@ export function defaultSeries(series: SeriesEntry[], saves: SaveEntry[]): number
   return 0;
 }
 
+// Loaded saves, read-only, shared by the screens: a save takes about 340 MB in memory, so at most
+// two are kept (the selected one and the one it's compared with). Never hand these to apply, which
+// changes the save it gets; applyToSave loads its own copy.
+const cache: { key: string; save: Save }[] = [];
+
+export function loadSave(path: string, modified: Date): Save {
+  const key = `${path}@${modified.getTime()}`;
+  const hit = cache.find((c) => c.key === key);
+  if (hit) {
+    cache.splice(cache.indexOf(hit), 1);
+    cache.push(hit);
+    return hit.save;
+  }
+  const save = Save.load(path);
+  cache.push({ key, save });
+  while (cache.length > 2) cache.shift();
+  return save;
+}
+
 /** Load a save and extract the league view of it (blocks for a second or two). */
-export function loadState(path: string, cfg: LeagueConfig): LeagueState {
-  return extractLeague(Save.load(path), cfg);
+export function loadState(path: string, modified: Date, cfg: LeagueConfig): LeagueState {
+  return extractLeague(loadSave(path, modified), cfg);
 }
 
 export interface SiteStatus {
