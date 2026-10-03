@@ -4,6 +4,7 @@ import type { LeagueState } from "../league-types.ts";
 import { Browser } from "./browser.tsx";
 import { Cockpit } from "./cockpit.tsx";
 import { Compare } from "./compare.tsx";
+import { Launcher } from "./launcher.tsx";
 import { Hints, Modal, type ModalSpec } from "./components.tsx";
 import { defaultSeries, fetchSite, loadState, readSaves, readSeries, savesOf, seriesSaves, type SaveEntry, type SeriesEntry, type SiteStatus } from "./data.ts";
 import { SavePicker, SeriesPicker } from "./pickers.tsx";
@@ -17,7 +18,7 @@ const SCREENS: { id: ScreenId; icon: string; label: string; soon?: string }[] = 
   { id: "series", icon: S.series, label: "Series" },
   { id: "browser", icon: S.team, label: "Save browser" },
   { id: "compare", icon: S.window, label: "Compare saves" },
-  { id: "launcher", icon: S.gear, label: "Commands", soon: "phase 3" },
+  { id: "launcher", icon: S.gear, label: "Commands" },
   { id: "editor", icon: S.part, label: "Editor", soon: "phase 4" },
 ];
 
@@ -152,6 +153,7 @@ export function App() {
       case "series": return <SeriesPicker {...props} />;
       case "browser": return <Browser {...props} />;
       case "compare": return <Compare {...props} />;
+      case "launcher": return <Launcher {...props} />;
       default: return <Text color={C.dim}>Coming in a later phase.</Text>;
     }
   }, [screen, shell, mainActive, bodyHeight, mainWidth]);
@@ -217,7 +219,7 @@ export function App() {
 
       {/* Footer */}
       <Box paddingX={1} height={1} flexShrink={0}>
-        <Hints items={[["Tab", focus === "nav" ? "to screen" : "to menu"], ["1-5", "screens"], ["l", "log"], ["q", "quit"]]} />
+        <Hints items={[["Tab", focus === "nav" ? "to screen" : "to menu"], ["1-6", "screens"], ["l", "log"], ["q", "quit"]]} />
       </Box>
     </Box>
   );

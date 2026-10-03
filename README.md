@@ -31,7 +31,8 @@ A full-screen dashboard for the organizer, run in the toolkit folder (Ink; plain
 - **Saves** (`2`): the Wine saves folder, newest first, with each save's game date. **Series** (`3`): the `league-*.json` files and their members.
 - **Save browser** (`4`): every team of the selected save by championship (`●` member teams, `★` the career team; `m` jumps to the next member team, `/` filters), with tabs (`←→`) for the overview, HQ, parts, staff and sponsors (deals and offers).
 - **Compare saves** (`5`): the selected save against another, older first. "Per team" lists what changed in plain words (budget, standings, HQ, the design, parts, staff, sponsors); "Every field" is the full diff as a tree, one branch per team, person and championship, then the rest of the save (`→` open, `←` close, `e` open all below).
-- Keys: `Tab` menu/screen, `1`–`5` screens, `l` bigger log, `q` quit. A command launcher and a save editor are planned (see HANDOFF.md).
+- **Commands** (`6`): every CLI command as a form (save and file fields open a picker; type to filter), with the command line it will run. `r` runs it as a child process (`tsx src/cli.ts …`) with its output streamed; `Esc` stops it, and it keeps running if you switch screens. Commands that upload, delete or write (`⚠`) ask first; new saves must have a name that doesn't exist yet.
+- Keys: `Tab` menu/screen, `1`–`6` screens, `l` bigger log, `q` quit. A save editor is planned (see HANDOFF.md).
 - The CLI's publish, pull and apply live in `src/commands/` and are shared by both.
 
 ## Changes (`changes.json`)

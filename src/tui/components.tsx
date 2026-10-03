@@ -105,12 +105,28 @@ export type ModalSpec =
   | { kind: "confirm"; title: string; lines?: ReactNode[]; yes?: string; danger?: boolean; onYes: () => void; onNo?: () => void }
   | { kind: "input"; title: string; lines?: ReactNode[]; value: string; placeholder?: string; validate?: (v: string) => string | null; onSubmit: (v: string) => void; onCancel?: () => void }
   | { kind: "info"; title: string; lines: ReactNode[]; tone?: "ok" | "bad" | "warn"; onClose?: () => void }
-  | { kind: "busy"; title: string; lines?: ReactNode[] };
+  | { kind: "busy"; title: string; lines?: ReactNode[] }
+  | { kind: "pick"; title: string; items: { label: string; value: string; hint?: string }[]; selected?: string; onPick: (value: string) => void };
 
 /** A dialog drawn over the screen: confirm (y/n), text input, a message, or "working". */
 export function Modal({ spec, close, width }: { spec: ModalSpec; close: () => void; width: number }) {
   const [value, setValue] = useState(spec.kind === "input" ? spec.value : "");
   const [error, setError] = useState<string | null>(null);
+  // "pick": type to filter, arrows to move, Enter to choose.
+  const [filter, setFilter] = useState("");
+  const picks = spec.kind === "pick" ? spec.items.filter((i) => !filter || `${i.label} ${i.hint ?? ""}`.toLowerCase().includes(filter.toLowerCase())) : [];
+  const [pickSel, setPickSel] = useState(() => (spec.kind === "pick" ? Math.max(0, spec.items.findIndex((i) => i.value === spec.selected)) : 0));
+  useInput((input, key) => {
+    if (spec.kind !== "pick") return;
+    if (key.escape) close();
+    else if (key.return) { const it = picks[Math.min(pickSel, picks.length - 1)]; if (it) { close(); spec.onPick(it.value); } }
+    else if (key.upArrow) setPickSel((n) => Math.max(0, n - 1));
+    else if (key.downArrow) setPickSel((n) => Math.min(picks.length - 1, n + 1));
+    else if (key.pageUp) setPickSel((n) => Math.max(0, n - 10));
+    else if (key.pageDown) setPickSel((n) => Math.min(picks.length - 1, n + 10));
+    else if (key.backspace || key.delete) { setFilter((f) => f.slice(0, -1)); setPickSel(0); }
+    else if (input && !key.ctrl && !key.meta && !key.tab) { setFilter((f) => f + input); setPickSel(0); }
+  }, { isActive: spec.kind === "pick" });
   useInput((input, key) => {
     if (spec.kind === "confirm") {
       if (input === "y" || input === "Y") { close(); spec.onYes(); }
@@ -124,7 +140,7 @@ export function Modal({ spec, close, width }: { spec: ModalSpec; close: () => vo
   return (
     <Box flexDirection="column" borderStyle="double" borderColor={color} paddingX={2} paddingY={1} width={width}>
       <Text bold color={color}>{spec.title}</Text>
-      {(spec.kind !== "input" || spec.lines) && (spec.lines ?? []).map((l, i) => <Box key={i}>{typeof l === "string" ? <Text wrap="wrap">{l}</Text> : l}</Box>)}
+      {spec.kind !== "pick" && (spec.lines ?? []).map((l, i) => <Box key={i}>{typeof l === "string" ? <Text wrap="wrap">{l}</Text> : l}</Box>)}
       {spec.kind === "input" && (
         <>
           <TextInput value={value} placeholder={spec.placeholder} onChange={(v) => { setValue(v); setError(null); }}
@@ -141,6 +157,14 @@ export function Modal({ spec, close, width }: { spec: ModalSpec; close: () => vo
       {spec.kind === "confirm" && <Box marginTop={1}><Hints items={[["y", spec.yes ?? "yes"], ["n", "no"]]} /></Box>}
       {spec.kind === "info" && <Box marginTop={1}><Hints items={[["Enter", "close"]]} /></Box>}
       {spec.kind === "busy" && <Box marginTop={1}><Text color={C.dim}>{S.clock} Working… the screen updates when it's done.</Text></Box>}
+      {spec.kind === "pick" && (
+        <>
+          <Text color={C.dim}>Filter: <Text color={C.accent2}>{filter || "type to filter"}</Text></Text>
+          <List items={picks} selected={Math.min(pickSel, Math.max(0, picks.length - 1))} height={12} empty="Nothing matches."
+            render={(i, on) => <Text bold={on} wrap="truncate-end">{i.label}{i.hint ? <Text color={C.dim}>  {i.hint}</Text> : null}</Text>} />
+          <Hints items={[["↑↓", "move"], ["Enter", "choose"], ["Esc", "cancel"]]} />
+        </>
+      )}
     </Box>
   );
 }

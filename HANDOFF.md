@@ -591,7 +591,7 @@ A member invests in their own engine programme, becomes an engine supplier, and 
 - Site: My team → **Sponsors** tab (6 slots "On the car" with Keep/Drop on AI deals and pending states; "Offers" table with upfront, income, length, guaranteed value, lapse date, Sign); rivals see only the sponsors on the car. Budget strips and the bid dialog count pay-backs. The organizer's race guide lists sponsor choices. Checked in demo mode with headless Chromium (playwright-core from the scratchpad).
 - Not verified in game yet. To check: sign an offer and drop an AI deal on a member team via the site, pull + apply, load in MM, advance past a race and save; then `mmsave extract` (or publish) should still show the deal, with per-race money added to its `earned`, and the dropped sponsor gone.
 
-## TUI (designed 2026-10-03 with the user; phases 1 and 2 built the same day)
+## TUI (designed 2026-10-03 with the user; phases 1–3 built the same day)
 **The user's choices:** all four areas (race cycle cockpit, save browser + diff, command launcher, save editor), built in that order; **Ink** (React for the terminal); a full-screen, game-like dashboard (sidebar of screens, panels, colours, keyboard navigation); **plain Unicode symbols** (the user isn't sure their terminal has a Nerd Font); offline save features always, website features with the CLI's own `.env` credentials; every write **previews a diff, asks, and writes a new save name** (never overwrites, through `Save.write()`).
 
 **Plan:**
@@ -611,6 +611,8 @@ A member invests in their own engine programme, becomes an engine supplier, and 
 - Loaded saves are cached (two at most, about 340 MB each; `loadSave` in `src/tui/data.ts`) and shared by the cockpit, browser and compare; apply always loads its own copy.
 - Fixed in the diff (CLI too): an object compared with a missing value was printed whole before being cut to 120 characters, which with a deep `--depth` ran out of memory (4 GB); objects are now described (`{TeamDisplayEffect}`, `[3 items]`). 50,000 fields take about 0.6–1.5 s.
 - Tests: `test/compare.test.ts` (League Test 3 → 4). Checked in the pseudo-terminal at 140×40.
+
+**Phase 3 built (2026-10-03):** screen 6, **Commands** (`src/tui/launcher.tsx`, forms in `src/tui/commands.ts`). All 12 CLI commands as forms with defaults from the selected series and save; it runs `node_modules/.bin/tsx src/cli.ts …` as a child process (the exact CLI behaviour, the screen stays responsive, `Esc` stops it), streams output into its pane and the log, and rescans saves after apply/encode. The run and the forms live in a module-level store, so a command keeps running across screen switches; the child is killed when the TUI exits. Upload/delete/write commands confirm first (archive `--end` in red). New pick-from-list dialog (`kind: "pick"`, type to filter). Tests: `test/tui-commands.test.ts` (argument building, confirmations). Checked in the pseudo-terminal: validate, teams, apply confirm (declined), diff save picker, Esc stop, screen switch during a run.
 
 ## Working notes for the assistant
 - The user plays MM under Wine on Linux (CachyOS). They test in game and report back, so give them concrete things to check.
