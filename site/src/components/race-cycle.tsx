@@ -1,7 +1,4 @@
-import {
-  ArrowRight, Check, ChevronDown, Copy, Download, Flag, Gamepad2, Gavel, Hammer, Handshake, LifeBuoy, PencilRuler, ShieldAlert,
-  Settings2, Upload, Users, Wrench, type LucideIcon,
-} from "lucide-react"
+import { ArrowRight, Check, ChevronDown, Copy, Download, Flag, Gamepad2, Gavel, Hammer, Handshake, LifeBuoy, PencilRuler, Settings2, ShieldAlert, Signature, type LucideIcon, Upload, Users, Wrench } from "lucide-react"
 import { useState, type ReactNode } from "react"
 import { cycleOf, seriesFiles, type Checkpoint } from "../../../src/race-cycle.ts"
 import { Badge } from "@/components/ui/badge"
@@ -11,6 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { fmtDate } from "@/lib/format"
 import { useHqOrders } from "@/lib/hq"
 import { useSponsors } from "@/lib/sponsors"
+import { useContracts } from "@/lib/contracts"
 import { useLeague } from "@/lib/league"
 import { useParts } from "@/lib/parts"
 import { useTransfers } from "@/lib/transfers"
@@ -71,6 +69,7 @@ export function RaceCycle() {
   const hq = useHqOrders().orders
   const designs = useParts().orders.filter((o) => o.status === "queued")
   const sponsorChoices = useSponsors().orders.filter((o) => o.status === "queued")
+  const renewals = useContracts().orders.filter((o) => o.status === "queued")
   const t = useTransfers()
   const w = t.transferWindow
 
@@ -95,6 +94,7 @@ export function RaceCycle() {
       <Badge variant="outline" className="gap-1"><PencilRuler className="size-3" /> {designs.length} part design{designs.length === 1 ? "" : "s"}</Badge>
       <Badge variant="outline" className="gap-1"><Hammer className="size-3" /> {hq.length} HQ order{hq.length === 1 ? "" : "s"}</Badge>
       <Badge variant="outline" className="gap-1"><Handshake className="size-3" /> {sponsorChoices.length} sponsor choice{sponsorChoices.length === 1 ? "" : "s"}</Badge>
+      <Badge variant="outline" className="gap-1"><Signature className="size-3" /> {renewals.length} contract renewal{renewals.length === 1 ? "" : "s"}</Badge>
       <Badge variant="outline" className="gap-1"><Gavel className="size-3" /> {w && w.status !== "applied" ? `window #${w.id} ${t.isOpen ? "open" : "closed"}` : "no window"}</Badge>
       <Badge variant="outline" className="gap-1"><Wrench className="size-3" /> fitting, improvement and pit crews: always</Badge>
     </div>
@@ -156,11 +156,11 @@ export function RaceCycle() {
                 Open one with the controls on this page. Give it a deadline before step 5: bids are only pulled once it has passed.
               </Step>
               <Step n={4} icon={Users} title="Tell the members they can act">
-                Part designs, HQ orders, bids, fitting and improvement, their pit crews and sponsors.
+                Part designs, HQ orders, bids, fitting and improvement, their pit crews, sponsors and contract renewals.
               </Step>
               <Step n={5} icon={Download} title="Pull their decisions">
                 <CopyCommand command={cmd.pull} />
-                It prints the designs, HQ orders, fitting, pit crews, sponsor deals and signings. The first changes undo what MM's AI did on member teams; that's expected. Sponsor deals MM's AI signed stay unless the member dropped them.
+                It prints the designs, HQ orders, fitting, pit crews, sponsor deals, contract renewals and signings. The first changes undo what MM's AI did on member teams; that's expected. Sponsor deals MM's AI signed stay unless the member dropped them.
               </Step>
               <Step n={6} icon={Wrench} title="Apply them to the save you published">
                 <CopyCommand command={cmd.apply(post)} />
@@ -194,7 +194,8 @@ export function RaceCycle() {
           </TabsContent>
         </Tabs>
 
-        {league.snapshot.championship.calendar.filter((e) => !e.ended).length <= 1 && <PreSeason cmd={cmd} prefix={files.prefix} />}
+        {(league.snapshot.championship.calendar.filter((e) => !e.ended).length <= 1 || inPreSeason(league.snapshot.championship.preSeason, league.snapshot.gameDate))
+          && <PreSeason cmd={cmd} prefix={files.prefix} inPreSeason={inPreSeason(league.snapshot.championship.preSeason, league.snapshot.gameDate)} />}
 
         <Details icon={ShieldAlert} title="Rules that keep it working">
           <li><b>Always apply to the save you just published.</b> Design options, parts and prices come from it; with a different save, apply stops with an error rather than guess.</li>
@@ -208,7 +209,7 @@ export function RaceCycle() {
           <li><b>Apply stops with an error:</b> nothing was written. The message names the change, e.g. <code>Change #4 (startDesign): …</code>.</li>
           <li><b>Members say their page is out of date:</b> publish the latest save. The header shows the game date and publish time.</li>
           <li>
-            <b>Members see no next season's suppliers:</b> MM only offers them after the final race. Check what a save would publish
+            <b>Members see no next season's suppliers:</b> MM only offers them when pre-season starts. Check what a save would publish
             with <code className="break-all">npx tsx src/cli.ts suppliers "Save&lt;name&gt;" --league {files.league}</code>.
           </li>
         </Details>
@@ -217,35 +218,40 @@ export function RaceCycle() {
   )
 }
 
-/** Shown from the final race weekend: next season's suppliers need two extra stops in MM. */
-function PreSeason({ cmd, prefix }: { cmd: { pull: string; publish: (s: string) => string; apply: (s: string) => string; suppliers: (s: string) => string }; prefix: string }) {
-  const end = `${prefix} Season End`, pre = `${prefix} Pre-season`
+/** MM's pre-season has started at this game date (and its car isn't built yet). */
+function inPreSeason(pre: { start: string; end: string } | undefined, gameDate: string) {
+  return !!pre && gameDate.slice(0, 10) >= pre.start.slice(0, 10) && gameDate.slice(0, 10) < pre.end.slice(0, 10)
+}
+
+/**
+ * Shown from the final race weekend through pre-season. MM draws next season's suppliers and its AI
+ * starts next year's car on the same day, when pre-season starts (ERS: 13 Dec), and resets the calendar.
+ */
+function PreSeason({ cmd, prefix, inPreSeason }: { cmd: { pull: string; publish: (s: string) => string; apply: (s: string) => string; suppliers: (s: string) => string }; prefix: string; inPreSeason: boolean }) {
+  const pre = `${prefix} Pre-season`
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2">
-      <span className="flex items-center gap-2 text-sm font-medium"><Settings2 className="size-4" /> Season end: next season's suppliers</span>
+      <span className="flex items-center gap-2 text-sm font-medium"><Settings2 className="size-4" /> {inPreSeason ? "Pre-season" : "Season end"}: next season's car</span>
       <span className="text-sm text-muted-foreground">
-        After the final race MM offers the championship a few deals per supplier type (when the season ends, ERS: early December),
-        and its AI picks from them when pre-season starts (ERS: mid-December). Members choose on Parts → Next season's car.
+        When pre-season starts (ERS: mid-December) MM offers the championship a few deals per supplier type and its AI picks from them
+        and starts next year's car the same day. Until then there's nothing to choose. The design runs until pre-season ends
+        (ERS: early March), so members have time: they choose on Parts → Next season's car, and every pull re-applies their choices.
+        Contract renewals close when pre-season starts, so remind members before you advance into it.
+        Every apply keeps the league's championship as it is (no promotion or relegation); if MM offers your own career team
+        promotion, refuse it.
       </span>
       <ol>
-        <Step n={1} icon={Gamepad2} title={<>After the final race, advance past the season's end (before pre-season) and save as <Save>{end}</Save></>}>
-          Check that MM has drawn next season's deals: it should list each member team with about 4 engine, 6 brakes,
-          5 fuel and 4 materials deals. If it says the draw isn't made yet, advance a few more days and save again.
-          <CopyCommand command={cmd.suppliers(end)} />
-          Then publish it, so members see MM's offers and can choose.
-          <CopyCommand command={cmd.publish(end)} />
-        </Step>
-        <Step n={2} icon={Gamepad2} title={<>Advance into pre-season and save as <Save>{pre}</Save></>}>
-          A few days in, so every team has started next year's car.
-        </Step>
-        <Step n={3} icon={Upload} title="Publish, pull and apply">
+        <Step n={1} icon={Gamepad2} title={<>After the final race, advance to the first day of pre-season and save as <Save>{pre}</Save></>}>
+          Each member team should say "MM designing" with a few deals per type:
           <CopyCommand command={cmd.suppliers(pre)} />
-          Each member team should now say "MM designing". Then:
+          Then publish it, so members see MM's offers and can choose.
           <CopyCommand command={cmd.publish(pre)} />
+        </Step>
+        <Step n={2} icon={Upload} title="Once members have chosen: pull and apply">
           <CopyCommand command={cmd.pull} />
           <CopyCommand command={cmd.apply(pre)} />
           Pull swaps MM's AI picks on member teams for their choices (or this season's suppliers), refunds the AI's payments and charges theirs.
-          Every pull repeats this until the car is built. Teams still waiting for pre-season are listed.
+          Every pull repeats this until the car is built.
         </Step>
       </ol>
     </div>

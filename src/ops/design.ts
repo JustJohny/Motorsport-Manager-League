@@ -462,6 +462,9 @@ export function removeUnorderedParts(save: Save, op: RemoveUnorderedPartsOp): st
       const unordered = save.parts(team, type).filter((p) => {
         if (String(p.buildDate) <= op.since) return false;
         const ids = componentIds(save, p);
+        // MM's pre-season rebuilds every part with no components (build date = pre-season start);
+        // designed parts always have some, so these aren't the AI's designs.
+        if (!ids.length) return false;
         return !op.keep.some((k) => k.team === team.name && k.type === type && sameSet(k.components, ids));
       });
       const refunded = new Set<string>();

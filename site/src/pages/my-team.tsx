@@ -16,12 +16,14 @@ import { PageHeader } from "@/components/page-header"
 import { PartsTab } from "@/components/parts-tab"
 import { PitCrewTab } from "@/components/pit-crew-tab"
 import { SponsorsTab } from "@/components/sponsors-tab"
+import { ContractsTab } from "@/components/contracts-tab"
 import { PersonCard } from "@/components/person-card"
 import { fmtDate, fmtMoney, fmtMoneyShort, fmtPct } from "@/lib/format"
 import { useHqOrders } from "@/lib/hq"
 import { useParts } from "@/lib/parts"
 import { usePitCrew } from "@/lib/pit-crew"
 import { useSponsors } from "@/lib/sponsors"
+import { useContracts } from "@/lib/contracts"
 import { nextHqStep, unorderedProject } from "@/lib/rules"
 import { useTransfers } from "@/lib/transfers"
 import { cn } from "@/lib/utils"
@@ -74,6 +76,7 @@ export function MyTeamPage() {
           <TabsTrigger value="parts">Parts</TabsTrigger>
           <TabsTrigger value="crew">Pit crew</TabsTrigger>
           <TabsTrigger value="sponsors">Sponsors</TabsTrigger>
+          <TabsTrigger value="contracts">Contracts</TabsTrigger>
         </TabsList>
         <TabsContent value="staff" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {people.map((s) => <PersonCard key={s.slotID} person={s.person!} role={s.job} gameDate={league.snapshot.gameDate} />)}
@@ -82,6 +85,7 @@ export function MyTeamPage() {
         <TabsContent value="parts">{priv ? <PartsTab priv={priv} team={name} own={name === me.team} /> : <PrivateNote />}</TabsContent>
         <TabsContent value="crew">{priv ? <PitCrewTab priv={priv} team={name} own={name === me.team} /> : <PrivateNote />}</TabsContent>
         <TabsContent value="sponsors"><SponsorsTab team={name} priv={priv} own={name === me.team} /></TabsContent>
+        <TabsContent value="contracts"><ContractsTab team={name} priv={priv} own={name === me.team} /></TabsContent>
       </Tabs>
     </>
   )
@@ -166,7 +170,8 @@ function HqTable({ hq, own, team }: { hq: TeamPrivate["hq"]; own: boolean; team:
   const designCommitted = useParts().committed(me.team)
   const crewCommitted = usePitCrew().committed(me.team)
   const sponsorCommitted = useSponsors().committed(me.team)
-  const available = budget - hqCommitted - designCommitted - crewCommitted - sponsorCommitted - t.committed
+  const renewalCommitted = useContracts().committed(me.team)
+  const available = budget - hqCommitted - designCommitted - crewCommitted - sponsorCommitted - renewalCommitted - t.committed
   const speed = Number(t.settings.hq_speed ?? 1)
   const days = (weeks: number) => weeks * 7 * speed
   // Races are about four weeks apart.
@@ -185,6 +190,7 @@ function HqTable({ hq, own, team }: { hq: TeamPrivate["hq"]; own: boolean; team:
           {designCommitted > 0 && <span><span className="text-muted-foreground">Queued design </span>−{fmtMoneyShort(designCommitted)}</span>}
           {crewCommitted > 0 && <span><span className="text-muted-foreground">Crew costs </span>−{fmtMoneyShort(crewCommitted)}</span>}
           {sponsorCommitted > 0 && <span><span className="text-muted-foreground">Sponsor pay-backs </span>−{fmtMoneyShort(sponsorCommitted)}</span>}
+          {renewalCommitted > 0 && <span><span className="text-muted-foreground">Renewal fees </span>−{fmtMoneyShort(renewalCommitted)}</span>}
           {t.committed > 0 && <span><span className="text-muted-foreground">Leading bids </span>−{fmtMoneyShort(t.committed)}</span>}
           <span className="font-medium"><span className="text-muted-foreground">Available </span>{fmtMoneyShort(available)}</span>
           <span className="text-xs text-muted-foreground">Orders are paid and started in game before the next race; building takes MM's own time.</span>

@@ -21,11 +21,14 @@ import { syncTeam, type SyncTeamOp } from "./ops/sync.ts";
 import { setPitCrew, type SetPitCrewOp } from "./ops/pit-crew.ts";
 import { equalizeTeams, type EqualizeOp } from "./ops/equalize.ts";
 import { dropSponsor, signSponsor, type DropSponsorOp, type SignSponsorOp } from "./ops/sponsors.ts";
+import { renewContract, type RenewContractOp } from "./ops/contracts.ts";
+import { holdPromotions, type HoldPromotionsOp } from "./ops/promotions.ts";
 
 export type Change = SetBuildingOp | StartBuildingOp | CancelBuildingOp | CancelUnorderedHqOp | SetBudgetOp | AdjustBudgetOp | AddPartOp | RemovePartOp | FitPartOp | HireOp | SyncTeamOp
   | StartDesignOp | CancelDesignOp | CancelUnorderedDesignsOp | RemoveUnorderedPartsOp | SetFittingOp | SetImprovementOp
   | ConcludeVoteOp | SetNextRuleOp | SetSuppliersOp | RenamePersonOp | RenameTeamOp | SetTeamCountryOp
-  | SetCurrentSupplierOp | RenameSupplierOp | SetPitCrewOp | EqualizeOp | SignSponsorOp | DropSponsorOp | SetChassisOp | SetCarInvestmentOp;
+  | SetCurrentSupplierOp | RenameSupplierOp | SetPitCrewOp | EqualizeOp | SignSponsorOp | DropSponsorOp | SetChassisOp | SetCarInvestmentOp | RenewContractOp
+  | HoldPromotionsOp;
 
 export interface ChangeSet {
   /** Optional note, e.g. "Before round 6 - Munich". */
@@ -80,6 +83,8 @@ function run(save: Save, c: Change): string | string[] {
     case "dropSponsor": return dropSponsor(save, c);
     case "setChassis": return setChassis(save, c);
     case "setCarInvestment": return setCarInvestment(save, c);
+    case "renewContract": return renewContract(save, c);
+    case "holdPromotions": return holdPromotions(save, c);
     default: throw new Error(`Unknown op ${(c as { op: string }).op}`);
   }
 }

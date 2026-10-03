@@ -8,6 +8,7 @@ import type { LeagueSettings } from "../league-rules.ts";
 import { choiceChanges, designChanges, fetchPartsContext, markDesignsApplied, undoAiParts } from "../part-orders.ts";
 import { fetchRegulationContext, recordVoteResults, regulationChanges } from "../rule-votes.ts";
 import { fetchSponsorOrders, markSponsorOrders, sponsorChanges } from "../sponsor-orders.ts";
+import { fetchRenewals, markRenewalsApplied, renewalChanges } from "../renewal-orders.ts";
 import { rest, type SupabaseEnv } from "../supabase.ts";
 import { fetchWindow, markApplied, windowChanges, winners } from "../transfers.ts";
 import type { Log } from "./common.ts";
@@ -54,6 +55,8 @@ export async function pullDecisions(env: SupabaseEnv, opts: { force?: boolean },
   // ...and to their parts: AI designs and AI-built parts go, refunded.
   const parts = await fetchPartsContext(env);
   if (ctx.leagueStart && ctx.memberTeams.length) changes.push(...undoAiParts(ctx.memberTeams, parts.orders, ctx.leagueStart));
+  // The league's championship keeps its teams: no promotion or relegation at the season change.
+  if (ctx.memberTeams.length) changes.push({ op: "holdPromotions", team: ctx.memberTeams[0] });
 
   // The organizer's equalization: after undoing the AI, before members' own orders.
   const eq = await fetchEqualize(env);
@@ -158,6 +161,17 @@ export async function pullDecisions(env: SupabaseEnv, opts: { force?: boolean },
   changes.push(...sponsors.changes);
   if (sponsors.applied.length) notes.push(`${sponsors.applied.length} sponsor choice${sponsors.applied.length > 1 ? "s" : ""}`);
 
+  // Contract renewals: before the transfer window, so a renewed person's new terms are in place.
+  const renewals = await fetchRenewals(env);
+  section("Contract renewals", renewals.rows.length);
+  if (renewals.missing) say("  WARNING: no contract_renewals table on the site yet (run migration 018_contract_renewals.sql); renewals skipped");
+  for (const r of renewals.rows) {
+    say(`  Renewal: ${r.team} renews ${r.kind} ${r.person_name} at $${Number(r.yearly_wage).toLocaleString()}/yr until ${r.new_end.slice(0, 10)}`
+      + `${Number(r.sign_on_fee) ? `, sign-on fee $${Number(r.sign_on_fee).toLocaleString()}` : ""}`);
+  }
+  changes.push(...renewalChanges(renewals.rows));
+  if (renewals.rows.length) notes.push(`${renewals.rows.length} contract renewal${renewals.rows.length > 1 ? "s" : ""}`);
+
   let windowDone = false;
   const won = w ? winners(w.auctions, w.bids, w.settings) : [];
   section("Transfer window", w ? won.length : 0);
@@ -189,6 +203,7 @@ export async function pullDecisions(env: SupabaseEnv, opts: { force?: boolean },
       await markEngineSpendApplied(env, engineSpend.map((r) => r.id));
       await markCrewSpendApplied(env, crewSpend.map((r) => r.id));
       await markSponsorOrders(env, sponsors.applied.map((o) => o.id), sponsors.expired.map((o) => o.id));
+      await markRenewalsApplied(env, renewals.rows.map((r) => r.id));
       if (eq.row) {
         await saveCrewUpdates(env, crewReset);
         await markEqualizeApplied(env, eq.row.id);

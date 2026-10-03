@@ -119,6 +119,11 @@ export interface Championship {
   name: string;
   eventNumber: number;
   calendar: CalendarEvent[];
+  /**
+   * MM's pre-season (ERS 2016: 13 Dec to 5 Mar). At its start MM draws next season's suppliers, its AI
+   * starts next year's car, and the calendar is reset to the new season. Missing before 2026-10-03.
+   */
+  preSeason?: { start: string; end: string };
   standings: { drivers: DriverStanding[]; teams: TeamStanding[] };
   lastRace: RaceResults | null;
   /** Every finished round this season, in calendar order. Missing in snapshots published before 2026-10-01. */
@@ -419,7 +424,36 @@ export interface TeamState {
   sponsors?: SponsorOnCar[];
   /** Deals with their money terms, and MM's offers. Private. Missing before 2026-10-03. */
   sponsorship?: TeamSponsorship | null;
+  /** Expiring contracts with MM's renewal terms. Private. Missing before 2026-10-03. */
+  contracts?: TeamContracts | null;
   staff: StaffSlot[];
+}
+
+/** Staff whose contracts end within 12 months, and the renewal deadline. */
+export interface TeamContracts {
+  /** MM's pre-season start (Championship.currentPreSeasonStartDate): MM's AI renews or replaces from then on. */
+  deadline: string;
+  renewals: ContractRenewal[];
+}
+
+/** One expiring contract with MM's renewal terms (src/ops/contracts.ts). */
+export interface ContractRenewal {
+  guid: string;
+  name: string;
+  kind: string;
+  slotID: number;
+  /** Current yearly wage and end date. */
+  wage: number;
+  end: string;
+  monthsLeft: number;
+  /** What MM's AI would offer to renew, per year. */
+  askingWage: number;
+  /** MM's sign-on fee; 0 when they don't want one. */
+  signOnFee: number;
+  /** The length they'd like, in seasons (MM's Short / Medium / Long). */
+  preferredYears: number;
+  /** Why they won't talk (MM's reaction), or null when they will. */
+  refusal: string | null;
 }
 
 /** MM's SponsorSlot.SlotType, in slot order. */
@@ -485,8 +519,8 @@ export interface LeagueState {
  * What every league member may see about a team. Budget, HQ and parts stay private to the
  * team's member (and the organizer), as MM itself hides them for rival teams.
  */
-export type TeamPublic = Omit<TeamState, "budget" | "hq" | "parts" | "design" | "gameCrew" | "sponsorship">;
-export type TeamPrivate = Pick<TeamState, "budget" | "hq" | "parts" | "design" | "gameCrew" | "sponsorship">;
+export type TeamPublic = Omit<TeamState, "budget" | "hq" | "parts" | "design" | "gameCrew" | "sponsorship" | "contracts">;
+export type TeamPrivate = Pick<TeamState, "budget" | "hq" | "parts" | "design" | "gameCrew" | "sponsorship" | "contracts">;
 
 export interface PublicSnapshot {
   extractedAt: string;

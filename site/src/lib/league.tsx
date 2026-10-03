@@ -86,10 +86,10 @@ async function loadDemo(): Promise<Status> {
         extractedAt: state.extractedAt,
         gameDate: state.gameDate,
         championship: state.championship,
-        teams: state.teams.map(({ budget: _b, hq: _h, parts: _p, design: _d, gameCrew: _g, sponsorship: _s, ...pub }) => pub),
+        teams: state.teams.map(({ budget: _b, hq: _h, parts: _p, design: _d, gameCrew: _g, sponsorship: _s, contracts: _c, ...pub }) => pub),
       },
       // Older extracts have no design data.
-      privateTeams: Object.fromEntries(state.teams.map((t) => [t.name, { budget: t.budget, hq: t.hq, parts: t.parts, design: t.design ?? null, gameCrew: t.gameCrew ?? null, sponsorship: t.sponsorship ?? null }])),
+      privateTeams: Object.fromEntries(state.teams.map((t) => [t.name, { budget: t.budget, hq: t.hq, parts: t.parts, design: t.design ?? null, gameCrew: t.gameCrew ?? null, sponsorship: t.sponsorship ?? null, contracts: t.contracts ?? null }])),
       freeAgents: state.freeAgents,
       members,
       logins: [],

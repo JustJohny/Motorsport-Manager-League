@@ -14,7 +14,7 @@ import { ago, C, fit, gameDate, moneyShort, S } from "./theme.ts";
 interface ScreenProps { shell: Shell; active: boolean; height: number; width: number }
 
 const SECTION_ICONS: Record<string, string> = {
-  "HQ orders": S.hq, Parts: S.part, "Pit crews": S.crew, Sponsors: S.sponsor, "Transfer window": S.window,
+  "HQ orders": S.hq, Parts: S.part, "Pit crews": S.crew, Sponsors: S.sponsor, "Contract renewals": S.contract, "Transfer window": S.window,
   "Rule votes": S.vote, "Engine programmes": S.engine, "Next season's suppliers": S.engine, "Equalize the field": S.gear, Overview: S.cloud,
 };
 

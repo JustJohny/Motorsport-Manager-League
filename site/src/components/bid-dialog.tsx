@@ -11,6 +11,7 @@ import { useHqOrders } from "@/lib/hq"
 import { useParts } from "@/lib/parts"
 import { usePitCrew } from "@/lib/pit-crew"
 import { useSponsors } from "@/lib/sponsors"
+import { useContracts } from "@/lib/contracts"
 import { useLeague } from "@/lib/league"
 import { bidCost, buyout, minWage, nextMinBid } from "@/lib/rules"
 import { useTransfers, type Auction } from "@/lib/transfers"
@@ -33,8 +34,8 @@ export function BidDialog({ auction, person, fromTeam = null, trigger }: {
 }) {
   const { me, league } = useLeague()
   const t = useTransfers()
-  // Queued HQ orders, the queued part design, crew costs and sponsor pay-backs commit budget too (hq_committed in the database).
-  const hqCommitted = useHqOrders().committed(me.team) + useParts().committed(me.team) + usePitCrew().committed(me.team) + useSponsors().committed(me.team)
+  // Queued HQ orders, the queued part design, crew costs, sponsor pay-backs and renewal fees commit budget too (hq_committed in the database).
+  const hqCommitted = useHqOrders().committed(me.team) + useParts().committed(me.team) + usePitCrew().committed(me.team) + useSponsors().committed(me.team) + useContracts().committed(me.team)
   const target = auction?.person ?? person!
   const kind = (auction?.kind ?? target.kind) as Auction["kind"]
   const from = auction ? auction.from_team : fromTeam

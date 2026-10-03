@@ -76,8 +76,9 @@ function dictValues(d: unknown): [string, unknown][] {
 
 /**
  * The deals MM drew for the championship's next season (SupplierManager.championshipSuppliers,
- * filled by DetermineNewSeasonSuppliers at Championship.OnChampionshipPromotionsEnd, after the
- * final race): about 4 engines, 6 brakes, 5 fuel and 4 materials deals. Empty until then.
+ * filled by DetermineNewSeasonSuppliers at Championship.OnChampionshipPromotionsEnd). Seen in the
+ * ERS saves: empty after the final race and at season end, filled on the first day of pre-season
+ * (13 Dec), the day the AI picks from it; ERS 2017 had 1 engine, 4 brakes, 3 fuel, 4 materials.
  */
 function drawnSuppliers(save: Save, champ: Obj, type: SupplierType): Obj[] {
   const byChamp = dictValues(save.data.supplierManager.championshipSuppliers)
@@ -90,7 +91,7 @@ function drawnSuppliers(save: Save, champ: Obj, type: SupplierType): Obj[] {
 /**
  * What a team may buy for next year's car, as MM's car design screen offers it
  * (SupplierManager.GetSuppliersForTeam): the deals MM drew for the championship that the team can
- * buy, at the team's price. Empty until MM has drawn them after the final race.
+ * buy, at the team's price. Empty until MM draws them when pre-season starts.
  */
 export function supplierOptions(save: Save, team: Obj): Partial<Record<SupplierType, SupplierOption[]>> {
   const champ = save.championship(team);
@@ -159,8 +160,9 @@ export interface SetSuppliersOp {
 
 /**
  * Put a member's chosen suppliers on next year's car, replacing MM's AI picks: the pending
- * chassis gets the suppliers (CarDesignScreen.OnStartDesign), its stats shift by the difference
- * (ApplySupplierStats), the engine level modifier follows the engine, and the AI's payments are
+ * chassis gets the suppliers (CarDesignScreen.OnStartDesign), its stats are rebuilt from them
+ * (ApplySupplierStats, floored at 0) keeping what the AI added on top (ChooseSuppliers2 gives 1-2
+ * random stats +4), the engine level modifier follows the engine, and the AI's payments are
  * swapped for the chosen suppliers' prices.
  */
 export function setSuppliers(save: Save, op: SetSuppliersOp): string[] {
@@ -171,6 +173,9 @@ export function setSuppliers(save: Save, op: SetSuppliersOp): string[] {
     throw new Error(`${team.name}: next year's car isn't being designed (MM starts it when pre-season starts)`);
   }
   const cs = g.deref<Obj>(ny.mChassisStats);
+  const supplied = () => SUPPLIER_TYPES.flatMap((t) => (cs[CHASSIS_FIELD[t]] ? [toOption(save, g.deref<Obj>(cs[CHASSIS_FIELD[t]]), team)] : []));
+  const before = chassisStats(supplied());
+  const was = Object.fromEntries(Object.entries(CHASSIS_STAT_FIELD).map(([k, f]) => [k, num(cs[f])])) as Record<keyof typeof before, number>;
   const log: string[] = [];
   for (const [type, id] of Object.entries(op.suppliers) as [SupplierType, number][]) {
     const chosen = findSupplier(save, type, id);
@@ -185,8 +190,19 @@ export function setSuppliers(save: Save, op: SetSuppliersOp): string[] {
     if (refund) log.push(adjustBudget(save, { op: "adjustBudget", team: team.name, delta: refund, reason: `Refund: ${old!.name} (${type.toLowerCase()} chosen on the league site instead)` }));
     log.push(adjustBudget(save, { op: "adjustBudget", team: team.name, delta: -cost, reason: `${chosen.name} ${type.toLowerCase()} supply` }));
   }
+  if (log.length) {
+    // putSupplier shifted the stats; MM floors each at 0 after every supplier, so rebuild the four
+    // chassis stats (a plain shift can go negative).
+    const after = chassisStats(supplied());
+    for (const key of Object.keys(after) as (keyof typeof after)[]) {
+      const field = CHASSIS_STAT_FIELD[key];
+      cs[field] = float(Math.max(0, after[key] + was[key] - before[key]));
+    }
+  }
   return log.length ? log : [`${team.name}: suppliers unchanged`];
 }
+
+const CHASSIS_STAT_FIELD = { tyreWear: "mTyreWear", tyreHeating: "mTyreHeating", fuelEfficiency: "mFuelEfficiency", improvability: "mImprovability" } as const;
 
 /** Put a supplier on a chassis, shifting its stats by the difference from the old one (CarChassisStats.ApplySupplierStats). */
 function putSupplier(save: Save, cs: Obj, type: SupplierType, chosen: Obj): void {

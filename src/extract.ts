@@ -5,6 +5,7 @@ import type {
 import { teamDesign } from "./ops/design.ts";
 import { gameCrew, pitCrewRules, pitStopLog } from "./ops/pit-crew.ts";
 import { teamSponsors } from "./ops/sponsors.ts";
+import { teamRenewals } from "./ops/contracts.ts";
 import { extractRegulations } from "./regulations.ts";
 import { carInvestment, currentSuppliers, hasChassisDesign, nextCarSeason, nextYearDesignState, pendingSuppliers, seasonOver, supplierOptions } from "./ops/suppliers.ts";
 import { BUILDING_STATES, JOBS, PART_TYPES, Save, numOrNull, personKind, personName, type PartType } from "./model.ts";
@@ -38,6 +39,7 @@ export function extractLeague(save: Save, cfg: LeagueConfig): LeagueState {
       name: save.championshipName(champ),
       eventNumber: champ.mEventNumber,
       calendar: calendar(save, champ),
+      preSeason: { start: champ.currentPreSeasonStartDate, end: champ.currentPreSeasonEndDate },
       standings: standings(save, champ),
       lastRace: raceResults(save, champ).at(-1) ?? null,
       races: raceResults(save, champ),
@@ -73,6 +75,7 @@ export function team(save: Save, t: Obj, champ: Obj, member: string | null): Tea
     engine: engineOf(save, t),
     sponsors: sponsors?.onCar ?? [],
     sponsorship: sponsors?.sponsorship ?? null,
+    contracts: { deadline: champ.currentPreSeasonStartDate, renewals: teamRenewals(save, t) },
     staff: save.slots(t).map((s) => {
       const p = s.personHired ? save.g.deref<Obj>(s.personHired) : null;
       return { slotID: s.slotID, job: JOBS[s.jobType] ?? String(s.jobType), person: p ? person(save, p) : null };

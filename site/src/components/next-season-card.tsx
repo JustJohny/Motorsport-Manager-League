@@ -82,7 +82,7 @@ function SupplierChoices({ priv, team, own, calendar }: { priv: TeamPrivate; tea
   }
   const bill = (pick: (t: string) => SupplierOffer | null | undefined) => types.reduce((a, t) => a + (pick(t)?.price ?? 0), 0)
   const status = {
-    closed: { icon: Lock, text: `MM offers next season's suppliers after the final race (${win.racesLeft} race${win.racesLeft === 1 ? "" : "s"} to go)` },
+    closed: { icon: Lock, text: `MM offers next season's suppliers when pre-season starts (${win.racesLeft} race${win.racesLeft === 1 ? "" : "s"} to go)` },
     open: car.state === "designing"
       ? { icon: CalendarClock, text: `MM is designing your ${car.season} car: choices are applied at every pull until it's built` }
       : { icon: CalendarClock, text: "Open: applied at the pre-season checkpoint, when MM starts next year's car" },
@@ -95,7 +95,7 @@ function SupplierChoices({ priv, team, own, calendar }: { priv: TeamPrivate; tea
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Settings2 className="size-4" /> Suppliers for {car.season}</CardTitle>
           <CardDescription>
-            As in MM's car design screen: after the final race MM offers each championship a few deals per supplier type, and they set
+            As in MM's car design screen: when pre-season starts MM offers each championship a few deals per supplier type, and they set
             next year's chassis stats; the engine supplier also adds to the engine level. No choice keeps this season's supplier if MM
             offers it again, otherwise MM's AI picks. Each one is paid at MM's price for your team when it's applied at pre-season.
             Choices are private; the organizer sees them too.

@@ -4,7 +4,7 @@ export type SupplierWindow = "closed" | "open" | "done";
 
 /**
  * Members choose from the deals MM draws for next season, as in MM's car design screen. MM draws
- * them after the final race, so the window opens once the published snapshot has offers. It stays
+ * them when pre-season starts, so the window opens once the published snapshot has offers. It stays
  * open while MM designs next year's car (each pull re-applies the choices) and closes once it's built.
  */
 export function supplierWindow(

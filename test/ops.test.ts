@@ -9,6 +9,7 @@ import { defaultSavesDir } from "../src/paths.ts";
 import { typeMismatches } from "../src/schema.ts";
 import { carPartDesign, designOptions, improvementSlots, previewDesign } from "../src/ops/design.ts";
 import { teamSponsors } from "../src/ops/sponsors.ts";
+import { renewalTerms, teamRenewals } from "../src/ops/contracts.ts";
 
 // Uses a real mid-season save (ERS, round 6). Set MM_TEST_SAVE to point at your own.
 const SAVE = process.env.MM_TEST_SAVE ?? join(defaultSavesDir(), "SaveJonatan Sulik - Tatra Racing 2 (3).sav");
@@ -515,6 +516,46 @@ describe.skipIf(!existsSync(SAVE))("operations on a real save", () => {
     const queued = reloaded.g.list<any>(reloaded.data.calendar.mDelayedEvents);
     expect(queued.some((e) => e.mDynamicDescription?.translatedText?.English === `Sponsorship Deal Ends With ${offer.sponsor}`)).toBe(true);
     expect(teamSponsors(reloaded, reloaded.team(dealTeam))!.sponsorship.deals.some((x) => x.slot === deal.slot)).toBe(false);
+  }, 120_000);
+
+  it("renews an expiring contract in place, with MM's terms, a moved end event and the driver's morale bonus", () => {
+    const save = Save.load(SAVE);
+    const all = save.teams().flatMap((t) => teamRenewals(save, t).map((r) => ({ team: t.name as string, r })));
+    expect(all.length).toBeGreaterThan(0);
+    for (const { r } of all) {
+      expect(r.monthsLeft).toBeLessThan(12);
+      expect(r.askingWage).toBeGreaterThan(0);
+      expect([1, 2, 3]).toContain(r.preferredYears);
+    }
+    // MM's AI never offers less than the current wage (within its rounding to $1K).
+    expect(all.every(({ r }) => r.askingWage >= r.wage - 1000)).toBe(true);
+    const { team, r } = all.find(({ r }) => r.kind === "Driver") ?? all[0];
+    const p = save.person(r.guid);
+    const morale = Number(p.mMorale);
+    const end = `${Number(r.end.slice(0, 4)) + 2}-12-31T00:00:00.0000000`;
+    expect(() => applyChanges(save, { changes: [{ op: "renewContract", team, person: r.guid, yearlyWages: r.askingWage, endDate: end, expectedEnd: "2000-12-31T00:00:00.0000000" }] }))
+      .toThrow(/changed since the order/);
+    applyChanges(save, { changes: [{ op: "renewContract", team, person: r.guid, yearlyWages: r.askingWage, endDate: end, expectedEnd: r.end, signOnFee: r.signOnFee }] });
+
+    const reloaded = reload(save);
+    expect(reloaded.g.validate()).toEqual([]);
+    expect(typeProblems(reloaded)).toEqual([]);
+    const q = reloaded.person(r.guid);
+    const c = reloaded.contract(q);
+    expect(c.mEndDate).toBe(end);
+    expect(Number(c.yearlyWages)).toBe(r.askingWage);
+    expect(c.startDate).toBe(reloaded.now);
+    const ev = reloaded.g.deref<any>(c.mCalendarEvent);
+    expect(ev.triggerDate).toBe(end);
+    // The event is still queued once, in date order.
+    const queued = reloaded.g.list<any>(reloaded.data.calendar.mDelayedEvents);
+    expect(queued.filter((e) => e === ev)).toHaveLength(1);
+    const dates = queued.map((e) => e.triggerDate as string);
+    expect(dates).toEqual([...dates].sort());
+    if (r.kind === "Driver") expect(Number(q.mMorale)).toBeGreaterThanOrEqual(morale);
+    // No longer expiring: off the list.
+    expect(teamRenewals(reloaded, reloaded.team(team)).some((x) => x.guid === r.guid)).toBe(false);
+    expect(renewalTerms(reloaded, reloaded.team(team), q).end).toBe(end);
   }, 120_000);
 });
 

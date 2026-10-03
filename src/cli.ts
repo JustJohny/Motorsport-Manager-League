@@ -143,7 +143,7 @@ switch (cmd) {
     const drawn = JSON.stringify(save.data.supplierManager.championshipSuppliers ?? {});
     const ended = state.championship.calendar.filter((e) => e.ended).length;
     console.log(`${state.championship.name}, game date ${state.gameDate.slice(0, 10)}, ${ended}/${state.championship.calendar.length} races done`);
-    console.log(`MM's draw for next season: ${drawn === "{}" || drawn === "[]" ? "not made yet (MM draws it when the season ends, after the final race)" : "present"}`);
+    console.log(`MM's draw for next season: ${drawn === "{}" || drawn === "[]" ? "not made yet (MM draws it when pre-season starts)" : "present"}`);
     for (const t of state.teams.filter((x) => x.member)) {
       const car = t.design?.nextYearCar;
       if (!car) { console.log(`  ${t.name}: no next-year car data`); continue; }

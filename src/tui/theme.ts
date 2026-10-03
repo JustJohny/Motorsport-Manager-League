@@ -42,6 +42,7 @@ export const S = {
   part: "◩",
   crew: "◎",
   sponsor: "◉",
+  contract: "✎",
   window: "⇄",
   vote: "⚖",
   engine: "⛭",
