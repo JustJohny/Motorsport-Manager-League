@@ -109,7 +109,7 @@ Decompile a class to C# with `dotnet tool install --tool-path <dir> ilspycmd`, t
 
 **Time.** `buildTimeDays` + `designCentrePartDaysPerLevel[DC level]` + component times (`timePerLevel` only for a component in the last slot) − the player's `designPartTimeModifier`.
 
-**Start and finish.** `StartDesigning` sets the stage, `startDate` and `endDate`, and adds a `CalendarEvent_v1` (category Design, `OnEventTrigger` = `PartComplete`). `PartComplete` clones `1 + mExtraCopies` parts into the inventory. For AI teams it then calls `teamAIController.FitPartsOnCars()`. `Cancel` (player UI) refunds half.
+**Start and finish.** `StartDesigning` sets the stage, `startDate` and `endDate`, and adds a `CalendarEvent_v1` (category Design = 8, `OnEventTrigger` = `PartComplete`, text `PSG_10009151` "Designing X Finished"). `startDesign` copies a running design's event; with none in the save it builds one from any queued event with an `OnEventTrigger` (same `CalendarEvent_v1` + `MMAction` shape). `PartComplete` clones `1 + mExtraCopies` parts into the inventory. For AI teams it then calls `teamAIController.FitPartsOnCars()`. `Cancel` (player UI) refunds half.
 
 **Improvement** (`carManager.partImprovement`):
 - `partsToImprove[1 = Reliability | 3 = Performance]`: lists of inventory parts. Any part in the inventory can be improved, not only fitted ones, unless it is banned or already at its max.

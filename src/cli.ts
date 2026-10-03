@@ -1,25 +1,17 @@
 #!/usr/bin/env -S npx tsx
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { basename, dirname, join } from "node:path";
+import { readFileSync, writeFileSync } from "node:fs";
+import { basename, join } from "node:path";
 import { parseArgs, type ParseArgsConfig } from "node:util";
-import { applyChanges, type ChangeSet } from "./apply.ts";
+import type { ChangeSet } from "./apply.ts";
 import { pack, parseLossless, stringifyLossless, unpack } from "./codec/sav.ts";
+import { readLeague, resolveSave, seriesEnvFor } from "./commands/common.ts";
+import { applyToSave, defaultApplyOut, publishSave } from "./commands/publish-apply.ts";
+import { pullDecisions } from "./commands/pull.ts";
 import { diffObjects } from "./diff.ts";
 import { extractLeague, type LeagueConfig } from "./extract.ts";
 import { Save } from "./model.ts";
 import { defaultSavesDir } from "./paths.ts";
-import { memberRows, publish, splitSnapshot } from "./publish.ts";
-import { cancelUnorderedChange, fetchHqContext, fetchQueuedOrders, hqChanges, markOrdersApplied } from "./hq-orders.ts";
-import type { LeagueSettings } from "./league-rules.ts";
-import { choiceChanges, designChanges, fetchPartsContext, markDesignsApplied, undoAiParts } from "./part-orders.ts";
-import { engineSpendChanges, fetchEngineSpend, fetchSupplierContext, markEngineSpendApplied, supplierChanges } from "./engine-orders.ts";
-import { crewChanges, crewSpendChanges, crewUpdates, fetchCrewContext, fetchCrewSpend, markCrewSpendApplied, saveCrewUpdates } from "./crew-orders.ts";
-import { fetchSponsorOrders, markSponsorOrders, sponsorChanges } from "./sponsor-orders.ts";
-import { crewNamePool } from "./ops/pit-crew.ts";
-import { equalizeChanges, fetchEqualize, markEqualizeApplied, resetCrews } from "./equalize-orders.ts";
-import { fetchRegulationContext, recordVoteResults, regulationChanges } from "./rule-votes.ts";
 import { rest, supabaseEnv, type SupabaseEnv } from "./supabase.ts";
-import { fetchWindow, markApplied, windowChanges, winners } from "./transfers.ts";
 
 const USAGE = `mmsave - Motorsport Manager league save toolkit
 
@@ -71,36 +63,23 @@ function parseArgsOrExit<const T extends ParseArgsConfig>(config: T): ReturnType
 }
 
 function savePath(p: string | undefined): string {
-  if (!p) fail("missing save file");
-  if (existsSync(p)) return p;
-  const inDir = join(defaultSavesDir(), p.endsWith(".sav") ? p : `${p}.sav`);
-  if (existsSync(inDir)) return inDir;
-  fail(`no such save: ${p}`);
+  try { return resolveSave(p); } catch (e) { fail((e as Error).message); }
 }
 
 /** The league file, which names the series it belongs to on the website. */
 function leagueConfig(command: string): LeagueConfig {
   if (!opt.league) fail(`${command} needs --league league.json`);
-  return JSON.parse(readFileSync(opt.league, "utf8")) as LeagueConfig;
+  return readLeague(opt.league);
 }
 
 /** Supabase settings for the league file's series. */
 function seriesEnv(cfg: LeagueConfig): SupabaseEnv {
-  const id = cfg.series?.id;
-  if (!id) fail(`${opt.league} has no series: add "series": { "id": "main", "name": "…" } (main is the league from before series existed)`);
-  if (!/^[a-z0-9][a-z0-9-]*$/.test(id)) fail(`series id "${id}": use lower case letters, digits and dashes`);
-  return { ...supabaseEnv(), series: id };
+  try { return seriesEnvFor(cfg, opt.league); } catch (e) { fail((e as Error).message); }
 }
 
 function fail(msg: string): never {
   console.error(`error: ${msg}`);
   process.exit(1);
-}
-
-function outPath(input: string, suffix: string): string {
-  const out = opt.out ?? join(dirname(input), basename(input, ".sav") + suffix);
-  if (out === input) fail("refusing to overwrite the input save; pass a different -o");
-  return out;
 }
 
 switch (cmd) {
@@ -178,163 +157,18 @@ switch (cmd) {
   case "publish": {
     const input = savePath(args[0]);
     if (!opt.league) fail("publish needs --league league.json");
-    const cfg = JSON.parse(readFileSync(opt.league, "utf8")) as LeagueConfig;
-    const save = Save.load(input);
-    const state = extractLeague(save, cfg);
-    const split = splitSnapshot(state);
-    const members = memberRows(cfg, state);
-    const ch = state.championship;
-    console.log(`${ch.name}, after round ${ch.lastRace?.round ?? 0}: ${split.teams.length} teams, ${split.freeAgents.length} free agents`);
-    for (const m of members) console.log(`  ${m.discord_username} -> ${m.team}${m.role === "organizer" ? " (organizer)" : ""}`);
-    if (!members.length) console.log("  WARNING: no member has a \"discord\" username in the league file, so nobody can log in");
-    if (opt["dry-run"]) break;
-    const env = seriesEnv(cfg);
-    console.log(`published snapshot #${await publish(env, members, split, cfg.series?.name)} to series "${env.series}"`);
-    // Member pit crews: starting crews for new member teams, then every race since the last publish.
-    const crew = crewUpdates(state, await fetchCrewContext(env), env.series!, crewNamePool(save));
-    await saveCrewUpdates(env, crew);
-    for (const u of crew) {
-      const costs = u.spend.reduce((s, x) => s + x.amount, 0);
-      console.log(`  Pit crew ${u.team}: ${u.log.map((l) => l.message).join("; ") || "races processed"}${costs ? `, costs $${costs.toLocaleString()}` : ""}`);
-    }
+    await publishSave(input, readLeague(opt.league), { dryRun: opt["dry-run"], leagueFile: opt.league }, console.log);
     break;
   }
   case "pull": {
-    // Everything members decided since the last apply: queued HQ orders and, once its deadline
-    // has passed, the transfer window's signings.
-    const env = seriesEnv(leagueConfig("pull"));
-    console.log(`Series "${env.series}"`);
-    const [w, orders, [settings]] = await Promise.all([
-      fetchWindow(env), fetchQueuedOrders(env), rest<LeagueSettings[]>(env, "GET", "league_settings?select=*"),
-    ]);
-    const changes: ChangeSet["changes"] = [];
-    const notes: string[] = [];
-
-    // First undo what the in-game AI did to member teams' HQ since the last apply.
-    const ctx = await fetchHqContext(env);
-    if (ctx.leagueStart && ctx.memberTeams.length) changes.push(cancelUnorderedChange(ctx.memberTeams, ctx.orders, ctx.leagueStart));
-    // ...and to their parts: AI designs and AI-built parts go, refunded.
-    const parts = await fetchPartsContext(env);
-    if (ctx.leagueStart && ctx.memberTeams.length) changes.push(...undoAiParts(ctx.memberTeams, parts.orders, ctx.leagueStart));
-
-    // The organizer's equalization: after undoing the AI, before members' own orders.
-    const eq = await fetchEqualize(env);
-    if (eq.row && eq.snapshot) {
-      const teams = eq.snapshot.teams.map((t) => t.name);
-      console.log(`Equalize the field: ${teams.length} teams (${Object.keys(eq.row.settings).join(", ")})`);
-      changes.push(...equalizeChanges(eq.row, teams));
-      notes.push("equalization");
-    }
-
-    console.log(`HQ orders: ${orders.length}`);
-    for (const o of orders) {
-      console.log(`  ${o.team}: ${o.to_level === 1 ? "build" : "upgrade"} ${o.building_name}${o.to_level > 1 ? ` to level ${o.to_level}` : ""}`
-        + ` for $${Number(o.cost).toLocaleString()} (${Math.round(o.weeks * Number(settings.hq_speed))} weeks)`);
-    }
-    changes.push(...hqChanges(orders, Number(settings.hq_speed)));
-
-    console.log(`Part designs: ${parts.queued.length}`);
-    for (const o of parts.queued) console.log(`  ${o.team}: ${o.part_type} with components ${o.components.join(", ")} for $${Number(o.cost).toLocaleString()}`);
-    changes.push(...designChanges(parts.queued));
-    // Fitting and improvement are standing choices: re-applied every time, after the designs.
-    console.log(`Fitting choices: ${parts.fitting.length}, improvement choices: ${parts.improvement.length}`);
-    changes.push(...choiceChanges(parts.fitting, parts.improvement));
-
-    // Engine programme spending (founding, development, research, engines bought from members).
-    const engineSpend = await fetchEngineSpend(env);
-    for (const r of engineSpend) console.log(`  Engine: ${r.team} ${r.description} $${Number(r.amount).toLocaleString()}${r.payee ? ` to ${r.payee}` : ""}`);
-    changes.push(...engineSpendChanges(engineSpend));
-    if (engineSpend.length) notes.push(`${engineSpend.length} engine payment${engineSpend.length > 1 ? "s" : ""}`);
-
-    // Next season's suppliers: applied once MM's AI has started next year's design (pre-season).
-    const suppliers = await fetchSupplierContext(env);
-    const sc = supplierChanges(suppliers.rows, suppliers.cars, ctx.memberTeams);
-    changes.push(...sc.changes);
-    if (sc.changes.length || sc.waiting.length) {
-      console.log(`Next season's suppliers: ${sc.changes.length} team${sc.changes.length === 1 ? "" : "s"}${sc.waiting.length ? `, waiting for pre-season: ${sc.waiting.join(", ")}` : ""}`);
-      for (const c of sc.changes) if (c.op === "setSuppliers") console.log(`  ${c.team}: ${Object.entries(c.suppliers).map(([t, id]) => `${t} ${id}`).join(", ")}`);
-    }
-    for (const u of sc.unavailable) console.log(`  WARNING: supplier no longer on offer, keeping current: ${u}`);
-    if (sc.changes.length) notes.push(`next season's suppliers for ${sc.changes.length} team${sc.changes.length === 1 ? "" : "s"}`);
-
-    // Rule votes due before the next checkpoint, settled with the league's result instead of MM's;
-    // then the organizer's choices for next season.
-    const reg = await fetchRegulationContext(env);
-    let voteResults: Awaited<ReturnType<typeof regulationChanges>>["results"] = [];
-    const regs = reg.snapshot?.championship.regulations;
-    if (reg.snapshot && regs) {
-      const next = reg.snapshot.championship.calendar.find((e) => !e.ended)?.date ?? null;
-      const r = regulationChanges(regs, reg.snapshot.championship.id, reg.snapshot.gameDate, next, reg.rows, reg.overrides, reg.decided);
-      voteResults = r.results;
-      for (const v of r.results) console.log(`  Rule vote ${v.rule_id}: ${v.accepted ? "accepted" : "rejected"} ${v.yes}-${v.no} (${v.abstained} abstained)`);
-      console.log(`Rule votes settled: ${r.results.length}, next-season overrides: ${reg.overrides.filter((o) => o.season === regs.season).length}`);
-      changes.push(...r.changes);
-      if (r.results.length) notes.push(`${r.results.length} rule vote${r.results.length > 1 ? "s" : ""}`);
-    }
-
-    // Member pit crews: their skills into MM's per-task values (a standing choice, re-applied every
-    // time), then their wages, funding and sign-on fees.
-    let crewCtx = await fetchCrewContext(env);
-    // An equalization restarts member crews at its skill (saved below with --mark-applied).
-    const crewReset = eq.row?.settings.pitCrew && eq.snapshot ? resetCrews(crewCtx, env.series!, eq.snapshot, eq.row.settings.pitCrew.skill) : [];
-    if (crewReset.length) {
-      crewCtx = { ...crewCtx, crew: crewReset.flatMap((u) => u.crew.map((c) => ({ ...c, team: u.team }))) };
-      console.log(`  Pit crews reset: ${crewReset.map((u) => u.team).join(", ")}`);
-    }
-    const crewOps = crewChanges(crewCtx, reg.snapshot?.championship.pitCrew?.roles ?? []);
-    for (const c of crewOps) if (c.op === "setPitCrew") console.log(`  Pit crew ${c.team}: ${c.tasks.map((x) => `task ${x.target} ${x.stat}/${x.confidence}`).join(", ")}`);
-    changes.push(...crewOps);
-    const crewSpend = await fetchCrewSpend(env);
-    for (const r of crewSpend) console.log(`  Crew: ${r.team} ${r.description} $${Number(r.amount).toLocaleString()}`);
-    changes.push(...crewSpendChanges(crewSpend));
-    if (crewOps.length) notes.push(`${crewOps.length} pit crew${crewOps.length > 1 ? "s" : ""}`);
-    if (crewSpend.length) notes.push(`${crewSpend.length} crew payment${crewSpend.length > 1 ? "s" : ""}`);
-
-    // Sponsors: AI deals members dropped (upfront paid back), then the offers they signed.
-    const sponsorCtx = await fetchSponsorOrders(env);
-    const sponsors = sponsorChanges(sponsorCtx.orders, sponsorCtx.gameDate);
-    for (const o of sponsors.applied) {
-      console.log(`  Sponsor: ${o.team} ${o.kind === "sign" ? "signs" : "drops"} ${o.sponsor_name} (slot ${o.slot})${Number(o.amount) ? `, upfront $${Number(o.amount).toLocaleString()}${o.kind === "drop" ? " paid back" : ""}` : ""}`);
-    }
-    for (const o of sponsors.expired) console.log(`  WARNING: ${o.team}'s offer from ${o.sponsor_name} lapsed on ${o.expires?.slice(0, 10)}; left out`);
-    changes.push(...sponsors.changes);
-    if (sponsors.applied.length) notes.push(`${sponsors.applied.length} sponsor choice${sponsors.applied.length > 1 ? "s" : ""}`);
-
-    let windowDone = false;
-    if (!w) console.log("Transfer window: none waiting");
-    else if (new Date(w.window.closes_at) > new Date() && !opt.force) {
-      console.log(`Transfer window #${w.window.id}: still open until ${new Date(w.window.closes_at).toLocaleString()}, skipped (--force to include)`);
-    } else {
-      const won = winners(w.auctions, w.bids, w.settings);
-      console.log(`Transfer window #${w.window.id}: ${w.auctions.length} auctions, ${won.length} signings`);
-      for (const s of won) {
-        console.log(`  ${s.team}: ${s.person.name}${s.fromTeam ? ` from ${s.fromTeam}` : ""} for $${s.wage.toLocaleString()}/yr x${s.years}, replacing ${s.replacingName}`
-          + ` (fee $${s.signOnFee.toLocaleString()}${s.buyout ? `, buyout $${s.buyout.toLocaleString()}` : ""})`);
-      }
-      changes.push(...windowChanges(w.window.id, w.gameDate, w.auctions, w.bids, w.settings).changes);
-      notes.push(`transfer window #${w.window.id}`);
-      windowDone = true;
-    }
-    if (orders.length) notes.push(`${orders.length} HQ order${orders.length > 1 ? "s" : ""}`);
-    if (parts.queued.length) notes.push(`${parts.queued.length} part design${parts.queued.length > 1 ? "s" : ""}`);
-
-    const json = JSON.stringify({ description: notes.join(" + ") || "nothing to apply", changes }, null, 2);
+    // Everything members decided since the last apply (src/commands/pull.ts).
+    const cfg = leagueConfig("pull");
+    const env = seriesEnv(cfg);
+    const r = await pullDecisions(env, { force: opt.force }, console.log);
+    const json = JSON.stringify(r.set, null, 2);
     if (opt.out) writeFileSync(opt.out, json), console.log(`wrote ${opt.out}`);
     else console.log(json);
-    if (opt["mark-applied"]) {
-      await markOrdersApplied(env, orders.map((o) => o.id));
-      await markDesignsApplied(env, parts.queued.map((o) => o.id));
-      await recordVoteResults(env, voteResults);
-      await markEngineSpendApplied(env, engineSpend.map((r) => r.id));
-      await markCrewSpendApplied(env, crewSpend.map((r) => r.id));
-      await markSponsorOrders(env, sponsors.applied.map((o) => o.id), sponsors.expired.map((o) => o.id));
-      if (eq.row) {
-        await saveCrewUpdates(env, crewReset);
-        await markEqualizeApplied(env, eq.row.id);
-      }
-      if (windowDone && w) await markApplied(env, w.window.id);
-      console.log(`marked as applied: ${notes.join(" + ") || "nothing"}`);
-    }
+    if (opt["mark-applied"]) await r.markApplied(console.log);
     break;
   }
   case "archive": {
@@ -368,16 +202,8 @@ switch (cmd) {
   case "apply": {
     const input = savePath(args[0]);
     const set = JSON.parse(readFileSync(args[1] ?? fail("missing changes.json"), "utf8")) as ChangeSet;
-    const save = Save.load(input);
-    for (const line of applyChanges(save, set)) console.log(`  ${line}`);
-    if (opt.name) {
-      // The name shown in MM's load menu comes from the header, not the file name.
-      save.file.header.saveInfo.name = opt.name;
-      save.file.header.saveInfo.isAutoSave = false;
-    }
-    const out = outPath(input, " (league).sav");
-    save.write(out);
-    console.log(`wrote ${out}`);
+    if ((opt.out ?? defaultApplyOut(input)) === input) fail("refusing to overwrite the input save; pass a different -o");
+    applyToSave(input, set, { out: opt.out ?? undefined, name: opt.name }, console.log);
     break;
   }
   case "diff": {

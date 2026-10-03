@@ -271,6 +271,29 @@ describe.skipIf(!existsSync(SAVE))("operations on a real save", () => {
     expect(dates).toEqual([...dates].sort());
   }, 120_000);
 
+  it("starts a design when no design is running anywhere (MM's event built from another event)", () => {
+    const save = Save.load(SAVE);
+    const g = save.g;
+    // As after an equalization: no PartComplete event left to copy.
+    const queue = g.rawList(save.data.calendar.mDelayedEvents);
+    for (let i = queue.length - 1; i >= 0; i--) if (g.deref<any>(queue[i])?.OnEventTrigger?.methodNames?.[0] === "PartComplete") queue.splice(i, 1);
+    const team = save.teams().find((t) => carPartDesign(save, t).mStage !== 1 && designOptions(save, t, "Brakes").available.length)!;
+    const opts = designOptions(save, team, "Brakes");
+    const pick = [opts.available.find((a) => !a.component.engineer && a.component.level === 1)!.component.id];
+    applyChanges(save, { changes: [{ op: "startDesign", team: team.name as string, type: "Brakes", components: pick }] });
+    const reloaded = reload(save);
+    expect(reloaded.g.validate()).toEqual([]);
+    expect(typeProblems(reloaded)).toEqual([]);
+    const cpd = carPartDesign(reloaded, reloaded.team(team.name as string));
+    const ev = reloaded.g.deref<any>(cpd.mCalendarEvent);
+    expect(ev.OnEventTrigger.methodNames).toEqual(["PartComplete"]);
+    expect(reloaded.g.same(ev.OnEventTrigger.targets[0], cpd)).toBe(true);
+    expect(ev.category).toBe(8);
+    expect(ev.OnButtonClick).toBeNull();
+    expect(ev.mDynamicDescription.translatedText.English).toBe("Designing Brakes Finished");
+    expect(reloaded.g.list<any>(reloaded.data.calendar.mDelayedEvents).some((e) => e === ev)).toBe(true);
+  }, 120_000);
+
   it("cancels and refunds designs the league didn't order, and sets improvement", () => {
     const save = Save.load(SAVE);
     const g = save.g;

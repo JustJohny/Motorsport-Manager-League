@@ -28,10 +28,14 @@ export function sponsorChanges(orders: SponsorOrderRow[], gameDate: string) {
 
 export async function fetchSponsorOrders(env: SupabaseEnv) {
   const [orders, [latest]] = await Promise.all([
-    rest<SponsorOrderRow[]>(env, "GET", "sponsor_orders?status=eq.queued&kind=in.(sign,drop)&select=*&order=created_at"),
+    rest<SponsorOrderRow[]>(env, "GET", "sponsor_orders?status=eq.queued&kind=in.(sign,drop)&select=*&order=created_at").catch((e: Error) => {
+      // Before migration 016 the table doesn't exist (PostgREST PGRST205): no sponsor choices yet.
+      if (/PGRST205/.test(e.message)) return null;
+      throw e;
+    }),
     rest<{ game_date: string }[]>(env, "GET", "snapshots?select=game_date&order=id.desc&limit=1"),
   ]);
-  return { orders, gameDate: latest?.game_date ?? "" };
+  return { orders: orders ?? [], gameDate: latest?.game_date ?? "", missing: orders === null };
 }
 
 export async function markSponsorOrders(env: SupabaseEnv, applied: number[], expired: number[]) {

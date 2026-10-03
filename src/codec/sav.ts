@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { closeSync, openSync, readFileSync, readSync, writeFileSync } from "node:fs";
 import { lz4Compress, lz4Decompress } from "./lz4.ts";
 
 // File layout: "mm2s" | int32 version | int32 headerCompressed | int32 headerRaw
@@ -169,6 +169,23 @@ export function float(n: number): Json {
 export function readSav(path: string): SaveFile {
   const raw = unpack(readFileSync(path));
   return { version: raw.version, header: parseLossless(raw.headerText), data: parseLossless(raw.dataText) };
+}
+
+/** Only the header (save name, game date, team), read without touching the much larger data block. */
+export function readSavHeader(path: string): Json {
+  const fd = openSync(path, "r");
+  try {
+    const pre = new Uint8Array(PREAMBLE);
+    readSync(fd, pre, 0, PREAMBLE, 0);
+    if (new TextDecoder().decode(pre.subarray(0, 4)) !== MAGIC) throw new Error("Not an MM save");
+    const dv = new DataView(pre.buffer);
+    const hc = dv.getInt32(8, true), hr = dv.getInt32(12, true);
+    const buf = new Uint8Array(hc);
+    readSync(fd, buf, 0, hc, PREAMBLE);
+    return parseLossless(new TextDecoder().decode(lz4Decompress(buf, hr)));
+  } finally {
+    closeSync(fd);
+  }
 }
 
 export function writeSav(path: string, save: SaveFile): void {

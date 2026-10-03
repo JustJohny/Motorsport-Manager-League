@@ -24,6 +24,14 @@ Needs Node 22+. The CLI finds saves in `…/AppData/LocalLow/Playsport Games/Mot
 | `validate <save>` | Check the object graph (duplicate ids, dangling or forward refs) |
 | `decode` / `encode` | Unpack to or repack from `header.json` + `data.json` for hand edits |
 
+## Terminal UI (`npm run tui`)
+A full-screen dashboard for the organizer, run in the toolkit folder (Ink; plain Unicode symbols, so any font works; 100×28 or larger).
+- **Race cycle:** where the series stands (checkpoint A after a race or B before the next), the selected save next to the website's latest snapshot, the race guide's steps, and members' queued decisions (a read-only pull, refreshed with `r`).
+- `p` publishes the selected save after showing what goes up. `u` pulls members' decisions into a review by area (HQ, parts, crews, sponsors, window…) with the change counts; from there `a` applies them to a **new** save you name (it refuses names that exist), writes `changes-<series>.json`, and then asks whether to mark the decisions applied on the site.
+- **Saves** (`2`): the Wine saves folder, newest first, with each save's game date. **Series** (`3`): the `league-*.json` files and their members.
+- Keys: `Tab` menu/screen, `1`–`3` screens, `l` bigger log, `q` quit. The save browser, a command launcher and a save editor are planned (see HANDOFF.md).
+- The CLI's publish, pull and apply live in `src/commands/` and are shared by both.
+
 ## Changes (`changes.json`)
 See `examples/changes.example.json`. Operations:
 - `setBuilding {team, building, level}`: 0 means not built. Otherwise it's the in-game level. It warns if prerequisites aren't met.

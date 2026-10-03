@@ -3,6 +3,7 @@ import {
   Settings2, Upload, Users, Wrench, type LucideIcon,
 } from "lucide-react"
 import { useState, type ReactNode } from "react"
+import { cycleOf, seriesFiles, type Checkpoint } from "../../../src/race-cycle.ts"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -15,38 +16,12 @@ import { useParts } from "@/lib/parts"
 import { useTransfers } from "@/lib/transfers"
 import { cn } from "@/lib/utils"
 
-type Checkpoint = "after" | "before"
-
-/**
- * The organizer's files for a series: its league file, its changes file, and the prefix of its MM
- * save names, so two series never share a save or a changes.json. The league from before series
- * existed ("main") keeps its "League …" save names.
- */
-export function seriesFiles(series: { id: string; name: string }) {
-  return {
-    league: `league-${series.id}.json`,
-    changes: `changes-${series.id}.json`,
-    prefix: series.id === "main" ? "League" : series.name.replace(/[^\w .-]/g, "").trim() || series.id,
-  }
-}
-
 const CRASH_LOG = "~/Downloads/Motorsport.Manager.v1.53.ALL.DLCs/Motorsport Manager v1.53/MM_Data/output_log.txt"
-const day = 86_400_000
-const time = (d: string) => Date.parse(d.slice(0, 19) + "Z")
 
-/**
- * Where the league is in the race cycle, from the published game date: a save made at the start
- * of the next race weekend is checkpoint B (before the race), anything earlier is A (after the
- * last race).
- */
+/** Where the league is in the race cycle, from the published game date. */
 function useCycle() {
   const { league } = useLeague()
-  const ch = league.snapshot.championship
-  const next = ch.calendar.find((e) => !e.ended) ?? null
-  const last = [...ch.calendar].reverse().find((e) => e.ended) ?? null
-  const gameDate = league.snapshot.gameDate
-  const current: Checkpoint = next && time(gameDate) >= time(next.date) - day ? "before" : "after"
-  return { last, next, current }
+  return cycleOf(league.snapshot.championship, league.snapshot.gameDate)
 }
 
 export function CopyCommand({ command }: { command: string }) {

@@ -22,6 +22,15 @@ const BUILDING = { DesignCentre: 0, Factory: 1 } as const;
 const IMPROVE = { Reliability: 1, Performance: 3 } as const;
 // "Designing <part> Finished".
 const TEXT_DESIGN_DONE = "PSG_10009151";
+/** CalendarEventCategory.Design. */
+const DESIGN_CATEGORY = 8;
+/** MM's texts for "Designing Front Wing Finished", from a real event ("League Test 10"). */
+const FRONT_WING_DONE = {
+  English: "Designing Front Wing Finished", French: "Conception terminée : Aileron avant", Italian: "Progettazione Alettone (A) terminata",
+  German: "Frontflügel: Entwicklung abgeschlossen", Spanish: "Diseño finalizado (Alerón delantero)", Brasilian: "Criação da Asa dianteira terminada",
+  Dutch: "Ontwerp Voorvleugel klaar", Hungarian: "A(z) Első szárny tervezése befejeződött", Polish: "Przedni spoiler – projektowanie zakończone",
+  Russian: "Разработка детали Переднее крыло завершена",
+};
 
 function designable(type: string): PartType {
   if (!COMPONENT_LISTS[type as PartType]) throw new Error(`Part type ${type} can't be designed (single-seater types only)`);
@@ -335,8 +344,12 @@ function addDesignEvent(save: Save, team: Obj, cpd: Obj, type: PartType, end: st
     const p = d?.mCarPart ? g.deref<Obj>(d.mCarPart) : null;
     return p ? PART_TYPES.find((t) => `${t}Part` === p.$type) : undefined;
   };
-  const template = designEvents.find((e) => typeOf(e) === type) ?? designEvents[0];
-  if (!template) throw new Error("No part design in progress anywhere in the save to copy the calendar event from");
+  // No design running anywhere (e.g. after an equalization cancelled them all): any event with an
+  // OnEventTrigger has the same shape (CalendarEvent_v1 + MMAction), and the fields below are set.
+  const template = designEvents.find((e) => typeOf(e) === type) ?? designEvents[0]
+    ?? events.find((e) => e.mDynamicDescription && e.displayEffect);
+  if (!template) throw new Error("No calendar event in the save to copy the design event from");
+  const fromDesign = designEvents.includes(template);
 
   const ev = g.clone({ ...template, OnEventTrigger: { ...template.OnEventTrigger, targets: [] }, OnButtonClick: null });
   const runtime = save.types.runtime.get(template);
@@ -349,8 +362,18 @@ function addDesignEvent(save: Save, team: Obj, cpd: Obj, type: PartType, end: st
   ev.interruptGameTime = isPlayer;
   ev.triggerDate = end;
   ev.triggerCacheDayDate = end.slice(0, 10) + "T00:00:00.0000000";
+  ev.category = DESIGN_CATEGORY;
+  ev.uiState = 1;
+  ev.triggerState = 5;
+  ev.mCachedDynamicDescriptionTextID = null;
+  if (ev.displayEffect) Object.assign(ev.displayEffect, { changeDisplay: true, changeInterrupt: true, changeUIState: false });
   const from = typeOf(template);
-  if (ev.mDynamicDescription) {
+  if (ev.mDynamicDescription && !fromDesign) {
+    // MM's "Designing X Finished" (PSG_10009151); other languages only for the front wing, which a real event gave us.
+    ev.mDynamicDescription.textID = TEXT_DESIGN_DONE;
+    ev.mDynamicDescription.translatedText = type === "FrontWing" ? { ...FRONT_WING_DONE }
+      : Object.fromEntries(Object.keys(FRONT_WING_DONE).map((lang) => [lang, `Designing ${ENGLISH_NAME[type] ?? type} Finished`]));
+  } else if (ev.mDynamicDescription) {
     ev.mDynamicDescription.textID = TEXT_DESIGN_DONE;
     if (from && from !== type) {
       // Different part: swap the English name in (other languages keep the template's name).

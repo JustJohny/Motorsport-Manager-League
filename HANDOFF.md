@@ -591,6 +591,20 @@ A member invests in their own engine programme, becomes an engine supplier, and 
 - Site: My team → **Sponsors** tab (6 slots "On the car" with Keep/Drop on AI deals and pending states; "Offers" table with upfront, income, length, guaranteed value, lapse date, Sign); rivals see only the sponsors on the car. Budget strips and the bid dialog count pay-backs. The organizer's race guide lists sponsor choices. Checked in demo mode with headless Chromium (playwright-core from the scratchpad).
 - Not verified in game yet. To check: sign an offer and drop an AI deal on a member team via the site, pull + apply, load in MM, advance past a race and save; then `mmsave extract` (or publish) should still show the deal, with per-race money added to its `earned`, and the dropped sponsor gone.
 
+## TUI (designed 2026-10-03 with the user; phase 1 built the same day)
+**The user's choices:** all four areas (race cycle cockpit, save browser + diff, command launcher, save editor), built in that order; **Ink** (React for the terminal); a full-screen, game-like dashboard (sidebar of screens, panels, colours, keyboard navigation); **plain Unicode symbols** (the user isn't sure their terminal has a Nerd Font); offline save features always, website features with the CLI's own `.env` credentials; every write **previews a diff, asks, and writes a new save name** (never overwrites, through `Save.write()`).
+
+**Plan:**
+1. **Shell + cockpit:** `npm run tui`; the CLI's commands move into functions (`src/commands/*.ts`) that take a logger and return results, so the CLI and the TUI share them. Screens: series picker (`league-*.json`), save picker (Wine folder, newest first, with game date and series prefix), and the cockpit: where the series stands (last/next race from the latest save and snapshot, like the site's race guide), publish, members' queued choices (HQ, designs, sponsors, crews, window), pull → change preview by team → apply to a new save name.
+2. **Save browser:** teams by championship, a team's budget, HQ, parts, staff, sponsors; `diff` of two saves as a tree.
+3. **Command launcher:** every CLI command as a form with pickers, output in a log pane.
+4. **Editor:** budget, HQ levels, renames, hire, parts, sponsors, with preview + new save.
+
+**Phase 1 built (2026-10-03):** `npm run tui` (`src/tui/`: `app.tsx` shell, `cockpit.tsx`, `pickers.tsx`, `components.tsx`, `data.ts`, `theme.ts`). `src/commands/` holds `publishSave`, `pullDecisions` (returns the change set, sections for the review and `markApplied`) and `applyToSave`, used by the CLI and the TUI; `src/race-cycle.ts` (`seriesFiles`, `cycleOf`) is shared with the site's race guide; `readSavHeader` reads a save's header without the data block. Checked by driving it in a pseudo-terminal (Python `pty` + `pyte` in the scratchpad) at 150×46, 120×34 and 100×28: publish (declined), pull review, apply to a new save (then deleted), mark-applied declined. Not yet used by the user.
+- Dialogs are overlays (absolute `Box` with a background) so the screen under them keeps its state; blocking work (loading, writing saves) runs behind a "Working…" dialog.
+- The F1 series is named "Formula 1", so the race guide's save names are "Formula 1 R1 Post", but the user's saves are "F1 League …": the save list falls back to all saves and the steps show the selected save's name. Renaming the series (or the saves) would line them up.
+- Found while testing: `startDesign` needed a design already running somewhere to copy its calendar event; the F1 save has none (the equalization cancelled them), so the real apply failed. It now builds the event from any queued event (same `CalendarEvent_v1` + `MMAction` shape). Test in `test/ops.test.ts`. Also `pull` now skips sponsors with a warning while migration 016 hasn't been run (it failed before).
+
 ## Working notes for the assistant
 - The user plays MM under Wine on Linux (CachyOS). They test in game and report back, so give them concrete things to check.
 - Never overwrite the user's own saves. Write new `SaveLeague Test N.sav` files.
