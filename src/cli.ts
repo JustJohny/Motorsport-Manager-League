@@ -1,6 +1,6 @@
 #!/usr/bin/env -S npx tsx
 import { readFileSync, writeFileSync } from "node:fs";
-import { basename, join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { parseArgs, type ParseArgsConfig } from "node:util";
 import type { ChangeSet } from "./apply.ts";
 import { pack, parseLossless, stringifyLossless, unpack } from "./codec/sav.ts";
@@ -202,8 +202,10 @@ switch (cmd) {
   case "apply": {
     const input = savePath(args[0]);
     const set = JSON.parse(readFileSync(args[1] ?? fail("missing changes.json"), "utf8")) as ChangeSet;
-    if ((opt.out ?? defaultApplyOut(input)) === input) fail("refusing to overwrite the input save; pass a different -o");
-    applyToSave(input, set, { out: opt.out ?? undefined, name: opt.name }, console.log);
+    // A bare file name goes next to the input save (usually the saves folder), not the current folder.
+    const out = opt.out && !/[\\/]/.test(opt.out) ? join(dirname(input), opt.out) : opt.out ?? undefined;
+    if ((out ?? defaultApplyOut(input)) === input) fail("refusing to overwrite the input save; pass a different -o");
+    applyToSave(input, set, { out, name: opt.name }, console.log);
     break;
   }
   case "diff": {
