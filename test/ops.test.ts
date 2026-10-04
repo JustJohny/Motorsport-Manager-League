@@ -10,6 +10,7 @@ import { typeMismatches } from "../src/schema.ts";
 import { carPartDesign, designOptions, improvementSlots, previewDesign } from "../src/ops/design.ts";
 import { teamSponsors } from "../src/ops/sponsors.ts";
 import { renewalTerms, teamRenewals } from "../src/ops/contracts.ts";
+import { brokenCircuits, CIRCUIT_FIELDS, circuitTable } from "../src/ops/circuits.ts";
 
 // Uses a real mid-season save (ERS, round 6). Set MM_TEST_SAVE to point at your own.
 const SAVE = process.env.MM_TEST_SAVE ?? join(defaultSavesDir(), "SaveJonatan Sulik - Tatra Racing 2 (3).sav");
@@ -466,6 +467,24 @@ describe.skipIf(!existsSync(SAVE))("operations on a real save", () => {
     expect(reloaded.g.deref<any>(t.nationality).mCountryKey).toBe("Austria");
     const uk = [...reloaded.g.byId.values()].find((o: any) => o.mCountryKey === "UK" && o.mNationalityID) as any;
     expect(t.locationID).toBe(uk.mCountryID);
+  }, 120_000);
+
+  it("puts back circuit start times and overtake corners that an older save format lacks", () => {
+    const save = Save.load(SAVE);
+    const circuits = (s: Save) => (s.data.circuitManager.mCircuits as unknown[]).map((r) => s.g.deref<any>(r));
+    const before = circuits(save).map((c) => JSON.stringify(c));
+    // As MM writes such a career after loading it: "" start times, 0/0 corners; or the fields missing.
+    const [a, b] = circuits(save);
+    for (const k of CIRCUIT_FIELDS) { a[k] = k.endsWith("Corners") ? 0 : ""; delete b[k]; }
+    expect(brokenCircuits(save)).toHaveLength(2);
+    expect(applyChanges(save, { changes: [{ op: "repairCircuits" }] })).toEqual(["Restored session start times and overtake corners on 2 circuits"]);
+
+    const reloaded = reload(save);
+    expect(reloaded.g.validate()).toEqual([]);
+    expect(brokenCircuits(reloaded)).toEqual([]);
+    const table = circuitTable();
+    for (const c of circuits(reloaded)) expect(c).toMatchObject(table[c.circuitID]);
+    expect(circuits(reloaded).slice(2).map((c) => JSON.stringify(c))).toEqual(before.slice(2));
   }, 120_000);
 
   it("renames an engine supplier and swaps it onto this season's cars", () => {

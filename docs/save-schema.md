@@ -166,6 +166,13 @@ Decompile a class to C# with `dotnet tool install --tool-path <dir> ilspycmd`, t
 - **Traits** (`PersonalityTrait`, stored in the save with their modifiers): a trait with special cases applies only when one holds (`PersonalitySpecialCaseBehaviour.CanBeApplied`); between races session and circuit conditions never do, while e.g. 30 TeammateEarningMoreThanDriver and 28 MechanicWorseThanDriver are checked from the save. Many drivers start a season at low morale, so "Morale too low" is common.
 - **Renewal** (`RenewContractForPerson`) replaces the contract object; the toolkit's `renewContract` edits it in place: `yearlyWages`, `startDate`, `mEndDate`, `length` (0 Short, 1 Medium, 2 Long), `signOnFee`, and moves `mCalendarEvent` (the contract-end event) to the new date in `calendar.mDelayedEvents`. Drivers get `moraleSignedContractBonus`.
 
+## Circuits from an older save format (found 2026-10-04)
+- The F1 2016 career ("SaveF1 League R1 …") comes from an older save format: dozens of types lack fields that a 1.53 career has. MM fills missing fields with C# defaults on load, and most are harmless or rebuilt.
+- **Circuits are the exception.** `CircuitManager.LoadCircuitsFromDatabase` sets the session start times (`SetSessionStartTimes`, hardcoded per location, `"HHmm"` strings) and `min/maxOvertakeCorners` (database) only when a career is created. Later loads take circuits from the save, so these careers have `""` start times, and practice crashes in `PreSessionState.SetGameTimeToSession` (`ArgumentOutOfRangeException` in `String.Substring`). Overtake corners are 0/0, which the AI's overtaking uses.
+- `timeCostMultiplier`, `overtakeDifficulty`, `fuelFillTimeCostMultiplier` and `pitLaneSpeedAdjuster` are set again by `PreSessionState.OnEnter` at every session, so they don't need fixing.
+- Fix: op `repairCircuits` (`src/ops/circuits.ts`) restores the 11 fields on every circuit without valid start times from `schema/circuits-1.53.json` (made with `tools/gen-circuits.ts`; two unrelated 1.53 careers give identical tables).
+- Not yet fixed, gameplay only: those careers' championships have empty `bannedLocations` and default `minRacesPerSeason`/`maxRacesPerSeason` (6/20), which MM uses when it draws next season's calendar.
+
 ## Verified in game (2026-09-30, save "League Test 2", player team)
 - `setBuilding`: Wind Tunnel shown at level 1.
 - `setBudget`: new budget shown, with our transaction note in the finance history.
