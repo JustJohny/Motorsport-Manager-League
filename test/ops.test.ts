@@ -408,6 +408,22 @@ describe.skipIf(!existsSync(SAVE))("operations on a real save", () => {
     if (ev) expect(ev.mDynamicDescription.translatedText.English).toContain("Kimi Räikkönen");
   }, 120_000);
 
+  it("keeps a namesake's mechanic relationships when renaming a driver who shares a name", () => {
+    const save = Save.load(SAVE);
+    const g = save.g;
+    const team = save.team("Garuda Racing");
+    const mech = save.slots(team).filter((s) => s.slotID === 7 || s.slotID === 8).map((s) => g.deref<any>(s.personHired))
+      .find((m) => Object.keys(m.mDictDriversRelationships ?? {}).length)!;
+    const teamDriverName = Object.keys(mech.mDictDriversRelationships)[0];
+    const agent = save.people().find((p) => save.isFreeAgent(p) && g.list(save.data.driverManager.mEntities).includes(p))!;
+    // Make the free agent a namesake of the mechanic's driver, as MM itself sometimes does.
+    agent.name = teamDriverName;
+    applyChanges(save, { changes: [{ op: "renamePerson", person: agent.id, firstName: "Nicolas", lastName: "Prost" }] });
+    expect(Object.keys(mech.mDictDriversRelationships)).toContain(teamDriverName);
+    expect(Object.keys(mech.mDictDriversRelationships)).not.toContain("Nicolas Prost");
+    expect(Object.keys(mech.mDictRelationshipModificationHistory)).toContain(teamDriverName);
+  }, 120_000);
+
   it("renames free agents by name or GUID and adds a nationality only the game knows", () => {
     const save = Save.load(SAVE);
     const [a, b] = save.people().filter((p) => save.isFreeAgent(p) && save.g.list(save.data.driverManager.mEntities).includes(p));

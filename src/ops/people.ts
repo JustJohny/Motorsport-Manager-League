@@ -48,7 +48,13 @@ export function renamePerson(save: Save, op: RenamePersonOp): string {
   p.name = name;
 
   if (isDriver) {
+    // MM has drivers sharing a name ("Ray Roberts" at Lockhart and as a free agent). The key then
+    // also belongs to the namesake, so only the renamed driver's own team mechanics follow;
+    // renaming the namesake's key crashes the game at week end (Mechanic.IncreaseDriverRelationships).
+    const shared = g.list(save.data.driverManager.mEntities).some((d) => d !== p && d.name === oldName);
+    const team = save.employer(p);
     for (const m of g.list(save.data.mechanicManager.mEntities)) {
+      if (shared && (!team || save.employer(m) !== team)) continue;
       for (const key of ["mDictDriversRelationships", "mDictRelationshipModificationHistory"]) {
         if (m[key] && oldName in m[key]) m[key] = renameKey(m[key], oldName, name);
       }
