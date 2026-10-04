@@ -24,12 +24,13 @@ import { dropSponsor, signSponsor, type DropSponsorOp, type SignSponsorOp } from
 import { renewContract, type RenewContractOp } from "./ops/contracts.ts";
 import { holdPromotions, type HoldPromotionsOp } from "./ops/promotions.ts";
 import { repairCircuits, type RepairCircuitsOp } from "./ops/circuits.ts";
+import { repairOldFormat, type RepairOldFormatOp } from "./ops/old-format.ts";
 
 export type Change = SetBuildingOp | StartBuildingOp | CancelBuildingOp | CancelUnorderedHqOp | SetBudgetOp | AdjustBudgetOp | AddPartOp | RemovePartOp | FitPartOp | HireOp | SyncTeamOp
   | StartDesignOp | CancelDesignOp | CancelUnorderedDesignsOp | RemoveUnorderedPartsOp | SetFittingOp | SetImprovementOp
   | ConcludeVoteOp | SetNextRuleOp | SetSuppliersOp | RenamePersonOp | RenameTeamOp | SetTeamCountryOp
   | SetCurrentSupplierOp | RenameSupplierOp | SetPitCrewOp | EqualizeOp | SignSponsorOp | DropSponsorOp | SetChassisOp | SetCarInvestmentOp | RenewContractOp
-  | HoldPromotionsOp | RepairCircuitsOp;
+  | HoldPromotionsOp | RepairCircuitsOp | RepairOldFormatOp;
 
 export interface ChangeSet {
   /** Optional note, e.g. "Before round 6 - Munich". */
@@ -87,6 +88,7 @@ function run(save: Save, c: Change): string | string[] {
     case "renewContract": return renewContract(save, c);
     case "holdPromotions": return holdPromotions(save, c);
     case "repairCircuits": return repairCircuits(save, c);
+    case "repairOldFormat": return repairOldFormat(save, c);
     default: throw new Error(`Unknown op ${(c as { op: string }).op}`);
   }
 }

@@ -11,6 +11,7 @@ import { carPartDesign, designOptions, improvementSlots, previewDesign } from ".
 import { teamSponsors } from "../src/ops/sponsors.ts";
 import { renewalTerms, teamRenewals } from "../src/ops/contracts.ts";
 import { brokenCircuits, CIRCUIT_FIELDS, circuitTable } from "../src/ops/circuits.ts";
+import { brokenChampionships, championshipTable, DEFAULT_AI_DRIVER_LEVEL } from "../src/ops/old-format.ts";
 
 // Uses a real mid-season save (ERS, round 6). Set MM_TEST_SAVE to point at your own.
 const SAVE = process.env.MM_TEST_SAVE ?? join(defaultSavesDir(), "SaveJonatan Sulik - Tatra Racing 2 (3).sav");
@@ -485,6 +486,29 @@ describe.skipIf(!existsSync(SAVE))("operations on a real save", () => {
     const table = circuitTable();
     for (const c of circuits(reloaded)) expect(c).toMatchObject(table[c.circuitID]);
     expect(circuits(reloaded).slice(2).map((c) => JSON.stringify(c))).toEqual(before.slice(2));
+  }, 120_000);
+
+  it("puts back the championship database values and AI driver level that an older save format lacks", () => {
+    const save = Save.load(SAVE);
+    const champs = (s: Save) => s.g.list<any>(s.data.championshipManager.mEntities);
+    const before = champs(save).map((c) => JSON.stringify(c));
+    const [a, b] = champs(save);
+    for (const c of [a, b]) Object.assign(c, { allowPromotions: false, minRacesPerSeason: 6, maxRacesPerSeason: 20, bannedLocations: [] });
+    save.data.mSerializedPreferences.mAIDriverLevel = 0;
+    expect(brokenChampionships(save)).toHaveLength(2);
+    expect(applyChanges(save, { changes: [{ op: "repairOldFormat" }] })).toEqual([
+      "All circuits already have start times",
+      "Restored banned locations, race counts and promotions on 2 championships",
+      `Set the AI driver level preference to ${DEFAULT_AI_DRIVER_LEVEL} (MM's default)`,
+    ]);
+
+    const reloaded = reload(save);
+    expect(reloaded.g.validate()).toEqual([]);
+    expect(brokenChampionships(reloaded)).toEqual([]);
+    const table = championshipTable();
+    for (const c of champs(reloaded).slice(0, 2)) expect({ ...c, bannedLocations: reloaded.g.list(c.bannedLocations) }).toMatchObject(table[c.championshipID]);
+    expect(champs(reloaded).slice(2).map((c) => JSON.stringify(c))).toEqual(before.slice(2));
+    expect(reloaded.data.mSerializedPreferences.mAIDriverLevel).toBe(DEFAULT_AI_DRIVER_LEVEL);
   }, 120_000);
 
   it("renames an engine supplier and swaps it onto this season's cars", () => {
