@@ -1,0 +1,6 @@
+{
+  "description": "In-game test of member team identity: Kubica GrandPrix gets league colour row 129 (out/team-look-test/Modding/Databases/Team Colours.txt) and livery 27 instead of 14. Its logo is in out/team-look-test/Modding/Images/teamlogos.",
+  "changes": [
+    { "op": "setTeamLook", "team": "Kubica GrandPrix", "colorID": 129, "liveryID": 27 }
+  ]
+}

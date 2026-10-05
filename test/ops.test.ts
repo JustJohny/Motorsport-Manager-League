@@ -11,6 +11,7 @@ import { carPartDesign, designOptions, improvementSlots, previewDesign } from ".
 import { teamSponsors } from "../src/ops/sponsors.ts";
 import { renewalTerms, teamRenewals } from "../src/ops/contracts.ts";
 import { brokenCircuits, CIRCUIT_FIELDS, circuitTable } from "../src/ops/circuits.ts";
+import { teamLiveries } from "../src/ops/team.ts";
 import { brokenChampionships, championshipTable, DEFAULT_AI_DRIVER_LEVEL } from "../src/ops/old-format.ts";
 
 // Uses a real mid-season save (ERS, round 6). Set MM_TEST_SAVE to point at your own.
@@ -457,6 +458,20 @@ describe.skipIf(!existsSync(SAVE))("operations on a real save", () => {
     const t = reloaded.team(id);
     expect([t.name, t.mShortName]).toEqual(["Scuderia Ferrari", "Ferrari"]);
     expect(reloaded.slots(t).some((s) => s.personHired)).toBe(true);
+  }, 120_000);
+
+  it("sets a team's colour row and livery", () => {
+    const save = Save.load(SAVE);
+    const team = save.team("Garuda Racing");
+    const liveries = teamLiveries(save, team).map((l) => l.id as number);
+    const other = liveries.find((id) => id !== team.liveryID)!;
+    const elsewhere = save.g.list<any>(save.data.liveryManager._currentLiveriesArr).find((l) => !liveries.includes(l.id))!;
+    expect(() => applyChanges(save, { changes: [{ op: "setTeamLook", team: "Garuda Racing", liveryID: elsewhere.id }] })).toThrow(/not available/);
+    applyChanges(save, { changes: [{ op: "setTeamLook", team: "Garuda Racing", colorID: 129, liveryID: other }] });
+    const reloaded = reload(save);
+    expect(reloaded.g.validate()).toEqual([]);
+    const t = reloaded.team("Garuda Racing");
+    expect([t.colorID, t.liveryID]).toEqual([129, other]);
   }, 120_000);
 
   it("sets a team's licence and HQ countries", () => {

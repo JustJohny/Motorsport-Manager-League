@@ -16,7 +16,7 @@ import {
 import { addPart, fitPart, removePart, type AddPartOp, type FitPartOp, type RemovePartOp } from "./ops/parts.ts";
 import { hire, type HireOp } from "./ops/staff.ts";
 import { renamePerson, type RenamePersonOp } from "./ops/people.ts";
-import { renameTeam, setTeamCountry, type RenameTeamOp, type SetTeamCountryOp } from "./ops/team.ts";
+import { renameTeam, setTeamCountry, setTeamLook, type RenameTeamOp, type SetTeamCountryOp, type SetTeamLookOp } from "./ops/team.ts";
 import { syncTeam, type SyncTeamOp } from "./ops/sync.ts";
 import { setPitCrew, type SetPitCrewOp } from "./ops/pit-crew.ts";
 import { equalizeTeams, type EqualizeOp } from "./ops/equalize.ts";
@@ -28,7 +28,7 @@ import { repairOldFormat, type RepairOldFormatOp } from "./ops/old-format.ts";
 
 export type Change = SetBuildingOp | StartBuildingOp | CancelBuildingOp | CancelUnorderedHqOp | SetBudgetOp | AdjustBudgetOp | AddPartOp | RemovePartOp | FitPartOp | HireOp | SyncTeamOp
   | StartDesignOp | CancelDesignOp | CancelUnorderedDesignsOp | RemoveUnorderedPartsOp | SetFittingOp | SetImprovementOp
-  | ConcludeVoteOp | SetNextRuleOp | SetSuppliersOp | RenamePersonOp | RenameTeamOp | SetTeamCountryOp
+  | ConcludeVoteOp | SetNextRuleOp | SetSuppliersOp | RenamePersonOp | RenameTeamOp | SetTeamCountryOp | SetTeamLookOp
   | SetCurrentSupplierOp | RenameSupplierOp | SetPitCrewOp | EqualizeOp | SignSponsorOp | DropSponsorOp | SetChassisOp | SetCarInvestmentOp | RenewContractOp
   | HoldPromotionsOp | RepairCircuitsOp | RepairOldFormatOp;
 
@@ -67,6 +67,7 @@ function run(save: Save, c: Change): string | string[] {
     case "renamePerson": return renamePerson(save, c);
     case "renameTeam": return renameTeam(save, c);
     case "setTeamCountry": return setTeamCountry(save, c);
+    case "setTeamLook": return setTeamLook(save, c);
     case "syncTeam": return syncTeam(save, c);
     case "startDesign": return startDesign(save, c);
     case "cancelDesign": return cancelDesign(save, c);

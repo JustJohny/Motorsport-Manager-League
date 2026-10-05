@@ -1,6 +1,6 @@
 # Handoff: MM League Toolkit
 
-_Last updated 2026-10-03 (pre-season saves checked; sponsors built; pit crews built; auction, HQ orders, part development, organizer race guide and grey-area parts live; regulations, engine programmes and illegal engines designed, not built). Read this first in a new session, then `README.md` and `docs/save-schema.md`._
+_Last updated 2026-10-05 (team colours/livery/logo explored; pre-season saves checked; sponsors built; pit crews built; auction, HQ orders, part development, organizer race guide and grey-area parts live; regulations, engine programmes and illegal engines designed, not built). Read this first in a new session, then `README.md` and `docs/save-schema.md`._
 
 ## The goal
 Run a **Motorsport Manager 1 (v1.53)** online league the way F1 Manager 24 community leagues run:
@@ -669,6 +669,22 @@ A member invests in their own engine programme, becomes an engine supplier, and 
 
 **Phase 4 built (2026-10-03):** screen 7, **Editor** (`src/tui/editor.tsx`; the team list is shared with the browser in `src/tui/teams.tsx`). Edits are toolkit changes (`setBudget`, `renameTeam`, `setTeamCountry`, `setBuilding`, `hire`, `renamePerson`, `fitPart`, `removePart`, `signSponsor` + `adjustBudget` for the upfront money, `dropSponsor`), keyed by team id so a queued rename doesn't break later edits. They're kept per save file in a module-level store (survive screen switches, dropped when another save is picked). `w`: `Save.load` a fresh copy, `applyChanges`, `compareSaves(original, edited)` as the preview, then a new name (must not exist) and `Save.write()`. Checked end to end in the pseudo-terminal on "F1 League R1 2016 League": DCT budget $50M + Design Centre level 3 → written, validated (12078 objects, budget and level as edited), then deleted; free-agent picker, sponsor sign, undo.
 - Not covered: adding new parts (`addPart` needs stats the editor would have to ask for), part stats, staff stats, contracts. Easy to add as more rows/actions.
+
+## Team identity: colours, livery and logo (explored 2026-10-05, not built)
+**The user's choices:** members can change all three (colour scheme, livery pattern, logo) on the site; colours with a **free colour picker**; changes allowed **any time between races** (applied at the next export); the user confirms MM mods load in their game.
+**How it would work** (details in docs/save-schema.md, "Team colours, livery and logos"):
+- Colours: the toolkit writes a full Team Colours database mod into `MM_Data/Modding/Databases/` (base rows extracted from the game + one new row per member team) and points the member team's `colorID` at it. Only the organizer installs it.
+- Livery: set `team.liveryID` to one of the save's `liveryManager._liveries` for that championship.
+- Logo: member uploads an image; the toolkit adds `Team_/TeamSmall_/TeamBW_/TeamHat_/TeamBody_/TeamChairmanBody_<teamID>` textures to the `Images/teamlogos` bundle (UnityPy). Riskiest part.
+**In-game test, built 2026-10-05: works in game (user, same day)** once the staging mod is switched on:
+- `setTeamLook` op (`src/ops/team.ts`): `colorID` and/or `liveryID` (checked against `teamLiveries`, the liveries valid for the team's championship).
+- `src/team-colours.ts`: `teamColoursMod()` = MM's table (`schema/team-colours-1.53.csv`, extracted from `resources.assets` with UnityPy) + one row per league team from four picked colours (primary, secondary, tertiary, trim); UI shades, helmet, staff, sponsor and livery-editor colours are derived. League IDs start at 129 and must stay contiguous. Very dark picks are lifted for the UI only.
+- `tools/team-logos.py` (Python + UnityPy): adds `<prefix>_<teamID>` textures (6 sizes, BW = greyscale) to a **copy** of the `teamlogos` bundle. Verified by reloading: 356 textures, container and preload table consistent.
+- Test files: save "F1 League R1 2016 Look Test" (`SaveF1 League R1 2016 Look Test.sav`, from "League Fixed Repaired" + `examples/team-look-test.json`): Kubica GrandPrix (team 7) → colour row 129 (red #c8102e / white / black / gold trim) and livery 27 (was 14). Mod files in `out/team-look-test/Modding/` (`Databases/Team Colours.txt`, `Images/teamlogos` with a placeholder "KUBICA GP" logo).
+- To check in game: logo on standings/team/HQ screens, hats and shirts; red UI colour; car body and livery pattern in the race/practice 3D view; nothing else changed for other teams (incl. the 62-127 logos of the user's existing bundle).
+- **The staging mod must be switched on in MM's Workshop screen after every launch** (`StagingMod.isStaging` is not saved). With it off, MM shows its own logo and falls back to colour row 0 (white car, grey staff) for a league `colorID`.
+**Site choices (2026-10-05, user):** logo uploads wait for **organizer approval** (pull exports approved logos only); livery picker shows **previews tinted in the member's colours** (extract MM's pattern textures); colour clashes **warn only**.
+**After the test:** site UI (colour pickers, livery gallery, logo upload to Supabase Storage), `pull` → `setTeamLook` changes + regenerated mod files, re-apply liveries after each season change (MM re-rolls AI liveries in `SelectNewLiveryForSeason`), and watch `TeamRebrand` (MM can change an AI team's `colorID`).
 
 ## Working notes for the assistant
 - The user plays MM under Wine on Linux (CachyOS). They test in game and report back, so give them concrete things to check.
