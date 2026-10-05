@@ -1,4 +1,4 @@
-import { ArrowRight, Check, ChevronDown, Copy, Download, Flag, Gamepad2, Gavel, Hammer, Handshake, LifeBuoy, PencilRuler, Settings2, ShieldAlert, Signature, type LucideIcon, Upload, Users, Wrench } from "lucide-react"
+import { ArrowRight, Check, ChevronDown, Copy, Download, Flag, Gamepad2, Gavel, Hammer, Handshake, LifeBuoy, PencilRuler, Settings2, ShieldAlert, Signature, Trophy, type LucideIcon, Upload, Users, Wrench } from "lucide-react"
 import { useState, type ReactNode } from "react"
 import { cycleOf, seriesFiles, type Checkpoint } from "../../../src/race-cycle.ts"
 import { Badge } from "@/components/ui/badge"
@@ -230,6 +230,10 @@ function inPreSeason(pre: { start: string; end: string } | undefined, gameDate: 
  */
 function PreSeason({ cmd, prefix, inPreSeason }: { cmd: { pull: string; publish: (s: string) => string; apply: (s: string) => string; suppliers: (s: string) => string }; prefix: string; inPreSeason: boolean }) {
   const pre = `${prefix} Pre-season`
+  const end = `${prefix} Season end`
+  const { league } = useLeague()
+  const start = league.snapshot.championship.preSeason?.start
+  const dayBefore = start ? new Date(Date.parse(start.slice(0, 10) + "T00:00:00Z") - 86_400_000).toISOString().slice(0, 10) : null
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-primary/40 bg-primary/5 px-3 py-2">
       <span className="flex items-center gap-2 text-sm font-medium"><Settings2 className="size-4" /> {inPreSeason ? "Pre-season" : "Season end"}: next season's car</span>
@@ -238,17 +242,24 @@ function PreSeason({ cmd, prefix, inPreSeason }: { cmd: { pull: string; publish:
         and starts next year's car the same day. Until then there's nothing to choose. The design runs until pre-season ends
         (ERS: early March), so members have time: they choose on Parts → Next season's car, and every pull re-applies their choices.
         Contract renewals close when pre-season starts, so remind members before you advance into it.
-        Every apply keeps the league's championship as it is (no promotion or relegation); if MM offers your own career team
-        promotion, refuse it.
+        Member teams and your career team are never promoted or relegated; AI teams still are. MM decides who moves at
+        season end and moves them when pre-season starts, so that needs one apply in between (step 1).
       </span>
       <ol>
-        <Step n={1} icon={Gamepad2} title={<>After the final race, advance to the first day of pre-season and save as <Save>{pre}</Save></>}>
+        <Step n={1} icon={Trophy} title={<>After the final race, advance to {dayBefore ? fmtDate(dayBefore) : "the day before pre-season starts"} and save as <Save>{end}</Save></>}>
+          The season has ended by then and MM has stored who goes up and down. Pull and apply, then load <Save>{end} (league)</Save>.
+          <CopyCommand command={cmd.pull} />
+          <CopyCommand command={cmd.apply(end)} />
+          The apply lists the AI team that moves instead of each protected one ("goes up instead of", "goes down instead of").
+          "Stored from last season" means the save is from before season end: advance further and do it again.
+        </Step>
+        <Step n={2} icon={Gamepad2} title={<>Advance to the first day of pre-season and save as <Save>{pre}</Save></>}>
           Each member team should say "MM designing" with a few deals per type:
           <CopyCommand command={cmd.suppliers(pre)} />
           Then publish it, so members see MM's offers and can choose.
           <CopyCommand command={cmd.publish(pre)} />
         </Step>
-        <Step n={2} icon={Upload} title="Once members have chosen: pull and apply">
+        <Step n={3} icon={Upload} title="Once members have chosen: pull and apply">
           <CopyCommand command={cmd.pull} />
           <CopyCommand command={cmd.apply(pre)} />
           Pull swaps MM's AI picks on member teams for their choices (or this season's suppliers), refunds the AI's payments and charges theirs.

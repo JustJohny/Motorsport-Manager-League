@@ -1,0 +1,6 @@
+{
+  "description": "In-game test of member-only promotion immunity on 'League Test 12' (6 Dec 2016, season ended): Eastwood Motorsport (ERS champion) and Chariot Motor Group (WMC last) stand in for member teams. Expected after advancing to pre-season (13 Dec): Eastwood stays in the ERS and Firebird MRT (ERS 2nd) goes up to the Asia-Pacific Super Cup; Chariot stays in the WMC and Cortossi Corsa (WMC 11th) goes down. Boa Esperança / Krüger Motorsport swap as MM decides. An AI champion goes up with 85 % chance, so a refusal is possible.",
+  "changes": [
+    { "op": "protectTeams", "teams": ["Eastwood Motorsport", "Chariot Motor Group"] }
+  ]
+}

@@ -22,7 +22,7 @@ import { setPitCrew, type SetPitCrewOp } from "./ops/pit-crew.ts";
 import { equalizeTeams, type EqualizeOp } from "./ops/equalize.ts";
 import { dropSponsor, signSponsor, type DropSponsorOp, type SignSponsorOp } from "./ops/sponsors.ts";
 import { renewContract, type RenewContractOp } from "./ops/contracts.ts";
-import { holdPromotions, type HoldPromotionsOp } from "./ops/promotions.ts";
+import { holdPromotions, protectTeams, type HoldPromotionsOp, type ProtectTeamsOp } from "./ops/promotions.ts";
 import { repairCircuits, type RepairCircuitsOp } from "./ops/circuits.ts";
 import { repairOldFormat, type RepairOldFormatOp } from "./ops/old-format.ts";
 
@@ -30,7 +30,7 @@ export type Change = SetBuildingOp | StartBuildingOp | CancelBuildingOp | Cancel
   | StartDesignOp | CancelDesignOp | CancelUnorderedDesignsOp | RemoveUnorderedPartsOp | SetFittingOp | SetImprovementOp
   | ConcludeVoteOp | SetNextRuleOp | SetSuppliersOp | RenamePersonOp | RenameTeamOp | SetTeamCountryOp | SetTeamLookOp
   | SetCurrentSupplierOp | RenameSupplierOp | SetPitCrewOp | EqualizeOp | SignSponsorOp | DropSponsorOp | SetChassisOp | SetCarInvestmentOp | RenewContractOp
-  | HoldPromotionsOp | RepairCircuitsOp | RepairOldFormatOp;
+  | HoldPromotionsOp | ProtectTeamsOp | RepairCircuitsOp | RepairOldFormatOp;
 
 export interface ChangeSet {
   /** Optional note, e.g. "Before round 6 - Munich". */
@@ -88,6 +88,7 @@ function run(save: Save, c: Change): string | string[] {
     case "setCarInvestment": return setCarInvestment(save, c);
     case "renewContract": return renewContract(save, c);
     case "holdPromotions": return holdPromotions(save, c);
+    case "protectTeams": return protectTeams(save, c);
     case "repairCircuits": return repairCircuits(save, c);
     case "repairOldFormat": return repairOldFormat(save, c);
     default: throw new Error(`Unknown op ${(c as { op: string }).op}`);

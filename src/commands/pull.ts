@@ -56,8 +56,9 @@ export async function pullDecisions(env: SupabaseEnv, opts: { force?: boolean },
   // ...and to their parts: AI designs and AI-built parts go, refunded.
   const parts = await fetchPartsContext(env);
   if (ctx.leagueStart && ctx.memberTeams.length) changes.push(...undoAiParts(ctx.memberTeams, parts.orders, ctx.leagueStart));
-  // The league's championship keeps its teams: no promotion or relegation at the season change.
-  if (ctx.memberTeams.length) changes.push({ op: "holdPromotions", team: ctx.memberTeams[0] });
+  // Member teams (and the career team) are never promoted or relegated; AI teams still are. Takes
+  // effect on a save from between season end and pre-season start.
+  if (ctx.memberTeams.length) changes.push({ op: "protectTeams", teams: ctx.memberTeams });
 
   // The organizer's equalization: after undoing the AI, before members' own orders.
   const eq = await fetchEqualize(env);
