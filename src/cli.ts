@@ -12,6 +12,7 @@ import { extractLeague, type LeagueConfig } from "./extract.ts";
 import { Save } from "./model.ts";
 import { defaultSavesDir } from "./paths.ts";
 import { rest, supabaseEnv, type SupabaseEnv } from "./supabase.ts";
+import { buildTeamMod, uploadLiveryMasks } from "./team-look-orders.ts";
 
 const USAGE = `mmsave - Motorsport Manager league save toolkit
 
@@ -25,6 +26,8 @@ const USAGE = `mmsave - Motorsport Manager league save toolkit
   mmsave pull     --league league.json [-o changes.json] [--mark-applied] [--force]   members' decisions as changes
   mmsave archive  --league league.json [-o backup.json] [--end]   back up the league's series; --end then deletes it from the site
   mmsave restore  <backup.json> [--as <series id>]               put an archived series back on the site
+  mmsave team-mod --league league.json [-o out/team-mod] [--logos-base teamlogos] [--python py]   members' colours and logos as MM mod files
+  mmsave liveries --game <MM_Data> [--python py]      upload MM's livery masks for the site's livery previews (once)
   mmsave apply    <save.sav> <changes.json> [-o out.sav] [--name "Shown name"]
   mmsave diff     <a.sav> <b.sav> [--team NAME] [--path teamManager] [--depth N]
 
@@ -46,6 +49,9 @@ const { values: opt, positionals: [cmd, ...args] } = parseArgsOrExit({
     force: { type: "boolean" },
     end: { type: "boolean" },
     as: { type: "string" },
+    "logos-base": { type: "string" },
+    python: { type: "string" },
+    game: { type: "string" },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -169,6 +175,21 @@ switch (cmd) {
     if (opt.out) writeFileSync(opt.out, json), console.log(`wrote ${opt.out}`);
     else console.log(json);
     if (opt["mark-applied"]) await r.markApplied(console.log);
+    break;
+  }
+  case "team-mod": {
+    // Colours and approved logos for every series, as files for MM_Data/Modding (src/team-look-orders.ts).
+    const cfg = leagueConfig("team-mod");
+    const env = seriesEnv(cfg);
+    const out = opt.out ?? join("out", "team-mod");
+    await buildTeamMod(env, { out, logosBase: opt["logos-base"], python: opt.python }, console.log);
+    console.log(`wrote ${join(out, "Modding")}. Copy its Databases and Images files into MM_Data/Modding, `
+      + "restart MM and switch the staging mod on in the Workshop screen.");
+    break;
+  }
+  case "liveries": {
+    if (!opt.game) fail("liveries needs --game <path to MM_Data>");
+    await uploadLiveryMasks(supabaseEnv(), { dataDir: opt.game, out: join("out", "liveries"), python: opt.python }, console.log);
     break;
   }
   case "archive": {

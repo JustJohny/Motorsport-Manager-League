@@ -63,3 +63,54 @@ function restOnce<T>(env: SupabaseEnv, method: string, path: string, body?: unkn
     req.end(data);
   });
 }
+
+function authHeaders(env: SupabaseEnv) {
+  return { apikey: env.serviceKey, ...(env.serviceKey.startsWith("sb_") ? {} : { authorization: `Bearer ${env.serviceKey}` }) };
+}
+
+function storageOnce(env: SupabaseEnv, method: string, path: string, body?: Buffer, contentType?: string): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const req = request(`${env.url}/storage/v1/${path}`, {
+      method,
+      headers: {
+        ...authHeaders(env),
+        ...(body ? { "content-type": contentType ?? "application/octet-stream", "content-length": body.length, "x-upsert": "true" } : {}),
+      },
+    }, (res) => {
+      const chunks: Buffer[] = [];
+      res.on("data", (c: Buffer) => chunks.push(c));
+      res.on("error", reject);
+      res.on("end", () => {
+        const out = Buffer.concat(chunks);
+        const status = res.statusCode ?? 0;
+        if (status < 200 || status >= 300) reject(new Error(`${method} storage ${path} failed: ${status} ${out.toString("utf8")}`));
+        else resolve(out);
+      });
+    });
+    req.on("error", reject);
+    req.end(body);
+  });
+}
+
+async function storage(env: SupabaseEnv, method: string, path: string, body?: Buffer, contentType?: string): Promise<Buffer> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await storageOnce(env, method, path, body, contentType);
+    } catch (e) {
+      const code = (e as NodeJS.ErrnoException).code;
+      if (!code || attempt === 3) throw e;
+      console.error(`network error (${code}), retrying…`);
+      await new Promise((r) => setTimeout(r, 2000 * attempt));
+    }
+  }
+}
+
+/** Upload (or replace) a file in a Storage bucket with the service key. */
+export function storageUpload(env: SupabaseEnv, bucket: string, name: string, data: Buffer, contentType: string): Promise<Buffer> {
+  return storage(env, "POST", `object/${bucket}/${name.split("/").map(encodeURIComponent).join("/")}`, data, contentType);
+}
+
+/** Download a file from a Storage bucket with the service key. */
+export function storageDownload(env: SupabaseEnv, bucket: string, name: string): Promise<Buffer> {
+  return storage(env, "GET", `object/${bucket}/${name.split("/").map(encodeURIComponent).join("/")}`);
+}

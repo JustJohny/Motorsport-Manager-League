@@ -1,5 +1,7 @@
 import type { Obj } from "../graph.ts";
+import type { LiveryOption, TeamLookInfo } from "../league-types.ts";
 import type { Save } from "../model.ts";
+import { baseColours } from "../team-colours.ts";
 import { nationality } from "./people.ts";
 
 export interface RenameTeamOp {
@@ -65,6 +67,28 @@ export function teamLiveries(save: Save, team: Obj): Obj[] {
   const champId = save.championship(team).championshipID;
   return save.g.list<Obj>(save.data.liveryManager._currentLiveriesArr)
     .filter((l) => (l.championshipID as number[]).includes(champId));
+}
+
+/** Liveries valid for a championship, for the site's picker. */
+export function liveryOptions(save: Save, champ: Obj): LiveryOption[] {
+  return save.g.list<Obj>(save.data.liveryManager._currentLiveriesArr)
+    .filter((l) => (l.championshipID as number[]).includes(champ.championshipID))
+    .map((l) => ({ id: l.id, number: l.friendlyNameInt, dlc: l.mDlcId !== 0, mask: liveryMask(l) }));
+}
+
+/**
+ * The side-view texture's file name in the livery image store: its resource path, lowercased,
+ * with "/" as "-" ("GP1/Livery5/LiveryBase" -> "gp1-livery5-liverybase.png").
+ * `Livery2D` and the 3D car pick the side view by projection: LiveryShader*Projection 1 = Side.
+ */
+export function liveryMask(livery: Obj): string {
+  const c = livery.chassis as Obj;
+  const side = c.baseProjection === 1 ? c.baseLiveryTexture : c.detailProjection === 1 ? c.detailLiveryTexture : c.baseLiveryTexture;
+  return `${String(side).toLowerCase().replace(/\//g, "-")}.png`;
+}
+
+export function teamLook(team: Obj): TeamLookInfo {
+  return { colorID: team.colorID, liveryID: team.liveryID, colours: baseColours(team.colorID) };
 }
 
 /**

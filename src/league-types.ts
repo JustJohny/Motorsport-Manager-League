@@ -136,6 +136,38 @@ export interface Championship {
   pitCrew?: PitCrewRules;
   /** Every team's pit stops per finished round (MM's log), fastest first. Missing before 2026-10-02. */
   pitStops?: PitStopRound[];
+  /** Livery patterns the championship's teams may use. Missing before 2026-10-05. */
+  liveries?: LiveryOption[];
+}
+
+/** A livery pattern (MM's `LiveryData`), with its side-view colour mask for previews. */
+export interface LiveryOption {
+  id: number;
+  /** MM's own number for it in the championship ("Livery 7"). */
+  number: number;
+  /** From the Livery Pack DLC. */
+  dlc: boolean;
+  /**
+   * File name of the side-view mask in the site's livery image store (`tools/livery-masks.py`):
+   * black = primary, red = secondary, green = tertiary, blue = trim.
+   */
+  mask: string;
+}
+
+/** Four "#rrggbb" livery colours, as members pick them (src/team-colours.ts derives the rest). */
+export interface TeamColours {
+  primary: string;
+  secondary: string;
+  tertiary: string;
+  trim: string;
+}
+
+/** A team's colours and livery as the save has them. */
+export interface TeamLookInfo {
+  colorID: number;
+  liveryID: number;
+  /** From MM's Team Colours table; null for a league colour row (the site has those). */
+  colours: TeamColours | null;
 }
 
 /** What `equalizeTeams` sets on every team (anything left out is untouched). Drivers keep their stats. */
@@ -422,6 +454,8 @@ export interface TeamState {
   engine?: { name: string; stats: Record<number, number> } | null;
   /** Sponsors on the car, by slot. Public, as rival cars show them in game. Missing before 2026-10-03. */
   sponsors?: SponsorOnCar[];
+  /** Colours and livery pattern. Public, as in game. Missing before 2026-10-05. */
+  look?: TeamLookInfo;
   /** Deals with their money terms, and MM's offers. Private. Missing before 2026-10-03. */
   sponsorship?: TeamSponsorship | null;
   /** Expiring contracts with MM's renewal terms. Private. Missing before 2026-10-03. */

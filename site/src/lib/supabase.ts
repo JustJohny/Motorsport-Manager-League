@@ -34,3 +34,14 @@ export const supabase = demoMode
 export function watchTable(channel: RealtimeChannel, table: string, onChange: () => void) {
   return channel.on("postgres_changes", { event: "*", schema: "league", table, filter: `series=eq.${currentSeries}` }, onChange)
 }
+
+export const seriesId = () => currentSeries
+
+/**
+ * A file in a public Storage bucket ("liveries", "team-logos"). Demo mode serves them from
+ * public/<bucket>/ (gitignored; copy out/liveries there to see livery previews).
+ */
+export function assetUrl(bucket: string, path: string) {
+  if (demoMode) return `${import.meta.env.BASE_URL}${bucket}/${path}`
+  return `${url!.replace(/\/$/, "")}/storage/v1/object/public/${bucket}/${path.split("/").map(encodeURIComponent).join("/")}`
+}

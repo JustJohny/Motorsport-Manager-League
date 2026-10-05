@@ -5,6 +5,7 @@ import type {
 import { teamDesign } from "./ops/design.ts";
 import { gameCrew, pitCrewRules, pitStopLog } from "./ops/pit-crew.ts";
 import { teamSponsors } from "./ops/sponsors.ts";
+import { liveryOptions, teamLook } from "./ops/team.ts";
 import { teamRenewals } from "./ops/contracts.ts";
 import { extractRegulations } from "./regulations.ts";
 import { carInvestment, currentSuppliers, hasChassisDesign, nextCarSeason, nextYearDesignState, pendingSuppliers, seasonOver, supplierOptions } from "./ops/suppliers.ts";
@@ -47,6 +48,7 @@ export function extractLeague(save: Save, cfg: LeagueConfig): LeagueState {
       regulations: extractRegulations(save, champ, new Set(memberTeams.map((m) => m.team.name as string))),
       pitCrew: pitCrewRules(save, champ),
       pitStops: pitStopLog(save, champ),
+      liveries: liveryOptions(save, champ),
     },
     teams: teamsInChamp.map((t) => team(save, t, champ, memberOf.get(t) ?? null)),
     freeAgents: save.people().filter((p) => save.isFreeAgent(p)).map((p) => person(save, p)),
@@ -74,6 +76,7 @@ export function team(save: Save, t: Obj, champ: Obj, member: string | null): Tea
     gameCrew: gameCrew(save, t),
     engine: engineOf(save, t),
     sponsors: sponsors?.onCar ?? [],
+    look: teamLook(t),
     sponsorship: sponsors?.sponsorship ?? null,
     contracts: { deadline: champ.currentPreSeasonStartDate, renewals: teamRenewals(save, t) },
     staff: save.slots(t).map((s) => {

@@ -9,6 +9,7 @@ import { choiceChanges, designChanges, fetchPartsContext, markDesignsApplied, un
 import { fetchRegulationContext, recordVoteResults, regulationChanges } from "../rule-votes.ts";
 import { fetchSponsorOrders, markSponsorOrders, sponsorChanges } from "../sponsor-orders.ts";
 import { fetchRenewals, markRenewalsApplied, renewalChanges } from "../renewal-orders.ts";
+import { fetchTeamLooks, teamLookChanges } from "../team-look-orders.ts";
 import { rest, type SupabaseEnv } from "../supabase.ts";
 import { fetchWindow, markApplied, windowChanges, winners } from "../transfers.ts";
 import type { Log } from "./common.ts";
@@ -171,6 +172,16 @@ export async function pullDecisions(env: SupabaseEnv, opts: { force?: boolean },
   }
   changes.push(...renewalChanges(renewals.rows));
   if (renewals.rows.length) notes.push(`${renewals.rows.length} contract renewal${renewals.rows.length > 1 ? "s" : ""}`);
+
+  // Team colours and livery: a standing choice, re-applied every time (MM re-rolls AI liveries
+  // each season). The colours only show with the team mod installed (mmsave team-mod).
+  const looks = await fetchTeamLooks(env);
+  section("Team identity", looks.rows.length);
+  if (looks.missing) say("  WARNING: no team_looks table on the site yet (run migration 019_team_identity.sql); skipped");
+  for (const r of looks.rows) say(`  Look: ${r.team} colour row ${r.color_id} (${r.primary_colour}), livery ${r.livery_id}`);
+  if (looks.rows.length) say("  Colours need the current team mod in MM_Data/Modding: run mmsave team-mod if a look or logo changed");
+  changes.push(...teamLookChanges(looks.rows));
+  if (looks.rows.length) notes.push(`${looks.rows.length} team look${looks.rows.length > 1 ? "s" : ""}`);
 
   let windowDone = false;
   const won = w ? winners(w.auctions, w.bids, w.settings) : [];

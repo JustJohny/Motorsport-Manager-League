@@ -17,6 +17,7 @@ import { PartsTab } from "@/components/parts-tab"
 import { PitCrewTab } from "@/components/pit-crew-tab"
 import { SponsorsTab } from "@/components/sponsors-tab"
 import { ContractsTab } from "@/components/contracts-tab"
+import { IdentityTab } from "@/components/identity-tab"
 import { PersonCard } from "@/components/person-card"
 import { fmtDate, fmtMoney, fmtMoneyShort, fmtPct } from "@/lib/format"
 import { useHqOrders } from "@/lib/hq"
@@ -77,6 +78,7 @@ export function MyTeamPage() {
           <TabsTrigger value="crew">Pit crew</TabsTrigger>
           <TabsTrigger value="sponsors">Sponsors</TabsTrigger>
           <TabsTrigger value="contracts">Contracts</TabsTrigger>
+          <TabsTrigger value="identity">Identity</TabsTrigger>
         </TabsList>
         <TabsContent value="staff" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {people.map((s) => <PersonCard key={s.slotID} person={s.person!} role={s.job} gameDate={league.snapshot.gameDate} />)}
@@ -86,6 +88,7 @@ export function MyTeamPage() {
         <TabsContent value="crew">{priv ? <PitCrewTab priv={priv} team={name} own={name === me.team} /> : <PrivateNote />}</TabsContent>
         <TabsContent value="sponsors"><SponsorsTab team={name} priv={priv} own={name === me.team} /></TabsContent>
         <TabsContent value="contracts"><ContractsTab team={name} priv={priv} own={name === me.team} /></TabsContent>
+        <TabsContent value="identity"><IdentityTab team={name} own={name === me.team} /></TabsContent>
       </Tabs>
     </>
   )

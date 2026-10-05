@@ -161,6 +161,7 @@ export function RaceCycle() {
               <Step n={5} icon={Download} title="Pull their decisions">
                 <CopyCommand command={cmd.pull} />
                 It prints the designs, HQ orders, fitting, pit crews, sponsor deals, contract renewals and signings. The first changes undo what MM's AI did on member teams; that's expected. Sponsor deals MM's AI signed stay unless the member dropped them.
+                If a member changed their team's colours or a logo was approved, also rebuild the game mod (Organizer → Team identity) and copy it into MM_Data/Modding.
               </Step>
               <Step n={6} icon={Wrench} title="Apply them to the save you published">
                 <CopyCommand command={cmd.apply(post)} />

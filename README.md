@@ -109,7 +109,7 @@ npx tsx tools/gen-schema.ts "<game>/MM_Data/Managed/Assembly-CSharp.dll" schema/
 ```
 
 ## Status
-**Database:** run every file in `supabase/migrations/` in order (001 to 018) in the Supabase SQL editor. Each one runs in a transaction and can be run again safely. `pull` skips a feature with a warning while its migration is missing.
+**Database:** run every file in `supabase/migrations/` in order (001 to 019) in the Supabase SQL editor. Each one runs in a transaction and can be run again safely. `pull` skips a feature with a warning while its migration is missing.
 
 **Verified in game:**
 - The save codec round-trips every tested save byte-for-byte, and every written save is type-checked against the game schema.
@@ -118,5 +118,7 @@ npx tsx tools/gen-schema.ts "<game>/MM_Data/Managed/Assembly-CSharp.dll" schema/
 - Pre-season (ERS saves, Dec 2016): next season's suppliers, chassis sliders and car fund on the pending design, and promotion/relegation held for the league's championship.
 
 **Built, tested on real saves, not yet seen in a league cycle:** sponsors, pit crews, field equalization, regulations and rule votes, works engine programmes (site only), contract renewals (migration 018).
+
+**Team identity (migration 019):** members pick their colours, livery pattern and logo on My team → Identity. Colours and livery go into the save at every pull; colours and logos also need the game mod (`mmsave team-mod`, copied into `MM_Data/Modding`, staging mod switched on in MM's Workshop screen). Tested in game with a hand-made mod; the site flow is not yet seen in a league cycle. One-time setup: `mmsave liveries --game "<game>/MM_Data" --python <python with UnityPy>` uploads MM's livery masks for the previews.
 
 **Next:** what MM does when contracts end on 31 December (needs a January save), non-renewed staff into the transfer window, and the engine programmes' season step. `HANDOFF.md` has the details.

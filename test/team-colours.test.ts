@@ -21,9 +21,16 @@ describe("team colours mod", () => {
     for (const r of out.rows) expect(r).toHaveLength(out.header.length);
   });
 
-  it("rejects taken IDs, gaps and bad colours", () => {
-    expect(() => teamColoursMod([{ colorID: 5, look }])).toThrow(/already used/);
-    expect(() => teamColoursMod([{ colorID: 131, look }])).toThrow(/without gaps/);
+  it("fills gaps with spare rows so IDs stay row positions", () => {
+    const out = parseColourTable(teamColoursMod([{ colorID: 131, look }]));
+    expect(out.rows.map((r) => Number(r[0]))).toEqual([...Array(132).keys()]);
+    expect(out.rows[129].slice(1)).toEqual(out.rows[0].slice(1));
+    expect(out.rows[131][out.header.indexOf("Car")]).toBe("#c8102e");
+  });
+
+  it("rejects MM's IDs, taken IDs and bad colours", () => {
+    expect(() => teamColoursMod([{ colorID: 5, look }])).toThrow(/start at 129/);
+    expect(() => teamColoursMod([{ colorID: 129, look }, { colorID: 129, look }])).toThrow(/already used/);
     expect(() => teamColoursMod([{ colorID: 129, look: { ...look, trim: "red" } }])).toThrow(/#rrggbb/);
   });
 });

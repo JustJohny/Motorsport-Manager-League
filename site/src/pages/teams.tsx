@@ -5,10 +5,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { PageHeader } from "@/components/page-header"
 import { fmtNum, humanize, statAverage } from "@/lib/format"
 import { useLeague } from "@/lib/league"
+import { useTeamLook } from "@/lib/team-look"
 import { cn } from "@/lib/utils"
 
 export function TeamsPage() {
   const { me, league } = useLeague()
+  const tl = useTeamLook()
   const { championship: ch, teams } = league.snapshot
   const byTeam = new Map(ch.standings.teams.map((s) => [s.teamID, s]))
   const sorted = [...teams].sort((a, b) => (byTeam.get(a.teamID)?.position ?? 99) - (byTeam.get(b.teamID)?.position ?? 99))
@@ -20,9 +22,24 @@ export function TeamsPage() {
         {sorted.map((t) => {
           const s = byTeam.get(t.teamID)
           const canOpen = t.name === me.team || me.role === "organizer"
+          const colours = tl.coloursOf(t.name)
+          const logo = tl.approvedLogo(t.name)
           return (
-            <Card key={t.teamID} size="sm" className={cn(t.name === me.team && "ring-primary/50")}>
+            <Card key={t.teamID} size="sm" className={cn("overflow-hidden", t.name === me.team && "ring-primary/50")}>
+              {colours && (
+                <div className="-mt-3 flex h-1.5" aria-hidden>
+                  <span className="flex-[3]" style={{ background: colours.primary }} />
+                  <span className="flex-[2]" style={{ background: colours.secondary }} />
+                  <span className="flex-1" style={{ background: colours.tertiary }} />
+                  <span className="flex-1" style={{ background: colours.trim }} />
+                </div>
+              )}
               <CardHeader>
+                {logo && (
+                  <div className="mb-1 flex h-12 items-center rounded bg-neutral-900 px-2">
+                    <img src={tl.logoUrl(logo)} alt={`${t.name} logo`} className="max-h-10 max-w-full object-contain" />
+                  </div>
+                )}
                 <CardTitle className="flex items-center justify-between gap-2">
                   <Link to={t.name === me.team ? "/" : `/team/${encodeURIComponent(t.name)}`} className="truncate hover:underline">
                     {t.name}

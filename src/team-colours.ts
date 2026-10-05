@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
  * plus one row per member team. See docs/save-schema.md, "Team colours, livery and logos".
  */
 
-/** Colours a member picks, as "#rrggbb". */
+/** Colours a member picks, as "#rrggbb" (TeamColours in league-types, plus the finish). */
 export interface TeamLook {
   /** Main colour: car body, UI, staff shirts, helmet. */
   primary: string;
@@ -131,17 +131,32 @@ export function teamColourRow(table: ColourTable, id: number, look: TeamLook): s
 /**
  * MM's base table plus a row per league team, as the mod file `Databases/Team Colours.txt`.
  * Keeps MM's CRLF line endings.
+ * IDs must be at least LEAGUE_COLOR_ID_START (the database hands them out, never reused).
  */
 export function teamColoursMod(looks: { colorID: number; look: TeamLook }[], base = loadBaseColourTable()): string {
   const taken = new Set(base.rows.map((r) => Number(r[0])));
   const rows = base.rows.map((r) => [...r]);
   for (const { colorID, look } of looks) {
+    if (!Number.isInteger(colorID) || colorID < LEAGUE_COLOR_ID_START) throw new Error(`League colour IDs start at ${LEAGUE_COLOR_ID_START}, got ${colorID}`);
     if (taken.has(colorID)) throw new Error(`Colour ID ${colorID} is already used`);
     taken.add(colorID);
     rows.push(teamColourRow(base, colorID, look));
   }
+  // IDs of ended series leave gaps; MM's row 0 (neutral grey) fills them so IDs stay row positions.
+  const max = Math.max(...taken);
+  for (let id = 0; id <= max; id++) if (!taken.has(id)) rows.push([String(id), ...base.rows[0].slice(1)]);
   rows.sort((a, b) => Number(a[0]) - Number(b[0]));
-  const gap = rows.findIndex((r, i) => Number(r[0]) !== i);
-  if (gap >= 0) throw new Error(`Colour IDs must run 0..${rows.length - 1} without gaps; row ${gap} has ID ${rows[gap][0]}`);
   return [base.header, ...rows].map((r) => r.join(",")).join("\r\n") + "\r\n";
+}
+
+let baseTable: ColourTable | null = null;
+
+/** The four livery colours of a row in MM's own table, or null for an ID it doesn't have. */
+export function baseColours(colorID: number): { primary: string; secondary: string; tertiary: string; trim: string } | null {
+  baseTable ??= loadBaseColourTable();
+  const t = baseTable;
+  const row = t.rows.find((r) => Number(r[0]) === colorID);
+  if (!row) return null;
+  const col = (name: string) => row[t.header.indexOf(name)].toLowerCase();
+  return { primary: col("Primary"), secondary: col("Secondary"), tertiary: col("Tertiary"), trim: col("Trim") };
 }

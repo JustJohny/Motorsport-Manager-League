@@ -7,6 +7,7 @@ import { CopyCommand, RaceCycle } from "@/components/race-cycle"
 import { seriesFiles } from "../../../src/race-cycle.ts"
 import { WindowControls } from "@/components/window-controls"
 import { EqualizeCard } from "@/components/equalize-card"
+import { LogoReviewCard } from "@/components/logo-review-card"
 import { fmtDate } from "@/lib/format"
 import { useLeague } from "@/lib/league"
 
@@ -48,6 +49,7 @@ export function OrganizerPage() {
         </Card>
       </div>
       <EqualizeCard />
+      <LogoReviewCard />
       <SeriesCard />
       <Card size="sm">
         <CardHeader><CardTitle>Members</CardTitle></CardHeader>
