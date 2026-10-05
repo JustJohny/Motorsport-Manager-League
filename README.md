@@ -121,4 +121,6 @@ npx tsx tools/gen-schema.ts "<game>/MM_Data/Managed/Assembly-CSharp.dll" schema/
 
 **Team identity (migration 019):** members pick their colours, livery pattern and logo on My team → Identity. Colours and livery go into the save at every pull; colours and logos also need the game mod (`mmsave team-mod`, copied into `MM_Data/Modding`, staging mod switched on in MM's Workshop screen). Tested in game with a hand-made mod; the site flow is not yet seen in a league cycle. One-time setup: `mmsave liveries --game "<game>/MM_Data" --python <python with UnityPy>` uploads MM's livery masks for the previews.
 
+**Game patch (`tools/league-patch`):** `mmsave game-patch --game "<game>/MM_Data"` makes the player team's cars retire as qualifying and races start, without a flag (for a spectator team). It patches `Assembly-CSharp.dll`, keeping the original; `--restore` undoes it. Verified in game for qualifying and the race.
+
 **Next:** what MM does when contracts end on 31 December (needs a January save), non-renewed staff into the transfer window, and the engine programmes' season step. `HANDOFF.md` has the details.

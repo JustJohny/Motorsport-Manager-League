@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Code the patched game calls (see ../README.md). Unity 5.3 runs the .NET 3.5 profile, so this
+    builds against net35 reference assemblies plus the game's own DLLs from $(GameManaged).
+  -->
+  <PropertyGroup>
+    <TargetFramework>net35</TargetFramework>
+    <LangVersion>7.3</LangVersion>
+    <AssemblyName>LeaguePatch</AssemblyName>
+    <RootNamespace>LeaguePatch</RootNamespace>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <Nullable>disable</Nullable>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <Reference Include="Assembly-CSharp"><HintPath>$(GameManaged)/Assembly-CSharp.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine"><HintPath>$(GameManaged)/UnityEngine.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+</Project>

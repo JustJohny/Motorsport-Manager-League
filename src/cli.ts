@@ -13,6 +13,7 @@ import { Save } from "./model.ts";
 import { defaultSavesDir } from "./paths.ts";
 import { rest, supabaseEnv, type SupabaseEnv } from "./supabase.ts";
 import { buildTeamMod, uploadLiveryMasks } from "./team-look-orders.ts";
+import { gamePatch } from "./game-patch.ts";
 
 const USAGE = `mmsave - Motorsport Manager league save toolkit
 
@@ -28,6 +29,7 @@ const USAGE = `mmsave - Motorsport Manager league save toolkit
   mmsave restore  <backup.json> [--as <series id>]               put an archived series back on the site
   mmsave team-mod --league league.json [-o out/team-mod] [--logos-base teamlogos] [--python py]   members' colours and logos as MM mod files
   mmsave liveries --game <MM_Data> [--python py]      upload MM's livery masks for the site's livery previews (once)
+  mmsave game-patch --game <MM_Data> [--retire on|off] [--status] [--restore]   the player team's cars retire as qualifying and races start (patches the game, original backed up)
   mmsave apply    <save.sav> <changes.json> [-o out.sav] [--name "Shown name"]
   mmsave diff     <a.sav> <b.sav> [--team NAME] [--path teamManager] [--depth N]
 
@@ -52,6 +54,9 @@ const { values: opt, positionals: [cmd, ...args] } = parseArgsOrExit({
     "logos-base": { type: "string" },
     python: { type: "string" },
     game: { type: "string" },
+    retire: { type: "string" },
+    status: { type: "boolean" },
+    restore: { type: "boolean" },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -190,6 +195,14 @@ switch (cmd) {
   case "liveries": {
     if (!opt.game) fail("liveries needs --game <path to MM_Data>");
     await uploadLiveryMasks(supabaseEnv(), { dataDir: opt.game, out: join("out", "liveries"), python: opt.python }, console.log);
+    break;
+  }
+  case "game-patch": {
+    // tools/league-patch: Assembly-CSharp.dll is backed up as .orig; --restore puts it back.
+    if (!opt.game) fail("game-patch needs --game <path to MM_Data>");
+    if (opt.retire && !["on", "off"].includes(opt.retire)) fail("--retire is on or off");
+    const mode = opt.restore ? "restore" : opt.status ? "status" : "patch";
+    gamePatch(opt.game, { mode, retire: opt.retire ? opt.retire === "on" : undefined, out: join("out", "league-patch") }, console.log);
     break;
   }
   case "archive": {
