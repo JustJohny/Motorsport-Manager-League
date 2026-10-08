@@ -86,7 +86,7 @@ export function EqualizeCard() {
   const chosen: EqualizeSettings = {
     ...(on.budget ? { budget: s.budget } : {}),
     ...(on.hq ? { hq: s.hq } : {}),
-    ...(on.parts ? { parts: s.parts, ...(s.developmentRate !== undefined ? { developmentRate: s.developmentRate } : {}) } : {}),
+    ...(on.parts ? { parts: s.parts, ...(s.developmentRate !== undefined && defaults.developmentRate !== undefined ? { developmentRate: s.developmentRate } : {}) } : {}),
     ...(on.leadDesigner ? { leadDesigner: s.leadDesigner } : {}),
     ...(on.mechanics ? { mechanics: s.mechanics } : {}),
     ...(on.pitCrew ? { pitCrew: s.pitCrew } : {}),
@@ -184,7 +184,10 @@ export function EqualizeCard() {
                 </div>
               )
             })}
-            <Num label="Development rate (component boosts ×)" value={s.developmentRate ?? NaN} step={0.01} onChange={(v) => setS((x) => ({ ...x, developmentRate: v }))} />
+            {/* Only saves from the old Rebirth: Redux install have team development rates; FF20 has none. */}
+            {defaults.developmentRate !== undefined && (
+              <Num label="Development rate (component boosts ×)" value={s.developmentRate ?? NaN} step={0.01} onChange={(v) => setS((x) => ({ ...x, developmentRate: v }))} />
+            )}
           </Section>
 
           <Section area={AREAS[3]} on={on.leadDesigner} onToggle={() => setOn((o) => ({ ...o, leadDesigner: !o.leadDesigner }))}>

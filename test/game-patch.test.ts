@@ -35,4 +35,22 @@ describe.skipIf(!hasDotnet || !existsSync(join(DATA, "Managed", "Assembly-CSharp
     expect(readFileSync(join(data, "Managed", "Assembly-CSharp.dll")).equals(original)).toBe(true);
     expect(existsSync(join(data, "Managed", "LeaguePatch.dll"))).toBe(false);
   }, 300_000);
+
+  it("refuses to patch or restore over Unity Mod Manager's injection", () => {
+    const eg = join(process.env.HOME ?? "", "Downloads/EnhancedGraphics-3-1-2-0a-1683272141/EnhancedGraphics/EnhancedGraphics.dll");
+    if (!existsSync(eg)) return;
+    const data = mkdtempSync(join(tmpdir(), "mm-data-"));
+    cpSync(join(DATA, "Managed"), join(data, "Managed"), { recursive: true });
+    const orig = existsSync(join(DATA, "Managed", "Assembly-CSharp.dll.orig")) ? "Assembly-CSharp.dll.orig" : "Assembly-CSharp.dll";
+    cpSync(join(DATA, "Managed", orig), join(data, "Managed", "Assembly-CSharp.dll.orig"));
+    // Any assembly that references UnityModManager stands in for a UMM-injected game DLL.
+    cpSync(eg, join(data, "Managed", "Assembly-CSharp.dll"));
+    const out = mkdtempSync(join(tmpdir(), "league-patch-"));
+    const log: string[] = [];
+    gamePatch(data, { mode: "status", out }, (l) => log.push(l));
+    expect(log.join("\n")).toMatch(/Unity Mod Manager: injected/);
+    expect(() => gamePatch(data, { mode: "patch", out }, () => {})).toThrow(/DoorstopProxy/);
+    expect(() => gamePatch(data, { mode: "restore", out }, () => {})).toThrow(/DoorstopProxy/);
+    expect(readFileSync(join(data, "Managed", "Assembly-CSharp.dll")).equals(readFileSync(eg))).toBe(true);
+  }, 300_000);
 });

@@ -4,8 +4,16 @@ A small patch to Motorsport Manager 1.53's game code for league races, applied w
 `mmsave game-patch`. It's the only part of the toolkit that changes the game itself; everything else
 edits saves or mod files.
 
-**What it does:** when qualifying or the race goes green, the player team's cars (the team MM treats
-as the player's, e.g. a spectator team) retire as if a part had failed, and drive to their garage.
+**What it does:**
+- When qualifying or the race goes green, the player team's cars (the team MM treats as the player's,
+  e.g. a spectator team) retire as if a part had failed, and drive to their garage.
+- **UI images:** `MM_Data/league-sprites/<Atlas>/<sprite name>.png` replaces that sprite of MM's UI
+  atlases (e.g. `TrackImages/TrackImages-Guildford.png`) whenever MM builds its sprite tables
+  (`AtlasManager.UpdateAtlasesWithMods`). MM's own mod system can only swap three atlases whole.
+- **Text:** `MM_Data/league-text.txt` is applied as each localisation table loads
+  (`LocalisationReader.LoadFromFile`): `PSG_10003767=Silverstone` sets that text ID in every
+  language, `~Guildford=Silverstone` renames a whole word or phrase in every text.
+  `tools/enzoli-port.py` writes both files from Enzoli's 2016 mod.
 
 **Why that way:** in MM, yellow flags, safety cars and VSCs come only from crashes and spins
 (`CrashDirector.OnCrashIncident`, `AISpinBehaviour`). A retirement for parts (`AIRetiredBehaviour`,

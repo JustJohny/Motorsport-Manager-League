@@ -1,6 +1,6 @@
 # Handoff: MM League Toolkit
 
-_Last updated 2026-10-05 (promotions: member teams protected, AI teams move; game patch: player team retires at the start, verified in game; team identity: colours, livery and logo on the site, migration 019; pre-season saves checked; sponsors built; pit crews built; auction, HQ orders, part development, organizer race guide and grey-area parts live; regulations, engine programmes and illegal engines designed, not built). Read this first in a new session, then `README.md` and `docs/save-schema.md`._
+_Last updated 2026-10-08 (third-party mods: Enzoli 2016 liveries, sponsor decals, track movies and facepack ported into the staging mod, AI teams' real 2016 looks, Enhanced Graphics checked; promotions: member teams protected, AI teams move; game patch: player team retires at the start, verified in game; team identity: colours, livery and logo on the site, migration 019; pre-season saves checked; sponsors built; pit crews built; auction, HQ orders, part development, organizer race guide and grey-area parts live; regulations, engine programmes and illegal engines designed, not built). Read this first in a new session, then `README.md` and `docs/save-schema.md`._
 
 ## The goal
 Run a **Motorsport Manager 1 (v1.53)** online league the way F1 Manager 24 community leagues run:
@@ -705,6 +705,176 @@ A member invests in their own engine programme, becomes an engine supplier, and 
 **Why a game patch:** see docs/save-schema.md, "Retirements and race flags": flags only come from crashes and spins; a parts retirement sets none; but a save edit (zeroed parts) only fails at MM's first condition tick, 6-12% into the race, and until then makes the car crash for certain when picked.
 **Built:** `tools/league-patch/` (see its README): `LeaguePatch.dll` (net35 against the game's DLLs, `Hooks.OnSessionStart`: in qualifying and race sessions, every `isPlayerDriver` car not out of the race → `ChangeBehaviour(Retired)` + reason `Parts`, logged as "LeaguePatch: retired …") and a Mono.Cecil patcher that adds one call at the end of `SessionManager.StartSession()` (original kept as `Assembly-CSharp.dll.orig`; patches always start from it; `--restore` is byte-identical). Switch: `MM_Data/league-patch.ini` `retirePlayerTeam=true|false`, read at each session start (off for a series where the organizer races the career team, e.g. Tatra in "main"). CLI: `mmsave game-patch --game <MM_Data> [--retire on|off] [--status] [--restore]` (needs `dotnet`). Test: `test/game-patch.test.ts` (on a copy of the game's Managed folder).
 **Verified in game (user, 2026-10-05):** works for both qualifying and the race. Original check list: patch, load a save before qualifying: the spectator cars retire as Q1 goes green (stay in the garage) and as the race starts (drive to the garage), no flag, the race runs on for viewing; `output_log.txt` shows "LeaguePatch: retired". Watch how a car retiring at the green on the grid behaves while the field launches.
+
+## Third-party mods: Enzoli 2016, facepack, track movies, Enhanced Graphics (2026-10-08; installed, not yet checked in game)
+The user downloaded these into ~/Downloads and asked that they work with the toolkit, with **member teams' branding always taking priority** over the mod's AI teams. Details are in docs/save-schema.md, "Third-party mods".
+**User's choices:**
+- Install UMM in **Doorstop mode**, with a guard in `game-patch`.
+- Port **liveries, sponsor logos, track movies and the facepack**.
+- **Pin AI liveries, members free:** members may still pick any pattern.
+- Give AI teams **real 2016 colours**.
+
+**Built:**
+- `tools/enzoli-port.py` (+ `tools/mod_bundle.py`, the shared bundle writer `portraits.py` now uses): Enzoli's `resources.assets` (not installable on 1.53) → `out/enzoli/Modding/Images/liveries` (12 liveries), `Images/sponsorlogos` (62 decals, car + UI), `Videos/TrackMovies/*.bik` (16).
+- AI looks: `league.json` `"aiLooks"` → `src/ai-looks.ts`; `examples/f1-2016-looks.json` covers 8 WMC AI teams (colours are a best match to the 2016 cars; tune freely). `team-mod` writes the colours over MM's rows, and `pull` pins the liveries (`setTeamLook` by teamID, `ifAvailable`). Member teams are skipped by name or teamID. `league-f1.json` points at the file. Tests: `test/ai-looks.test.ts`, ops test for `ifAvailable`.
+- `game-patch`: refuses patch/restore while `Assembly-CSharp.dll` references UnityModManager. `--status` reports UMM (injected or Doorstop). Test in `test/game-patch.test.ts`.
+- `tools/livery-masks.py`: masks of liveries replaced by `Modding/Images/liveries` come from the mod, so the site previews Enzoli's patterns.
+- `tools/driver-photos.py facepack --facepack <bundle>`: SFace match of the facepack's faces to the save's drivers (107 matched, threshold 0.5). A matched face is the default pick on `sheet.html` (value `facepack:Driver_<n>`). `build` cuts it out like the photos and credits the facepack.
+
+**Installed in the game's `MM_Data/Modding`** (backup of the old `Team Colours.txt` in `out/modding-backup-2026-10-08/`):
+- `Images/liveries`
+- `Images/sponsorlogos`
+- `Videos/TrackMovies/*.bik`
+- `Databases/Team Colours.txt` (member rows 129–131 unchanged, AI rows 1–5, 7, 64, 104 replaced)
+
+**Still to do:**
+- **Tracks (2026-10-08, user feedback: calendar still showed MM's tracks):**
+  - Enzoli's file does embed real track pictures (`TrackImages@1080`, 16 circuits). His team logos and track outlines are not in it: they point back into the old game's `.resS`.
+  - MM can't mod those atlases or its text, so the league game patch now has two more hooks (`tools/league-patch/README.md`):
+    - `MM_Data/league-sprites/<Atlas>/<sprite>.png`;
+    - `MM_Data/league-text.txt` (circuit, series and GMA→FIA renames, from Enzoli's Shared table).
+  - Both files are written by `tools/enzoli-port.py`, installed, and the patch was re-applied. Not yet checked in game.
+  - The 3D circuits stay MM's fictional ones.
+  - The track intro movies hadn't been tested: that session never went to a race weekend.
+- Enzoli's newer Workshop **"2016 Mod Layer"** (and his "Intro Videos") are referenced by the facepack's previews but not downloaded. That's the likely source of real team logos and colours; ask the user for it.
+- Facepack portraits now keep their own background (user preference).
+- **Portraits built and installed 2026-10-08** from the user's `choices.json` (in `out/portraits/`): 107 facepack faces, MM's drawn face for the other 98 drivers (no Wikimedia photos); indexes checked against "SaveF1 R2 2016 Post"; the old test bundle is in `out/modding-backup-2026-10-08/portraits`.
+- **The user:** re-run `mmsave liveries` so the site shows the new patterns.
+- **UMM installed 2026-10-08** (0.33.1 from Nexus, the official console installer run under mono, DoorstopProxy):
+  - `winhttp.dll` and `doorstop_config.ini` in the game folder (target `MM_Data\Managed\UnityModManager\UnityModManager.dll`, rewritten with backslashes);
+  - `MM_Data/Managed/UnityModManager/` holds the manager;
+  - `Mods/EnhancedGraphics/` holds the mod;
+  - Wine per-app override `HKCU\Software\Wine\AppDefaults\MM.exe\DllOverrides` `winhttp=native,builtin` in `~/.wine`;
+  - `Assembly-CSharp.dll` and the league patch are untouched (`game-patch --status` reports Doorstop).
+  - First launch (2026-10-08): UMM loaded and Enhanced Graphics reported `Active`, but UMM's window was empty: Unity's `Font.GetOSInstalledFontNames()` found no fonts (the prefix's `C:\windows\Fonts` was empty, though Wine's registry already listed the Linux fonts under `Z:\`). Fix: Liberation Sans copied into `~/.wine/drive_c/windows/Fonts` and registered, plus a Wine replacement Arial → Liberation Sans. Not yet checked in game.
+  - To uninstall: run the installer again with "D. Delete", or remove those files and the registry key.
+- **Check in game** (staging mod on): Enzoli patterns and real colours on the AI cars; sponsor decals on cars and in the sponsor screens; a track intro movie; the facepack faces; Enhanced Graphics loading (UMM log) together with the league patch.
+- **Not done:**
+  - Feeder-series AI colours (the user can add GP2/GP3 teams to the looks file).
+  - Enzoli's UI atlases (F1/GP2 series branding in `Shared1@1080`/`Frontend1@1080`): there's no mod type for atlases except `AssetManager.GetAtlasTexture`, unexplored.
+  - The 89 facepack faces with no confident match.
+
+## Fresh start with FIRE (decided 2026-10-08)
+- **The community chose a new career on a FIRE mod.** The user says "Fire 20" (a FIRE 2020 mod?); they first linked FIRE Mod 2017, Workshop 1118440753. The F1 2016 career and today's Enzoli/2016 work are retired; the tools stay.
+- **The game install is not vanilla.** Three base files were changed before the toolkit touched it, presumably by Rebirth: Redux. Their build stamps are the 2017 originals, and there's no marker text.
+  - `Managed/Assembly-CSharp.dll`: 2025-11-05. The league patch's `.orig` backup was taken from this already-modified DLL.
+  - `Managed/Assembly-CSharp-firstpass.dll`: 2024-06-30.
+  - `resources.assets`: 2025-10-06.
+- **These can't be restored without clean copies** from the same 1.53 build (expected build stamps: firstpass 2017-11-17, Assembly-CSharp 2017-11-22). `schema/team-colours-1.53.csv`, `circuits-1.53.json` and `championships-1.53.json` were extracted from the modified `resources.assets`: re-extract and compare once clean files are in.
+- **Removed 2026-10-08:** everything the toolkit added. The game patch is restored (to the Rebirth DLL).
+  - UMM and Doorstop, `Mods/`, and the Wine `MM.exe` DLL override;
+  - `league-sprites`, `league-text.txt` and `league-patch.ini`;
+  - `Modding` liveries, sponsorlogos, portraits, teamlogos, Team Colours and the track movies.
+  - Everything is backed up in `out/game-backup-2026-10-08/`.
+- **Left in place:**
+  - `Modding` files from 2026-10-01 that the toolkit didn't make: `Databases/Chassis.txt`, `Create Team Defaults.txt`, `Part Suppliers.txt`, `Images/supplierlogos`, `Preview.png`;
+  - the Liberation Sans fonts in `~/.wine/drive_c/windows/Fonts`.
+
+## FIRE Fantasy 20 installed (2026-10-08, not yet run)
+- **The mod:** Workshop 2020326985, the zip from ~/Downloads, extracted to `~/Downloads/FF20/mod`. Manual: https://docs.google.com/document/d/16LmFibA56tC3aIfOWam43kyQgC7qGcQO4CBkvzYhos4. It's a new career only, starting in 2020, with F1/F2/F3, GT World/Cup, WEC and the Global Endurance Trophy: 84 teams, 12 per series.
+- **Installed into the game:**
+  - `00_installation/MM_Data` copied over `MM_Data`: FF20's `Assembly-CSharp.dll`, `resources.assets`, 14 `sharedassets*.assets`, 4 frontend `.bk2` videos and `StreamingAssets/FireFantasy20/config.txt`. Overwritten files are backed up in `out/game-backup-2026-10-08/before-ff20/`. Those are the Rebirth versions.
+  - The Workshop part (Databases, DesignData, Images, Logos, Models, Videos) copied into `MM_Data/Modding` (the staging mod). The five 2026-10-01 Modding files were removed (copies in `out/game-backup-2026-10-08/Modding`).
+- **firstpass:** FF20 doesn't ship `Assembly-CSharp-firstpass.dll`. Every type and member its DLL uses exists in the (Rebirth-dated) firstpass copy.
+- **Manual setup:**
+  - race difficulty slider 0, Race Strategy Difficulty "realistic", Expanded Camera off;
+  - switch the staging mod on before creating the career;
+  - play in English.
+- **Bonus:** FF20's DLL exports race results, lap/sector data and driver stats to files (`FF20_DataManagement`, configured in `StreamingAssets/FireFantasy20/config.txt`). It's a candidate source for results import.
+- **Big finding: the old install ran Rebirth: Redux code.** It adds fields to 55 classes compared with FF20 (which is vanilla 1.53 plus FIRE's edits).
+  - Fields the toolkit treated as "1.53" are Rebirth's:
+    - `Team` development rates, breakthrough/dead-end parts and ranks;
+    - `CarPart.developmentVariance`;
+    - `Circuit` per-series session start times and overtake corners;
+    - `Championship.bannedLocations`, min/max races, `hadResetThisYear`;
+    - `Supplier` temporary discounts; `SupplierManager.championshipSuppliers` and `priceMultiplier`.
+  - So `schema/mm-1.53.json` describes the Rebirth game.
+  - Code that uses these fields: `src/ops/design.ts`, `src/ops/equalize.ts`, `src/ops/parts.ts`, `src/ops/suppliers.ts`, `src/ops/circuits.ts`, `src/ops/old-format.ts` and `src/cli.ts`.
+  - The F1 2016 save's "older save format" was a pre-Rebirth save.
+- **Toolkit work needed for FF20** (discuss with the user first):
+  - Regenerate the schema from FF20's DLL. `monodis` segfaults on it, so use a Cecil- or ilspy-based dumper.
+  - Review every feature that reads Rebirth fields.
+  - Re-extract the colour, circuit and championship tables from FF20's assets and mod databases.
+  - Re-check the league patch hook targets against FF20's code.
+  - Team identity: build on FF20's Team Colours table and teamlogos bundle. Its liveries use UV mapping on its own models.
+
+## Toolkit on FF20 data: foundation (2026-10-08)
+**User's direction:** rebuild the toolkit on FF20 data. Add FF20's race data export to the site with all four views (results, position/gap charts, lap times/stints, sectors/speed). Tyre wear, fuel, setup and form/stamina are visible to the own team only. Upload goes with `publish`.
+
+**Built:**
+- **Schemas:**
+  - `tools/schema-dump` (C#, Mono.Cecil) writes the schema JSON from a game DLL. `monodis` crashes on FF20's DLL; the dumper also fixes the old monodis generator's naming bugs.
+  - `schema/mm-ff20.json` comes from FF20's DLL. The old `schema/mm-1.53.json` is renamed `schema/mm-rebirth.json`, since it was generated from the Rebirth DLL.
+  - `Save.game` (`detectGameCode`: a Team with `breakthroughParts` means Rebirth) picks the schema, so old saves and tests still work.
+- **Colours:** the base table is `schema/team-colours-ff20.csv` (FF20's `Databases/Team Colours.txt`: 85 rows, 0..84, without the Metallic/Smoothness columns). The old one is `team-colours-rebirth.csv`. `teamLook`/`baseColours` take the game code. League colour IDs still start at 129; 85..128 are filled with neutral rows.
+- **Sponsors:** FF20 repurposed `Sponsor.Category` as the series tier (SingleSeaterTier1..EnduranceTier2), and the labels are now per game.
+- **Test:** `test/ff20.test.ts` on "SaveFF20 F1 Test" (or `MM_FF20_SAVE`).
+
+**FF20 facts found:**
+- Part stats are on a **0–1000 scale** (Mercedes 1000, Manor 600; old saves ~0–100).
+- Enum changes:
+  - `Championship.Series` gains `EnduranceSeries2` (4);
+  - `RaceStartType` has no `Jump`;
+  - `PenaltySize` has no `Tiny`;
+  - `UITeamLogo.Type` has no `ChairmanBody`.
+- **Team logos:** `Images/teamlogos` has `Team`/`TeamSmall`/`TeamBW` for all 84 teams, with ARGB32 templates present. The `team-mod` logo base must be FF20's pristine bundle (`~/Downloads/FF20/mod/Images/teamlogos`).
+- **Liveries:**
+  - Each team has its own livery in `Images/liverypack`: ids 92..362, `LiveryBase_<n>`/`LiveryDetail_<n>`, 4096² UV maps for FF20's models. They are still colour keys (black/red/green/blue), so a member's four colours still tint them.
+  - The save stores the liverypack's **absolute path** (`customAssetBundleName`); moving the game folder breaks liveries in saves.
+  - The site's side-view masks don't apply, so the livery picker preview needs a new design.
+- **Race data export:** `FF20_DataManagement.FF20_DataManager.SaveAllData`, run when the race results screen shows (race only, no qualifying).
+  - **Path:** `MM_Data/StreamingAssets/FireFantasy20/<baseFolderName>/<locationName>_<yyyyMMdd>_<timestamp>/{RaceResults,LapSectorData,DriverStats}`, as set in the installed `config.txt`.
+  - **Format:** pipe-separated CSV with a `SEP=|` first line. RaceData has the public fields of `RaceEventResults.ResultData`, with references written by `name`. LapData is one file per driver: `lapNum|sectorNum|compounds|tyreWear|tyreTemp|fuel|setupQuality|sessionTrim|trackWater|trackRubber|flag|gapToLeader|gapToCarAhead|topSpeed|sectorTime|standingPos|form|stamina|timeDriven|overtakesDelta|runWides|cutCorners|lockUps`. DriverData has the driver stats.
+
+**Rebirth clean-up (2026-10-08).** The rules follow `save.game`; old saves keep Rebirth's, and `test/ff20.test.ts` covers FF20.
+- **Part design** (`src/ops/design.ts`, `src/part-design.ts`, `DesignContext.rules`). FF20's `CarPartDesign` differs from Rebirth's:
+  - base stat = season start + engineer skill (no ×1.5);
+  - max performance = improvability ×2;
+  - max reliability = `initialMaxReliabilityValue` (no design-centre/engineer bonus);
+  - no development rates;
+  - component days for every non-engineer component (Rebirth only counted them when the slot count equalled the level);
+  - AI (non-player) materials ×0.01 (Rebirth ×0.1), and AI designs 10 days faster;
+  - design-centre days 0/−2/−3.5/−5;
+  - starting reliability rolled per game launch (0.5–0.7, max 0.85–0.95); the planner shows 0.6/0.9.
+  - `developmentVariance` is only written to Rebirth saves (`design.ts`, `parts.ts`).
+- **Equalize:** development rates are only written where the save has them. The site hides the field when the field average has none.
+- **Suppliers** (`src/ops/suppliers.ts`): FF20 has no next-season draw. It offers every supplier of the type with `mTier === championshipID + 1` that isn't in `mTeamsThatCannotBuy`, which gives each team its own engine list. Battery prices add the harvest-efficiency modifier (+ the hybrid mode cost $1M, rounded to $1000). The site still shows them only at season end (a league rule).
+- **`repairCircuits`/`repairOldFormat`:** refuse FF20 saves (Rebirth-only fields).
+- **Site:** the parts tab hides the development-rate note for FF20 contexts.
+
+- **League game patch re-applied on FF20 (2026-10-08, user request: "retire the player team" must stay active).**
+  - `Assembly-CSharp.dll.orig` is now FF20's pristine DLL.
+  - `retirePlayerTeam=true`.
+  - FF20's `SessionManager.StartSession` and `AIRetiredBehaviour` match Rebirth's.
+  - The atlas and text hooks are in too, but do nothing without `league-sprites/` or `league-text.txt`.
+  - FF20's `SessionManager.isUsingAIForPlayerDrivers` only means "session being skipped", so it can't replace the patch.
+  - Not yet checked in game on FF20.
+
+**Still to do:**
+- Rescale for 0–1000 stats.
+- Design the livery picker.
+- Build the race data feature (needs a real export: play a race in the FF20 test career).
+
+## FF20 race data on the site (built 2026-10-08; needs migration 020 and "gameData" in the league file)
+- **Parser:** `src/race-data.ts` (`findRaceExport`, `readRaceExport`) reads FF20's export folder for a round (`<location>_<yyyyMMdd>_*`, newest wins, base folder from FF20's `config.txt`).
+  - Public: classification, per-driver sector rows (gaps, position, compound, flag, top speed, sector time running within the lap, incidents, track water/rubber) and driver stats.
+  - Private per team: tyre wear/temp, fuel, setup quality, form, stamina.
+  - A real race is about 218 KB public + 81 KB private.
+- **Database:** `supabase/migrations/020_race_data.sql`.
+  - `league.race_data` is readable by series members; `league.race_data_private` by the own team or the organizer.
+  - `publish_race_data` is service-role only and replaces a round.
+  - Both are in `series_tables`. Test: `test/db-race-data.test.ts`.
+- **Upload:** `publishSave` uploads every finished round with an export when league.json has `"gameData": "<MM_Data>"`.
+- **Site:** Results gets Classification, Race trace (position and gap charts), Lap times & tyres (lap chart clipped at 107 %, stint bars), Sectors & speed and My team data (tyre wear/temp, fuel, form).
+  - Code: `site/src/components/race-data.tsx`, `site/src/lib/race-data.tsx` (demo mode: `public/race-data-demo.json`, gitignored), Recharts 2.15.4.
+  - Checked with headless Chromium on desktop and 390 px, with no console errors.
+  - `site/public/demo-state.json` is now an FF20 extract; the old one is in `out/work/demo-state.backup.json`.
+- **Seen in the test race:** a car demoted by the post-race scrutineers has negative `lapsToLeader` (shown as "Penalty"). The Stewards' decisions card shows "Places lost −23" for it, which is wrong; still to fix.
+- **To go live:**
+  - run migration 020;
+  - add `"gameData"` to `league-f1.json`;
+  - keep FF20's `config.txt` with `oneFolderPerRace = true`;
+  - publish after each race.
 
 ## Working notes for the assistant
 - The user plays MM under Wine on Linux (CachyOS). They test in game and report back, so give them concrete things to check.

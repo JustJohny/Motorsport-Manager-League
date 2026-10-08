@@ -4,7 +4,8 @@ import { describe, expect, it } from "vitest";
 import { lz4Compress, lz4Decompress } from "../src/codec/lz4.ts";
 import { pack, parseLossless, stringifyLossless, unpack, num, float } from "../src/codec/sav.ts";
 import { defaultSavesDir } from "../src/paths.ts";
-import { Types, loadSchema } from "../src/schema.ts";
+import { Graph, type Obj } from "../src/graph.ts";
+import { Types, detectGameCode, loadSchema } from "../src/schema.ts";
 
 describe("lz4", () => {
   it("round-trips repetitive and random data", () => {
@@ -41,8 +42,8 @@ describe.skipIf(saves.length === 0)("real saves", () => {
     expect(again.dataText === raw.dataText).toBe(true);
 
     // The game schema must type every object, and an untouched save needs no extra "$type".
-    const types = new Types(loadSchema());
     const tree = parseLossless(raw.dataText);
+    const types = new Types(loadSchema(detectGameCode(new Graph(tree as Obj).list((tree as Obj).teamManager?.mEntities))));
     types.record(tree);
     expect(types.annotate(tree)).toEqual({ added: [], unknown: 0 });
   }, 60_000);

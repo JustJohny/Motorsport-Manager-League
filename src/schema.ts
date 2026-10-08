@@ -3,7 +3,7 @@ import type { Json } from "./codec/sav.ts";
 import type { Obj } from "./graph.ts";
 
 // Declared C# types of every serialized field, generated from the game's assembly by
-// tools/gen-schema.ts. FullSerializer only writes "$type" when an object's runtime type
+// tools/schema-dump (Mono.Cecil; tools/gen-schema.ts is the older monodis version). FullSerializer only writes "$type" when an object's runtime type
 // differs from the declared type where it is written, so moving an object definition to a
 // different field can silently change the type the game constructs. This module lets the
 // toolkit work out declared types and add "$type" where needed.
@@ -17,8 +17,25 @@ export type TypeRef =
 export interface ClassDef { base?: TypeRef; fields: Record<string, TypeRef> }
 export interface Schema { root: string; classes: Record<string, ClassDef> }
 
-export function loadSchema(path = new URL("../schema/mm-1.53.json", import.meta.url)): Schema {
-  return JSON.parse(readFileSync(path, "utf8"));
+/**
+ * Which game code wrote a save. The league runs on FIRE Fantasy 20 (`ff20`: MM 1.53 plus FIRE's
+ * DLL). The toolkit's first saves came from an install running Rebirth: Redux's DLL (`rebirth`),
+ * which adds fields to 55 classes (see docs/save-schema.md, "Which game code").
+ */
+export type GameCode = "ff20" | "rebirth";
+
+const SCHEMAS: Record<GameCode, string> = { ff20: "../schema/mm-ff20.json", rebirth: "../schema/mm-rebirth.json" };
+const cache = new Map<GameCode, Schema>();
+
+export function loadSchema(game: GameCode = "ff20"): Schema {
+  let s = cache.get(game);
+  if (!s) cache.set(game, (s = JSON.parse(readFileSync(new URL(SCHEMAS[game], import.meta.url), "utf8")) as Schema));
+  return s;
+}
+
+/** Rebirth's Team has fields FF20's (and vanilla 1.53's) doesn't, e.g. `breakthroughParts`. */
+export function detectGameCode(teams: Obj[]): GameCode {
+  return teams.some((t) => t && typeof t === "object" && "breakthroughParts" in t) ? "rebirth" : "ff20";
 }
 
 const LISTS = /^System\.Collections\.Generic\.(List|HashSet|Queue|Stack|LinkedList|SortedSet)`1$|^System\.Collections\.ObjectModel\.ReadOnlyCollection`1$/;

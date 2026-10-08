@@ -9,10 +9,18 @@ import { choiceChanges, designChanges, fetchPartsContext, markDesignsApplied, un
 import { fetchRegulationContext, recordVoteResults, regulationChanges } from "../rule-votes.ts";
 import { fetchSponsorOrders, markSponsorOrders, sponsorChanges } from "../sponsor-orders.ts";
 import { fetchRenewals, markRenewalsApplied, renewalChanges } from "../renewal-orders.ts";
+import { aiLiveryChanges, aiOnly, type AiLook } from "../ai-looks.ts";
 import { fetchTeamLooks, teamLookChanges } from "../team-look-orders.ts";
 import { rest, type SupabaseEnv } from "../supabase.ts";
 import { fetchWindow, markApplied, windowChanges, winners } from "../transfers.ts";
 import type { Log } from "./common.ts";
+
+/** MM teamIDs of the member teams, from the latest snapshot (names can change with a rename). */
+async function memberTeamIds(env: SupabaseEnv, names: string[]): Promise<number[]> {
+  if (!names.length) return [];
+  const [snap] = await rest<{ public: { teams?: { name: string; teamID: number }[] } }[]>(env, "GET", "snapshots?select=public&order=id.desc&limit=1");
+  return (snap?.public.teams ?? []).filter((t) => names.includes(t.name)).map((t) => t.teamID);
+}
 
 /** One area of members' decisions, as the TUI previews them. */
 export interface PullSection {
@@ -35,7 +43,7 @@ export interface PullResult {
  * member teams is undone, then the organizer's equalization, members' orders and standing choices,
  * and, once its deadline has passed (or with `force`), the transfer window's signings.
  */
-export async function pullDecisions(env: SupabaseEnv, opts: { force?: boolean }, log: Log): Promise<PullResult> {
+export async function pullDecisions(env: SupabaseEnv, opts: { force?: boolean; aiLooks?: AiLook[] }, log: Log): Promise<PullResult> {
   const sections: PullSection[] = [];
   // Lines go to the log as they come and into the current section for the preview.
   let current: PullSection = { title: "Overview", count: 0, lines: [] };
@@ -177,7 +185,12 @@ export async function pullDecisions(env: SupabaseEnv, opts: { force?: boolean },
   // Team colours and livery: a standing choice, re-applied every time (MM re-rolls AI liveries
   // each season). The colours only show with the team mod installed (mmsave team-mod).
   const looks = await fetchTeamLooks(env);
-  section("Team identity", looks.rows.length);
+  // AI teams' liveries (league.json "aiLooks") first; never for a member's team.
+  const ai = aiOnly(opts.aiLooks ?? [], [...ctx.memberTeams, ...looks.rows.map((r) => r.team), ...await memberTeamIds(env, ctx.memberTeams)]);
+  const aiPins = aiLiveryChanges(ai);
+  section("Team identity", looks.rows.length + aiPins.length);
+  for (const l of ai.filter((l) => l.liveryID !== undefined)) say(`  AI livery: ${l.team} (team ${l.teamID}) livery ${l.liveryID}`);
+  changes.push(...aiPins);
   if (looks.missing) say("  WARNING: no team_looks table on the site yet (run migration 019_team_identity.sql); skipped");
   for (const r of looks.rows) say(`  Look: ${r.team} colour row ${r.color_id} (${r.primary_colour}), livery ${r.livery_id}`);
   if (looks.rows.length) say("  Colours need the current team mod in MM_Data/Modding: run mmsave team-mod if a look or logo changed");

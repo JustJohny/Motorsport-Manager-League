@@ -1,3 +1,4 @@
+import { readAiLooks } from "../ai-looks.ts";
 import { readSavHeader } from "../codec/sav.ts";
 import { listLeagues, listSaves, seriesEnvFor, type SaveFileInfo } from "../commands/common.ts";
 import { pullDecisions, type PullSection } from "../commands/pull.ts";
@@ -98,7 +99,7 @@ export async function fetchSite(cfg: LeagueConfig, file: string): Promise<SiteSt
   const env = seriesEnvFor(cfg, file);
   const [snaps, pull] = await Promise.all([
     rest<SiteStatus["snapshot"][]>(env, "GET", "snapshots?select=id,game_date,created_at&order=id.desc&limit=1"),
-    pullDecisions(env, {}, () => {}),
+    pullDecisions(env, { aiLooks: readAiLooks(cfg, file) }, () => {}),
   ]);
   return { snapshot: snaps[0] ?? null, sections: pull.sections, changes: pull.set.changes.length };
 }

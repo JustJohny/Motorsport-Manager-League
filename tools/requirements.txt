@@ -1,0 +1,6 @@
+# Python tools in tools/ (team logos, livery masks, driver portraits):
+#   python3 -m venv ~/.mm-venv && ~/.mm-venv/bin/pip install -r tools/requirements.txt
+UnityPy
+numpy
+opencv-python-headless
+rembg[cpu]

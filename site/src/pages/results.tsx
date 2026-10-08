@@ -8,6 +8,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/page-header"
 import { fmtDate, fmtMoney, fmtTime } from "@/lib/format"
 import { useLeague } from "@/lib/league"
+import { useRaceData } from "@/lib/race-data"
+import { Classification, driverStyles, LapTimes, RaceTrace, SectorsSpeed, TeamTelemetry } from "@/components/race-data"
 import type { PitStopRound, SessionResult } from "@/lib/types"
 import { cn } from "@/lib/utils"
 
@@ -24,6 +26,10 @@ export function ResultsPage() {
   const races = ch.races ?? (ch.lastRace ? [ch.lastRace] : [])
   const [params, setParams] = useSearchParams()
   const race = races.find((r) => r.round === Number(params.get("round"))) ?? races.at(-1) ?? null
+  const raceData = useRaceData(race?.round ?? null)
+  const styles = raceData.data
+    ? driverStyles(raceData.data, Object.fromEntries(league.snapshot.teams.map((t) => [t.name, t.look?.colours ?? undefined])))
+    : {}
   const show = (round: number) => setParams(round === races.at(-1)?.round ? {} : { round: String(round) }, { replace: true })
   // The extract's qualifying rows carry no position or time yet, so order them by grid slot.
   const qualifying = [...(race?.qualifying ?? [])].sort((a, b) => a.grid - b.grid)
@@ -83,10 +89,17 @@ export function ResultsPage() {
             </CardHeader>
             <CardContent>
               <Tabs defaultValue="race">
-                <TabsList>
+                <TabsList className="flex-wrap group-data-horizontal/tabs:h-auto">
                   <TabsTrigger value="race">Race</TabsTrigger>
                   <TabsTrigger value="qualifying">Grid</TabsTrigger>
                   <TabsTrigger value="pits">Pit stops</TabsTrigger>
+                  {raceData.data && <>
+                    <TabsTrigger value="classification">Classification</TabsTrigger>
+                    <TabsTrigger value="trace">Race trace</TabsTrigger>
+                    <TabsTrigger value="laps">Lap times & tyres</TabsTrigger>
+                    <TabsTrigger value="sectors">Sectors & speed</TabsTrigger>
+                    {Object.keys(raceData.teams).length > 0 && <TabsTrigger value="telemetry">My team data</TabsTrigger>}
+                  </>}
                 </TabsList>
                 <TabsContent value="race">
                   <ResultTable rows={race.race} myTeam={me.team} kind="race" />
@@ -97,6 +110,13 @@ export function ResultsPage() {
                 <TabsContent value="pits">
                   <PitStopTable round={race.round} rounds={ch.pitStops} myTeam={me.team} />
                 </TabsContent>
+                {raceData.data && <>
+                  <TabsContent value="classification"><Classification data={raceData.data} myTeam={me.team} /></TabsContent>
+                  <TabsContent value="trace"><RaceTrace data={raceData.data} styles={styles} /></TabsContent>
+                  <TabsContent value="laps"><LapTimes data={raceData.data} styles={styles} myTeam={me.team} /></TabsContent>
+                  <TabsContent value="sectors"><SectorsSpeed data={raceData.data} /></TabsContent>
+                  <TabsContent value="telemetry"><TeamTelemetry data={raceData.data} teams={raceData.teams} styles={styles} myTeam={me.team} /></TabsContent>
+                </>}
               </Tabs>
             </CardContent>
           </Card>

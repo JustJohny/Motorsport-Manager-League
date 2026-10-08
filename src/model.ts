@@ -1,6 +1,6 @@
 import { num, readSav, writeSav, type Json, type SaveFile } from "./codec/sav.ts";
 import { Graph, type Obj } from "./graph.ts";
-import { loadSchema, Types } from "./schema.ts";
+import { detectGameCode, loadSchema, Types, type GameCode } from "./schema.ts";
 
 // Enum values mirrored from the game (see docs/save-schema.md).
 export const PART_TYPES = [
@@ -25,10 +25,13 @@ export const NULL_DATE = "0001-01-01T00:00:00.0000000";
 export class Save {
   readonly g: Graph;
   readonly types: Types;
+  /** The game code that wrote the save; its schema types the objects. */
+  readonly game: GameCode;
 
   constructor(readonly file: SaveFile) {
     this.g = new Graph(file.data);
-    this.types = new Types(loadSchema());
+    this.game = detectGameCode(this.g.list(file.data.teamManager?.mEntities ?? []));
+    this.types = new Types(loadSchema(this.game));
     this.types.record(file.data);
     this.g.onClone = (original, copy) => {
       const t = this.types.runtime.get(original);

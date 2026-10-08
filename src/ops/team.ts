@@ -1,6 +1,7 @@
 import type { Obj } from "../graph.ts";
 import type { LiveryOption, TeamLookInfo } from "../league-types.ts";
 import type { Save } from "../model.ts";
+import type { GameCode } from "../schema.ts";
 import { baseColours } from "../team-colours.ts";
 import { nationality } from "./people.ts";
 
@@ -60,6 +61,8 @@ export interface SetTeamLookOp {
   colorID?: number;
   /** A livery (chassis pattern) `id` from `liveryManager`, valid for the team's championship. */
   liveryID?: number;
+  /** Skip the livery, instead of failing, when it isn't valid for the team's championship (AI pins). */
+  ifAvailable?: boolean;
 }
 
 /** Liveries the team may use: MM's own pick, `Team.SelectNewLiveryForSeason`, draws from these. */
@@ -87,8 +90,8 @@ export function liveryMask(livery: Obj): string {
   return `${String(side).toLowerCase().replace(/\//g, "-")}.png`;
 }
 
-export function teamLook(team: Obj): TeamLookInfo {
-  return { colorID: team.colorID, liveryID: team.liveryID, colours: baseColours(team.colorID) };
+export function teamLook(team: Obj, game: GameCode = "ff20"): TeamLookInfo {
+  return { colorID: team.colorID, liveryID: team.liveryID, colours: baseColours(team.colorID, game) };
 }
 
 /**
@@ -107,9 +110,14 @@ export function setTeamLook(save: Save, op: SetTeamLookOp): string {
   }
   if (op.liveryID !== undefined) {
     const ok = teamLiveries(save, team).map((l) => l.id as number);
-    if (!ok.includes(op.liveryID)) throw new Error(`Livery ${op.liveryID} is not available in ${team.name}'s championship (${ok.join(", ")})`);
-    team.liveryID = op.liveryID;
-    out.push(`livery ${op.liveryID}`);
+    if (ok.includes(op.liveryID)) {
+      team.liveryID = op.liveryID;
+      out.push(`livery ${op.liveryID}`);
+    } else if (op.ifAvailable) {
+      out.push(`livery ${op.liveryID} skipped (not available in its championship)`);
+    } else {
+      throw new Error(`Livery ${op.liveryID} is not available in ${team.name}'s championship (${ok.join(", ")})`);
+    }
   }
   if (!out.length) throw new Error("Give colorID and/or liveryID");
   if (team.isCreatedByPlayer) out.push("(player-created team: MM uses the header's stored colours for it)");

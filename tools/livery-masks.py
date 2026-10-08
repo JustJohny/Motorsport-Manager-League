@@ -11,13 +11,20 @@ globalgamemanagers, under carcustomisation/liverytextures/) and the Livery Pack 
 (StreamingAssets/AssetBundles/livery_pack_dlc). Files are named after the livery data's texture
 path, lowercased, "/" -> "-" (src/ops/team.ts, liveryMask): "gp1-livery5-liverybase.png".
 
+A livery mod in MM_Data/Modding/Images/liveries (e.g. Enzoli's 2016 patterns, tools/enzoli-port.py)
+replaces the game's textures per livery ID, so its side textures (LiveryBase_<id-7>) replace those
+liveries' masks: the site then previews what the game draws.
+
 These are game assets: they go to the site's storage bucket (`mmsave liveries`), not the repo.
 
   tools/livery-masks.py <MM_Data folder> <out folder>
 
 Needs UnityPy (pip install UnityPy).
 """
+import csv
+import io
 import os
+import re
 import sys
 
 import UnityPy
@@ -41,6 +48,29 @@ def flank(img):
     return img.convert("RGB").crop((0, h // 2, w, h)).resize(SIZE, Image.LANCZOS)
 
 
+def mod_liveries(data_dir, resources, out):
+    """Masks from the staging mod's Images/liveries, by livery ID; returns how many."""
+    bundle = os.path.join(data_dir, "Modding", "Images", "liveries")
+    if not os.path.exists(bundle):
+        return 0
+    table = next(o for o in resources.objects if o.type.name == "TextAsset" and o.peek_name() == "Liveries").read().m_Script
+    side = {}
+    for r in csv.DictReader(io.StringIO(table.replace("\r", ""))):
+        if r.get("ID"):
+            base = r["Chassis Base Projection"] == "Side"
+            side[int(r["ID"])] = (r["Chassis Base Texture"] if base else r["Chassis Detail Texture"]).lower()
+    count = 0
+    for o in UnityPy.load(bundle).objects:
+        if o.type.name != "Texture2D":
+            continue
+        m = re.fullmatch(r"LiveryBase_(\d+)", o.peek_name())
+        path = side.get(int(m.group(1)) + 7) if m else None  # ModImageFileInfo.liveryIdOffset
+        if path:
+            flank(o.read().image).save(os.path.join(out, path.replace("/", "-") + ".png"), optimize=True)
+            count += 1
+    return count
+
+
 def main(argv):
     if len(argv) != 3:
         sys.exit(__doc__)
@@ -49,7 +79,8 @@ def main(argv):
     count = 0
 
     paths = resource_paths(data_dir)
-    objects = {o.path_id: o for o in UnityPy.load(os.path.join(data_dir, "resources.assets")).objects}
+    resources = UnityPy.load(os.path.join(data_dir, "resources.assets"))
+    objects = {o.path_id: o for o in resources.objects}
     for name, path_id in sorted(paths.items()):
         rel = name[len(PREFIX):]
         flank(objects[path_id].read().image).save(os.path.join(out, rel.replace("/", "-") + ".png"), optimize=True)
@@ -64,7 +95,8 @@ def main(argv):
             rel = name[len(DLC_PREFIX):-len(".psd")]
             flank(obj.read().image).save(os.path.join(out, rel.replace("/", "-") + ".png"), optimize=True)
             count += 1
-    print(f"Wrote {count} masks to {out}")
+    modded = mod_liveries(data_dir, resources, out)
+    print(f"Wrote {count} masks to {out}" + (f", {modded} from the livery mod" if modded else ""))
 
 
 if __name__ == "__main__":

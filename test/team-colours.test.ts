@@ -4,14 +4,17 @@ import { LEAGUE_COLOR_ID_START, loadBaseColourTable, parseColourTable, teamColou
 const look = { primary: "#c8102e", secondary: "#ffffff", tertiary: "#1a1a1a", trim: "#f2c200" };
 
 describe("team colours mod", () => {
-  it("keeps MM's rows and adds league rows in MM's column order", () => {
+  it("keeps FF20's rows, fills up to the league IDs and adds league rows in the base's column order", () => {
     const base = loadBaseColourTable();
-    expect(base.rows).toHaveLength(LEAGUE_COLOR_ID_START);
+    expect(base.rows).toHaveLength(85); // FIRE Fantasy 20: one row per team, 0..84
+    expect(base.header).not.toContain("Metallic"); // FF20's table is the older format
+    expect(loadBaseColourTable("rebirth").rows).toHaveLength(LEAGUE_COLOR_ID_START);
     const text = teamColoursMod([{ colorID: 129, look }, { colorID: 130, look: { ...look, primary: "#000000" } }]);
     expect(text.endsWith("\r\n")).toBe(true);
     const out = parseColourTable(text);
     expect(out.header).toEqual(base.header);
     expect(out.rows.slice(0, base.rows.length)).toEqual(base.rows);
+    expect(out.rows.slice(85, 129).every((r) => r.slice(1).join() === base.rows[0].slice(1).join())).toBe(true);
     const row = Object.fromEntries(out.header.map((h, i) => [h, out.rows[129][i]]));
     expect(row).toMatchObject({ ID: "129", Car: "#c8102e", Primary: "#c8102e", Trim: "#f2c200", "Normal UI": "#c8102e" });
     // A black pick stays black on the car but is lifted for MM's dark UI.

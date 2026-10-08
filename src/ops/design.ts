@@ -158,6 +158,7 @@ export function designOptions(save: Save, team: Obj, type: PartType): DesignOpti
     },
     slots: cpd.mAllPartsUnlocked ? 5 : slots,
     designCentreLevel: isBuilt(dc) ? dc.currentLevel : null,
+    rules: save.game,
     isPlayer,
     // Player.designPartTimeModifier: only the ex-engineer backstory (PlayerBackStoryType 1) has it.
     playerTimeModifierDays: isPlayer && save.data.player?.mPlayerBackStory?.mBackStory === 1
@@ -171,13 +172,17 @@ export function designOptions(save: Save, team: Obj, type: PartType): DesignOpti
 }
 
 const STAT_KEYS = ["topSpeed", "acceleration", "braking", "lowSpeedCorners", "mediumSpeedCorners", "highSpeedCorners"];
+/** Rebirth only: Team.<part>DevelopmentRate. */
 const DEV_RATE: Partial<Record<PartType, string>> = {
   Brakes: "brakesDevelopmentRate", Engine: "engineDevelopmentRate", FrontWing: "frontWingDevelopmentRate",
   Gearbox: "gearboxDevelopmentRate", RearWing: "rearWingDevelopmentRate", Suspension: "suspensionDevelopmentRate",
 };
-// GameStatsConstants.initialReliabilityValue / initialMaxReliabilityValue.
+// GameStatsConstants.initialReliabilityValue / initialMaxReliabilityValue (Rebirth).
 const INITIAL_RELIABILITY = 0.4;
 const INITIAL_MAX_RELIABILITY = 0.45;
+// FF20 rolls them per launch: 0.5 + Random(0, 0.2) and 0.75 + Random(0.1, 0.2).
+const FF20_RELIABILITY = 0.6;
+const FF20_MAX_RELIABILITY = 0.9;
 
 /** CarPartDesign.SetBaseStats: the new part before its components. */
 function designBase(save: Save, team: Obj, type: PartType, ctx: DesignContext): DesignBase {
@@ -187,6 +192,18 @@ function designBase(save: Save, team: Obj, type: PartType, ctx: DesignContext): 
   const skill = num(pcs?.[STAT_KEYS[statType]] ?? 0);
   const chassis = save.g.deref<Obj>(save.cars(team)[0]?.chassisStats);
   const dcLevel = findBuilding(save, team, BUILDING.DesignCentre).currentLevel as number;
+  if (save.game === "ff20") {
+    // FF20's SetBaseStats: no engineer x1.5 or design-centre/engineer reliability bonus, double
+    // improvability, no development rates. Its starting reliability values are rolled once per
+    // game launch (GameStatsConstants: 0.5-0.7 and 0.85-0.95); the mid-points are shown.
+    return {
+      stat: seasonStartStat(save, team, type) + Math.floor(skill),
+      maxPerformance: num(chassis?.mImprovability ?? 0) * 2,
+      reliability: FF20_RELIABILITY,
+      maxReliability: FF20_MAX_RELIABILITY,
+      developmentRate: 1,
+    };
+  }
   return {
     stat: seasonStartStat(save, team, type) + Math.floor(skill) * 1.5,
     maxPerformance: num(chassis?.mImprovability ?? 0),
@@ -299,7 +316,7 @@ export function startDesign(save: Save, op: StartDesignOp): string {
   part.name = `${type[0]}-${Array.from({ length: 4 }, () => String.fromCharCode(65 + Math.floor(Math.random() * 26))).join("")}`;
   part.buildDate = NULL_DATE;
   part.isBanned = false;
-  part.developmentVariance = float(0);
+  if (save.game === "rebirth") part.developmentVariance = float(0);
   const s = part.mStats;
   // Only a preview: PartComplete re-applies the components to the parts it builds.
   s.level = plan.level;

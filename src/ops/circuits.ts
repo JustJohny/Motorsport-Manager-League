@@ -39,6 +39,9 @@ export function brokenCircuits(save: Save): Obj[] {
 
 /** Put MM's database values back on every broken circuit. Healthy circuits are left alone. */
 export function repairCircuits(save: Save, _op: RepairCircuitsOp): string {
+  // The fields it restores (session start times, overtake corners, banned locations...) exist
+  // only in Rebirth: Redux's game code; a FIRE Fantasy 20 save never needs or has them.
+  if (save.game !== "rebirth") throw new Error("Only for saves from the old Rebirth: Redux install; this save is FIRE Fantasy 20's");
   const table = circuitTable();
   const broken = brokenCircuits(save);
   for (const c of broken) {

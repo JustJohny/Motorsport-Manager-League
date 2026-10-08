@@ -1,11 +1,14 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import type { GameCode } from "./schema.ts";
 
 /**
  * League team colours as an MM database mod. MM keeps only `Team.colorID` in the save and reads
  * the colours from its Team Colours table; a mod's table replaces the whole base table, so the
- * mod file is MM's own rows (schema/team-colours-1.53.csv, extracted from resources.assets)
- * plus one row per member team. See docs/save-schema.md, "Team colours, livery and logos".
+ * mod file is the base rows plus one row per member team. The base is FIRE Fantasy 20's own
+ * table (schema/team-colours-ff20.csv, its Databases/Team Colours.txt), or for saves from the
+ * old Rebirth install MM's (schema/team-colours-rebirth.csv, from resources.assets).
+ * See docs/save-schema.md, "Team colours, livery and logos".
  */
 
 /** Colours a member picks, as "#rrggbb" (TeamColours in league-types, plus the finish). */
@@ -23,11 +26,15 @@ export interface TeamLook {
   smoothness?: number;
 }
 
-export const BASE_TEAM_COLOURS = fileURLToPath(new URL("../schema/team-colours-1.53.csv", import.meta.url));
+export const BASE_TEAM_COLOURS: Record<GameCode, string> = {
+  ff20: fileURLToPath(new URL("../schema/team-colours-ff20.csv", import.meta.url)),
+  rebirth: fileURLToPath(new URL("../schema/team-colours-rebirth.csv", import.meta.url)),
+};
 
 /**
- * First ID for league rows: MM's own table is 0..128. IDs stay contiguous because
- * `TeamColorManager.OnLoad` uses the player's `colorID` as an array index.
+ * First ID for league rows: FF20's table is 0..84, MM's own 0..128; the gap is filled with
+ * neutral rows. IDs stay contiguous because `TeamColorManager.OnLoad` uses the player's
+ * `colorID` as an array index.
  */
 export const LEAGUE_COLOR_ID_START = 129;
 
@@ -76,8 +83,8 @@ export function parseColourTable(text: string): ColourTable {
   return { header, rows };
 }
 
-export function loadBaseColourTable(path = BASE_TEAM_COLOURS): ColourTable {
-  return parseColourTable(readFileSync(path, "utf8"));
+export function loadBaseColourTable(game: GameCode = "ff20"): ColourTable {
+  return parseColourTable(readFileSync(BASE_TEAM_COLOURS[game], "utf8"));
 }
 
 /** One table row in MM's column order, following the patterns of MM's own rows. */
@@ -88,6 +95,7 @@ export function teamColourRow(table: ColourTable, id: number, look: TeamLook): s
   const ui2 = uiColour(secondary);
   const darkSponsor = luminance(primary) > 0.5 ? shade(primary, -0.85) : "#0d0d0d";
   const lightSponsor = "#ffffff";
+  // Every column the base table has (FF20's has no Metallic/Smoothness).
   const values: Record<string, string> = {
     "ID": String(id),
     "Staff Primary": primary,
@@ -132,10 +140,17 @@ export function teamColourRow(table: ColourTable, id: number, look: TeamLook): s
  * MM's base table plus a row per league team, as the mod file `Databases/Team Colours.txt`.
  * Keeps MM's CRLF line endings.
  * IDs must be at least LEAGUE_COLOR_ID_START (the database hands them out, never reused).
+ * `baseOverrides` replace rows of MM's own table (AI teams' real colours, src/ai-looks.ts).
  */
-export function teamColoursMod(looks: { colorID: number; look: TeamLook }[], base = loadBaseColourTable()): string {
+export function teamColoursMod(looks: { colorID: number; look: TeamLook }[], base = loadBaseColourTable(),
+  baseOverrides: { colorID: number; look: TeamLook }[] = []): string {
   const taken = new Set(base.rows.map((r) => Number(r[0])));
   const rows = base.rows.map((r) => [...r]);
+  for (const { colorID, look } of baseOverrides) {
+    const i = rows.findIndex((r) => Number(r[0]) === colorID);
+    if (i < 0 || colorID >= LEAGUE_COLOR_ID_START) throw new Error(`Colour ID ${colorID} isn't a row of MM's own table`);
+    rows[i] = teamColourRow(base, colorID, look);
+  }
   for (const { colorID, look } of looks) {
     if (!Number.isInteger(colorID) || colorID < LEAGUE_COLOR_ID_START) throw new Error(`League colour IDs start at ${LEAGUE_COLOR_ID_START}, got ${colorID}`);
     if (taken.has(colorID)) throw new Error(`Colour ID ${colorID} is already used`);
@@ -149,12 +164,12 @@ export function teamColoursMod(looks: { colorID: number; look: TeamLook }[], bas
   return [base.header, ...rows].map((r) => r.join(",")).join("\r\n") + "\r\n";
 }
 
-let baseTable: ColourTable | null = null;
+const baseTables = new Map<GameCode, ColourTable>();
 
-/** The four livery colours of a row in MM's own table, or null for an ID it doesn't have. */
-export function baseColours(colorID: number): { primary: string; secondary: string; tertiary: string; trim: string } | null {
-  baseTable ??= loadBaseColourTable();
-  const t = baseTable;
+/** The four livery colours of a row in the base table, or null for an ID it doesn't have. */
+export function baseColours(colorID: number, game: GameCode = "ff20"): { primary: string; secondary: string; tertiary: string; trim: string } | null {
+  let t = baseTables.get(game);
+  if (!t) baseTables.set(game, (t = loadBaseColourTable(game)));
   const row = t.rows.find((r) => Number(r[0]) === colorID);
   if (!row) return null;
   const col = (name: string) => row[t.header.indexOf(name)].toLowerCase();

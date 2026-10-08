@@ -76,7 +76,7 @@ export function team(save: Save, t: Obj, champ: Obj, member: string | null): Tea
     gameCrew: gameCrew(save, t),
     engine: engineOf(save, t),
     sponsors: sponsors?.onCar ?? [],
-    look: teamLook(t),
+    look: teamLook(t, save.game),
     sponsorship: sponsors?.sponsorship ?? null,
     contracts: { deadline: champ.currentPreSeasonStartDate, renewals: teamRenewals(save, t) },
     staff: save.slots(t).map((s) => {

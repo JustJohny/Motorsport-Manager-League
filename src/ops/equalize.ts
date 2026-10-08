@@ -81,8 +81,10 @@ export function equalizeTeams(save: Save, op: EqualizeOp): string[] {
       done.push(`parts ${Object.keys(op.parts).length} types`);
     }
     if (op.developmentRate !== undefined) {
-      for (const field of Object.values(DEV_RATE)) if (field! in team) team[field!] = float(op.developmentRate);
-      done.push(`development rate ${op.developmentRate}`);
+      // Rebirth only: FF20 (like vanilla MM) has no team development rates.
+      const fields = Object.values(DEV_RATE).filter((f) => f! in team);
+      for (const field of fields) team[field!] = float(op.developmentRate);
+      done.push(fields.length ? `development rate ${op.developmentRate}` : "development rate skipped (not in this game)");
     }
 
     // Staff: the lead designer's part contributions and every mechanic's stats.

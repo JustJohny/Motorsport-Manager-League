@@ -467,6 +467,11 @@ describe.skipIf(!existsSync(SAVE))("operations on a real save", () => {
     const other = liveries.find((id) => id !== team.liveryID)!;
     const elsewhere = save.g.list<any>(save.data.liveryManager._currentLiveriesArr).find((l) => !liveries.includes(l.id))!;
     expect(() => applyChanges(save, { changes: [{ op: "setTeamLook", team: "Garuda Racing", liveryID: elsewhere.id }] })).toThrow(/not available/);
+    // An AI pin (ifAvailable) skips a livery its championship doesn't have.
+    const before = team.liveryID;
+    const log = applyChanges(save, { changes: [{ op: "setTeamLook", team: team.teamID, liveryID: elsewhere.id, ifAvailable: true }] });
+    expect(String(log)).toMatch(/skipped/);
+    expect(team.liveryID).toBe(before);
     applyChanges(save, { changes: [{ op: "setTeamLook", team: "Garuda Racing", colorID: 129, liveryID: other }] });
     const reloaded = reload(save);
     expect(reloaded.g.validate()).toEqual([]);

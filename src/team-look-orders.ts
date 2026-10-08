@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import type { ChangeSet } from "./apply.ts";
 import type { Log } from "./commands/common.ts";
 import { rest, storageDownload, storageUpload, type SupabaseEnv } from "./supabase.ts";
+import { aiColourRows, aiOnly, type AiLook } from "./ai-looks.ts";
 import { teamColoursMod } from "./team-colours.ts";
 
 /**
@@ -77,17 +78,23 @@ export function logosByTeamId(rows: TeamIdentityRow[]) {
  * league colour row) and, if any logo is approved, `Images/teamlogos` (the base bundle + logos).
  * The organizer copies both into MM_Data/Modding and switches the staging mod on in game.
  */
-export async function buildTeamMod(env: SupabaseEnv, opts: { out: string; logosBase?: string; python?: string }, log: Log) {
+export async function buildTeamMod(env: SupabaseEnv,
+  opts: { out: string; logosBase?: string; python?: string; aiLooks?: AiLook[]; memberTeams?: (string | number)[] }, log: Log) {
   const rows = await rest<TeamIdentityRow[]>(env, "POST", "rpc/all_team_identities", {});
   const looks = rows.filter((r) => r.color_id != null && r.primary_colour);
+  // AI teams' real colours go over their own rows of MM's table; member teams are never overridden.
+  const ai = aiOnly(opts.aiLooks ?? [], [...(opts.memberTeams ?? []), ...rows.map((r) => r.team), ...rows.map((r) => r.team_id)]);
+  const aiRows = aiColourRows(ai);
   const db = join(opts.out, "Modding", "Databases");
   mkdirSync(db, { recursive: true });
   writeFileSync(join(db, "Team Colours.txt"), teamColoursMod(looks.map((r) => ({
     colorID: r.color_id!,
     look: { primary: r.primary_colour!, secondary: r.secondary_colour!, tertiary: r.tertiary_colour!, trim: r.trim_colour! },
-  }))));
-  log(`Team Colours.txt: ${looks.length} league row${looks.length === 1 ? "" : "s"}`);
+  })), undefined, aiRows));
+  log(`Team Colours.txt: ${looks.length} league row${looks.length === 1 ? "" : "s"}, ${aiRows.length} AI team${aiRows.length === 1 ? "" : "s"}`);
   for (const r of looks) log(`  ${r.series}/${r.team}: row ${r.color_id} ${r.primary_colour} ${r.secondary_colour} ${r.tertiary_colour} ${r.trim_colour}`);
+  for (const l of ai.filter((l) => l.colours)) log(`  AI ${l.team}: row ${l.colorID} ${l.colours!.primary} ${l.colours!.secondary} ${l.colours!.tertiary} ${l.colours!.trim}`);
+  for (const l of (opts.aiLooks ?? []).filter((l) => !ai.includes(l))) log(`  ${l.team} is a member team: its look is the member's, not aiLooks`);
 
   const { logos, clashes } = logosByTeamId(rows);
   for (const c of clashes) log(`  WARNING: two series have a logo for ${c}; the later approval is used`);

@@ -7,3 +7,5 @@ changes.json
 league-*.json
 changes-*.json
 backup-*.json
+tools/.cache/
+__pycache__/

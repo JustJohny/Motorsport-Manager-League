@@ -40,6 +40,9 @@ export function brokenChampionships(save: Save): Obj[] {
  * level preference, which the save applies to the game's settings on load (missing reads as 0).
  */
 export function repairOldFormat(save: Save, _op: RepairOldFormatOp): string[] {
+  // The fields it restores (session start times, overtake corners, banned locations...) exist
+  // only in Rebirth: Redux's game code; a FIRE Fantasy 20 save never needs or has them.
+  if (save.game !== "rebirth") throw new Error("Only for saves from the old Rebirth: Redux install; this save is FIRE Fantasy 20's");
   const g = save.g;
   const out = [repairCircuits(save, { op: "repairCircuits" })];
 

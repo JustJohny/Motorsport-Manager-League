@@ -13,7 +13,9 @@ import { Save } from "./model.ts";
 import { defaultSavesDir } from "./paths.ts";
 import { rest, supabaseEnv, type SupabaseEnv } from "./supabase.ts";
 import { buildTeamMod, uploadLiveryMasks } from "./team-look-orders.ts";
+import { readAiLooks } from "./ai-looks.ts";
 import { gamePatch } from "./game-patch.ts";
+import { portraitDrivers } from "./driver-list.ts";
 
 const USAGE = `mmsave - Motorsport Manager league save toolkit
 
@@ -30,6 +32,7 @@ const USAGE = `mmsave - Motorsport Manager league save toolkit
   mmsave team-mod --league league.json [-o out/team-mod] [--logos-base teamlogos] [--python py]   members' colours and logos as MM mod files
   mmsave liveries --game <MM_Data> [--python py]      upload MM's livery masks for the site's livery previews (once)
   mmsave game-patch --game <MM_Data> [--retire on|off] [--status] [--restore]   the player team's cars retire as qualifying and races start (patches the game, original backed up)
+  mmsave drivers  <save.sav> [--championships 0,1,2] [-o drivers.json]   drivers for portrait photos (contracted + free agents) with their portrait index
   mmsave apply    <save.sav> <changes.json> [-o out.sav] [--name "Shown name"]
   mmsave diff     <a.sav> <b.sav> [--team NAME] [--path teamManager] [--depth N]
 
@@ -57,6 +60,7 @@ const { values: opt, positionals: [cmd, ...args] } = parseArgsOrExit({
     retire: { type: "string" },
     status: { type: "boolean" },
     restore: { type: "boolean" },
+    championships: { type: "string" },
     help: { type: "boolean", short: "h" },
   },
 });
@@ -154,7 +158,8 @@ switch (cmd) {
     const drawn = JSON.stringify(save.data.supplierManager.championshipSuppliers ?? {});
     const ended = state.championship.calendar.filter((e) => e.ended).length;
     console.log(`${state.championship.name}, game date ${state.gameDate.slice(0, 10)}, ${ended}/${state.championship.calendar.length} races done`);
-    console.log(`MM's draw for next season: ${drawn === "{}" || drawn === "[]" ? "not made yet (MM draws it when pre-season starts)" : "present"}`);
+    if (save.game === "ff20") console.log("FF20 offers every supplier of the series' tier (no draw)");
+    else console.log(`MM's draw for next season: ${drawn === "{}" || drawn === "[]" ? "not made yet (MM draws it when pre-season starts)" : "present"}`);
     for (const t of state.teams.filter((x) => x.member)) {
       const car = t.design?.nextYearCar;
       if (!car) { console.log(`  ${t.name}: no next-year car data`); continue; }
@@ -175,7 +180,7 @@ switch (cmd) {
     // Everything members decided since the last apply (src/commands/pull.ts).
     const cfg = leagueConfig("pull");
     const env = seriesEnv(cfg);
-    const r = await pullDecisions(env, { force: opt.force }, console.log);
+    const r = await pullDecisions(env, { force: opt.force, aiLooks: readAiLooks(cfg, opt.league!) }, console.log);
     const json = JSON.stringify(r.set, null, 2);
     if (opt.out) writeFileSync(opt.out, json), console.log(`wrote ${opt.out}`);
     else console.log(json);
@@ -187,7 +192,10 @@ switch (cmd) {
     const cfg = leagueConfig("team-mod");
     const env = seriesEnv(cfg);
     const out = opt.out ?? join("out", "team-mod");
-    await buildTeamMod(env, { out, logosBase: opt["logos-base"], python: opt.python }, console.log);
+    await buildTeamMod(env, {
+      out, logosBase: opt["logos-base"], python: opt.python,
+      aiLooks: readAiLooks(cfg, opt.league!), memberTeams: cfg.members.map((m) => m.team),
+    }, console.log);
     console.log(`wrote ${join(out, "Modding")}. Copy its Databases and Images files into MM_Data/Modding, `
       + "restart MM and switch the staging mod on in the Workshop screen.");
     break;
@@ -195,6 +203,16 @@ switch (cmd) {
   case "liveries": {
     if (!opt.game) fail("liveries needs --game <path to MM_Data>");
     await uploadLiveryMasks(supabaseEnv(), { dataDir: opt.game, out: join("out", "liveries"), python: opt.python }, console.log);
+    break;
+  }
+  case "drivers": {
+    // Input for tools/driver-photos.py.
+    const save = Save.load(savePath(args[0]));
+    const ids = opt.championships?.split(",").map(Number);
+    const list = portraitDrivers(save, ids);
+    const json = JSON.stringify(list, null, 2);
+    if (opt.out) writeFileSync(opt.out, json), console.log(`wrote ${opt.out}: ${list.length} drivers`);
+    else console.log(json);
     break;
   }
   case "game-patch": {

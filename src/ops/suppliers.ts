@@ -38,15 +38,29 @@ function dictEntries(d: unknown): [number, number][] {
 }
 const list = (l: unknown): number[] => (Array.isArray(l) ? l.map(Number) : []);
 
-/** Supplier.GetPrice: base (+ engine level modifier x multiplier x scalar), minus the team's discount. */
+/** Supplier.SupplierType.Battery. */
+const BATTERY = SUPPLIER_TYPES.indexOf("Battery");
+/** GameStatsConstants.hybridModeCost (FF20). */
+const HYBRID_MODE_COST = 1_000_000;
+
+/**
+ * Supplier.GetPrice: base (+ engine level modifier x multiplier x scalar), minus the team's
+ * discount. FF20 also prices batteries by their harvest efficiency (+ the hybrid mode cost when
+ * the championship runs it). Rebirth adds temporary discounts.
+ */
 function price(save: Save, s: Obj, team: Obj): number {
   let p = Number(s.mBasePrice);
   if (s.supplierType === 0) p += Math.round(Number(s.mRandomEngineLevelModifier ?? 0) * num(s.mPriceMultiplier) * num(s.mScalar));
+  else if (s.supplierType === BATTERY && save.game === "ff20") {
+    p += Math.round(num(s.mRandomHarvestEfficiencyModifier ?? 0) * num(s.mPriceMultiplier) * num(s.mScalar));
+    if (save.g.deref<Obj>(save.championship(team).rules)?.isHybridModeActive) p += HYBRID_MODE_COST;
+    p = Math.round(Math.trunc(p / 1000)) * 1000;
+  }
   const d = [...dictEntries(s.teamDiscounts), ...dictEntries(s.temporaryDiscounts)].find(([k]) => k === team.teamID)?.[1] ?? 0;
   return d > 0 ? p - Math.round(p * (d / 100)) : p;
 }
 
-/** Supplier.CanTeamBuyThis. */
+/** Supplier.CanTeamBuyThis (Rebirth adds temporary bans and exceptions; absent in FF20). */
 function canBuy(s: Obj, team: Obj): boolean {
   const no = [...list(s.mTeamsThatCannotBuy), ...list(s.mTemporaryTeamsCannotBuy)];
   return !no.includes(team.teamID) || list(s.mTemporaryTeamCanBuy).includes(team.teamID);
@@ -97,7 +111,12 @@ export function supplierOptions(save: Save, team: Obj): Partial<Record<SupplierT
   const champ = save.championship(team);
   const out: Partial<Record<SupplierType, SupplierOption[]>> = {};
   for (const type of SUPPLIER_TYPES) {
-    const list = drawnSuppliers(save, champ, type).filter((s) => canBuy(s, team)).map((s) => toOption(save, s, team));
+    // FF20 (like vanilla MM) has no draw: GetSuppliersForTeam offers every supplier of the type
+    // whose tier is championshipID + 1 and that the team may buy.
+    const pool = save.game === "ff20"
+      ? save.g.list<Obj>(save.data.supplierManager[LIST_NAME[type]]).filter((s) => s.mTier === champ.championshipID + 1)
+      : drawnSuppliers(save, champ, type);
+    const list = pool.filter((s) => canBuy(s, team)).map((s) => toOption(save, s, team));
     if (list.length) out[type] = list;
   }
   return out;

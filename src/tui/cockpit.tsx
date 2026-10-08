@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { useState } from "react";
 import { applyToSave, publishSave } from "../commands/publish-apply.ts";
 import { pullDecisions, type PullResult } from "../commands/pull.ts";
+import { readAiLooks } from "../ai-looks.ts";
 import { seriesEnvFor } from "../commands/common.ts";
 import { defaultSavesDir } from "../paths.ts";
 import { cycleOf, cycleSaves, seriesFiles } from "../race-cycle.ts";
@@ -50,7 +51,7 @@ function Status({ shell, active, height, width, openPull }: ScreenProps & { open
   const startPull = async () => {
     if (!series) return;
     shell.log(`Pulling members' decisions for series "${series.id}"…`);
-    const r = await shell.heavy("Pulling members' decisions", () => pullDecisions(seriesEnvFor(series.cfg, series.file), {}, (l) => shell.log(l, "dim")));
+    const r = await shell.heavy("Pulling members' decisions", () => pullDecisions(seriesEnvFor(series.cfg, series.file), { aiLooks: readAiLooks(series.cfg, series.file) }, (l) => shell.log(l, "dim")));
     if (r) openPull(r);
   };
 

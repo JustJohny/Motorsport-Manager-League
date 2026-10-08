@@ -345,7 +345,9 @@ function Designer({ priv, busy, onOrder }: { priv: TeamPrivate; busy: boolean; o
               <StatPill icon={ShieldPlus} label="Max reliability">{fmtPct(base.maxReliability)}</StatPill>
             </div>
             <div className="text-xs text-muted-foreground">
-              Your best {humanize(type).toLowerCase()} now: {fmtNum(best)}. Component performance counts ×{base.developmentRate.toFixed(2)} (your {humanize(type).toLowerCase()} development rate).
+              Your best {humanize(type).toLowerCase()} now: {fmtNum(best)}.
+              {/* Development rates are a Rebirth: Redux feature; FIRE Fantasy 20 adds component boosts as they are. */}
+              {opts.ctx.rules !== "ff20" && <> Component performance counts ×{base.developmentRate.toFixed(2)} (your {humanize(type).toLowerCase()} development rate).</>}
             </div>
           </div>
           <div className={cn("flex flex-col gap-2 rounded-lg border p-3", chosen.length && "border-primary/50")}>

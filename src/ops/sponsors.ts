@@ -1,3 +1,4 @@
+import type { GameCode } from "../schema.ts";
 import type { Json } from "../codec/sav.ts";
 import type { Obj } from "../graph.ts";
 import type { SponsorDeal, SponsorOffer, SponsorOnCar, SponsorTerms, TeamSponsorship } from "../league-types.ts";
@@ -7,11 +8,16 @@ import { addDays, delayedEvents, insertByDate } from "./calendar.ts";
 // MM's sponsor rules (SponsorController, ContractSponsor and Sponsor in Assembly-CSharp).
 // See docs/save-schema.md, "Sponsors".
 
-/** Sponsor.Category. */
-const CATEGORIES = [
-  "Alcoholic Drinks", "Appliances", "Automotive", "Banking", "Clothing", "Fashion", "Food",
-  "Games", "Media", "Oil", "Security", "Technology", "Telecoms", "Travel",
-];
+/**
+ * Sponsor.Category. FIRE Fantasy 20 replaced MM's business categories with the series tier a
+ * sponsor deal is offered in.
+ */
+const CATEGORIES: Record<GameCode, string[]> = {
+  ff20: ["Single-seater tier 1", "Single-seater tier 2", "Single-seater tier 3", "GT tier 1", "GT tier 2",
+    "Endurance tier 1", "Endurance tier 2"],
+  rebirth: ["Alcoholic Drinks", "Appliances", "Automotive", "Banking", "Clothing", "Fashion", "Food",
+    "Games", "Media", "Oil", "Security", "Technology", "Telecoms", "Travel"],
+};
 /** Contract.ContractStatus. */
 const ON_GOING = 1;
 const TERMINATED = 3;
@@ -53,7 +59,7 @@ function offerList(save: Save, sc: Obj, slot: number): Json[] {
 }
 
 function onCar(save: Save, slot: number, sponsor: Obj): SponsorOnCar {
-  return { slot, sponsor: sponsor.name as string, category: CATEGORIES[sponsor.category as number] ?? "Other", prestige: sponsor.prestigeLevel as number };
+  return { slot, sponsor: sponsor.name as string, category: CATEGORIES[save.game][sponsor.category as number] ?? "Other", prestige: sponsor.prestigeLevel as number };
 }
 
 function terms(save: Save, slot: number, c: Obj): SponsorTerms {

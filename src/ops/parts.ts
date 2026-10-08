@@ -60,7 +60,7 @@ export function addPart(save: Save, op: AddPartOp): string {
   part.name = op.name ?? randomName(type);
   part.buildDate = save.now;
   part.isBanned = false;
-  part.developmentVariance = float(0);
+  if (save.game === "rebirth") part.developmentVariance = float(0);
   const s = part.mStats;
   s.level = op.level ?? s.level;
   s.mStat = float(op.stat);

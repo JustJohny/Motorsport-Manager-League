@@ -2,7 +2,7 @@
 // the league site agree on slots, cost and time. See docs/save-schema.md, "Part design".
 // Only type imports: the site bundles this file.
 
-import type { DesignBase, DesignComponent, DesignContext } from "./league-types.ts";
+import type { DesignBase, DesignComponent, DesignContext, GameRules } from "./league-types.ts";
 
 export type { DesignBase, DesignComponent, DesignContext, DesignSettings } from "./league-types.ts";
 
@@ -14,15 +14,17 @@ export interface DesignPlan {
   extraCopies: number;
   /** What the league charges: MM's player price (full materials + components). */
   cost: number;
-  /** What MM itself would charge this team (AI teams pay 10 % of materials). */
+  /** What MM itself would charge this team (AI teams pay 10 % of materials; FF20 1 %). */
   gameCost: number;
   days: number;
   /** Sum of component levels → part level (1..5). */
   level: number;
 }
 
-/** MM's HQsBuilding_v1.designCentrePartDaysPerLevel. */
-export const DESIGN_CENTRE_DAYS = [0, -1, -2, -3];
+/** HQsBuilding_v1.designCentrePartDaysPerLevel. */
+export const DESIGN_CENTRE_DAYS: Record<GameRules, number[]> = { ff20: [0, -2, -3.5, -5], rebirth: [0, -1, -2, -3] };
+/** FF20: CarPartDesign.GetDesignDuration takes 10 days off for every team but the player's. */
+const FF20_AI_DAYS = 10;
 /** Bonuses that open a slot when the component is chosen (CarPartComponentBonus.OnSelect). */
 const SLOT_BONUSES: Record<string, (c: DesignComponent, value: number) => number> = {
   BonusUnlockExtraSlot: (_c, v) => v,
@@ -76,11 +78,14 @@ export function planDesign(ctx: DesignContext, chosen: DesignComponent[]): Desig
   const s = ctx.settings;
   const componentCost = all.reduce((sum, c) => sum + (c.cost !== 0 ? c.cost : c.engineer ? 0 : s.costPerLevel[c.level - 1] ?? 0), 0);
   const cost = Math.round(Math.max(0, s.materialsCost + componentCost));
-  const gameCost = ctx.isPlayer ? cost : Math.round(Math.max(0, s.materialsCost * 0.1 + componentCost));
+  const rules: GameRules = ctx.rules ?? "rebirth";
+  const aiMaterials = rules === "ff20" ? 0.01 : 0.1;
+  const gameCost = ctx.isPlayer ? cost : Math.round(Math.max(0, s.materialsCost * aiMaterials + componentCost));
 
-  // GetComponentDesignDurationBonus: own days, else the slot level's days, but only for a
-  // component whose level equals the number of normal slots.
-  const compDays = (c: DesignComponent) => (c.days !== 0 ? c.days : !c.engineer && ctx.slots === c.level ? s.timePerLevel[c.level - 1] ?? 0 : 0);
+  // GetComponentDesignDurationBonus: own days, else the slot level's days for every other
+  // non-engineer component (Rebirth: only one whose level equals the number of normal slots).
+  const levelDays = (c: DesignComponent) => !c.engineer && (rules === "ff20" || ctx.slots === c.level);
+  const compDays = (c: DesignComponent) => (c.days !== 0 ? c.days : levelDays(c) ? s.timePerLevel[c.level - 1] ?? 0 : 0);
   let bonusDays = 0;
   for (const c of all) for (const x of c.bonuses) {
     if (x.type === "BonusSpecificLevelComponentAddNoDays") {
@@ -92,12 +97,20 @@ export function planDesign(ctx: DesignContext, chosen: DesignComponent[]): Desig
       bonusDays += (gameCost / 1_000_000) * x.value;
     }
   }
-  let days = s.buildTimeDays + (ctx.designCentreLevel != null ? DESIGN_CENTRE_DAYS[ctx.designCentreLevel] ?? 0 : 0);
+  let days = s.buildTimeDays + (ctx.designCentreLevel != null ? DESIGN_CENTRE_DAYS[rules][ctx.designCentreLevel] ?? 0 : 0);
   days += all.reduce((sum, c) => sum + compDays(c), 0) + bonusDays;
   days = Math.max(0, days);
-  if (ctx.isPlayer) days -= ctx.playerTimeModifierDays ?? 0;
-  // MM keeps whole days plus rounded hours.
-  days = Math.trunc(days) + Math.round((days - Math.trunc(days)) * 24) / 24;
+  if (rules === "ff20") {
+    // GetDesignDuration: hours from the fraction, then 10 days off for non-player teams, then the
+    // player's backstory modifier.
+    const hours = Math.round((days - Math.trunc(days)) * 24);
+    if (!ctx.isPlayer) days -= FF20_AI_DAYS;
+    days = Math.max(0, Math.trunc(days) + hours / 24 - (ctx.isPlayer ? ctx.playerTimeModifierDays ?? 0 : 0));
+  } else {
+    if (ctx.isPlayer) days -= ctx.playerTimeModifierDays ?? 0;
+    // MM keeps whole days plus rounded hours.
+    days = Math.trunc(days) + Math.round((days - Math.trunc(days)) * 24) / 24;
+  }
 
   return {
     slots: slots.map((c) => c?.id ?? null),
@@ -111,9 +124,10 @@ export function planDesign(ctx: DesignContext, chosen: DesignComponent[]): Desig
 }
 
 /**
- * Expected stats of the designed part (CarPartComponent.ApplyStats): stat and max-performance
- * boosts scale with the team's development rate; reliability boosts add as they are. MM adds a
- * little randomness (max reliability ±10 %, development variance), so this is an estimate.
+ * Expected stats of the designed part (CarPartComponent.ApplyStats): components' boosts add to
+ * the base. In Rebirth stat and max-performance boosts scale with the team's development rate
+ * and MM adds randomness (max reliability ±10 %, development variance); FF20 rolls the starting
+ * reliability once per game launch. So this is an estimate.
  */
 export function predictPart(base: DesignBase, chosen: DesignComponent[]) {
   const rate = base.developmentRate;

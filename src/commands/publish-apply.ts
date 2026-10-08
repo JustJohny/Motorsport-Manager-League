@@ -6,6 +6,8 @@ import type { LeagueConfig, LeagueState } from "../league-types.ts";
 import { Save } from "../model.ts";
 import { crewNamePool } from "../ops/pit-crew.ts";
 import { memberRows, publish, splitSnapshot } from "../publish.ts";
+import { findRaceExport, readRaceExport } from "../race-data.ts";
+import { rest } from "../supabase.ts";
 import { seriesEnvFor, type Log } from "./common.ts";
 
 /**
@@ -32,7 +34,31 @@ export async function publishSave(input: string, cfg: LeagueConfig, opts: { dryR
     const costs = u.spend.reduce((s, x) => s + x.amount, 0);
     log(`  Pit crew ${u.team}: ${u.log.map((l) => l.message).join("; ") || "races processed"}${costs ? `, costs $${costs.toLocaleString()}` : ""}`);
   }
+  await publishRaceData(env, cfg, state, log);
   return { state, snapshotId };
+}
+
+/**
+ * FIRE Fantasy 20's race data for every finished round that has an export (re-uploading a round
+ * replaces it). Needs league.json "gameData" (the MM_Data folder).
+ */
+async function publishRaceData(env: ReturnType<typeof seriesEnvFor>, cfg: LeagueConfig, state: LeagueState, log: Log) {
+  if (!cfg.gameData) {
+    log("Race data: no \"gameData\" (MM_Data folder) in the league file; skipped");
+    return;
+  }
+  let n = 0;
+  for (const ev of state.championship.calendar.filter((e) => e.ended)) {
+    const dir = findRaceExport(cfg.gameData, ev.circuit, ev.date);
+    if (!dir) continue;
+    const { data, privateByTeam } = readRaceExport(dir);
+    await rest(env, "POST", "rpc/publish_race_data", {
+      p_series: env.series, p_round: ev.round, p_location: ev.circuit, p_race_date: ev.date.slice(0, 10), p_data: data, p_private: privateByTeam,
+    });
+    log(`  Race data round ${ev.round} (${ev.circuit}): ${data.results.length} cars, ${data.laps.length} lap files`);
+    n++;
+  }
+  if (!n) log("Race data: no FF20 export found for the finished rounds");
 }
 
 /** Where `apply` writes by default: next to the input, " (league)" added. */

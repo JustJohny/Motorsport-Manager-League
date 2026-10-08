@@ -14,6 +14,16 @@ export interface LeagueConfig {
    * `organizer: true` lets that member see every team's private data on the website.
    */
   members: { member: string; team: string | number; discord?: string; organizer?: boolean }[];
+  /**
+   * Looks for the AI teams (colours and a pinned livery), a file relative to the league file,
+   * e.g. "f1-2016-looks.json". Member teams are never touched. See src/ai-looks.ts.
+   */
+  aiLooks?: string;
+  /**
+   * The game's MM_Data folder. With FIRE Fantasy 20 its race data export is read from here and
+   * uploaded by `publish` (src/race-data.ts).
+   */
+  gameData?: string;
 }
 
 export interface CalendarEvent {
@@ -298,13 +308,21 @@ export interface DesignSettings {
   timePerLevel: number[];
 }
 
+/**
+ * Which game code's rules apply: FIRE Fantasy 20 (the league) or the old Rebirth: Redux install.
+ * Mirrors GameCode in src/schema.ts (this file can't import).
+ */
+export type GameRules = "ff20" | "rebirth";
+
 export interface DesignContext {
   settings: DesignSettings;
+  /** Game rules for cost and time; absent means Rebirth (contexts published before FF20). */
+  rules?: GameRules;
   /** Normal slots: highest level of a part of this type in inventory + 1, clamped 1..5. */
   slots: number;
   /** Design Centre currentLevel when built, else null. */
   designCentreLevel: number | null;
-  /** The player's career team pays full materials; AI teams 10 %. */
+  /** The player's career team pays full materials; AI teams 10 % (FF20: 1 %, and 10 days faster). */
   isPlayer: boolean;
   /** The player's backstory time reduction, in days (player team only). */
   playerTimeModifierDays?: number;
@@ -312,13 +330,13 @@ export interface DesignContext {
 
 /** A new part before its components, as MM's SetBaseStats makes it. */
 export interface DesignBase {
-  /** Season starting stat + 1.5 x the lead engineer's skill for this part. */
+  /** Season starting stat + the lead engineer's skill for this part (x 1.5 in Rebirth). */
   stat: number;
-  /** The chassis' improvability. */
+  /** The chassis' improvability (x 2 in FF20). */
   maxPerformance: number;
   reliability: number;
   maxReliability: number;
-  /** The team's development rate for this part: components' stat boosts are multiplied by it. */
+  /** Rebirth: the team's development rate for this part, multiplying components' stat boosts. FF20 has none (1). */
   developmentRate: number;
 }
 
@@ -574,4 +592,51 @@ export interface LeagueMemberRow {
   member: string;
   team: string;
   role: "member" | "organizer";
+}
+
+/** One car in FIRE Fantasy 20's exported race classification (src/race-data.ts). */
+export interface RaceResultRow {
+  position: number;
+  driver: string;
+  team: string;
+  grid: number | null;
+  /** Race time in seconds; for lapped cars MM's numbers are only meaningful with lapsToLeader. */
+  time: number | null;
+  gapToLeader: number | null;
+  lapsToLeader: number;
+  laps: number;
+  bestLap: number | null;
+  fastestLap: boolean;
+  stops: number;
+  points: number;
+  tyre: string;
+  /** CarState at the end: "None" while running, else e.g. "Retired", "Crashed". */
+  state: string;
+  penalties: string;
+}
+
+/** A driver's laps, one entry per lap and sector (3 per lap). sectorTime counts up within the lap. */
+export interface RaceDriverLaps {
+  driver: string;
+  team: string;
+  lap: number[];
+  sector: number[];
+  compound: string[];
+  flag: string[];
+  /** gapToLeader, gapToCarAhead, topSpeed, sectorTime, standingPos, overtakesDelta, runWides, cutCorners, lockUps, trackWater, trackRubber. */
+  values: Record<string, (number | null)[]>;
+}
+
+/** The public race data of one round (league.race_data). */
+export interface RaceData {
+  /** Export folder name: <location>_<yyyyMMdd>_<timestamp>. */
+  folder: string;
+  results: RaceResultRow[];
+  laps: RaceDriverLaps[];
+  driverStats: { driver: string; stats: Record<string, number | null> }[];
+}
+
+/** A team's own lap data (league.race_data_private): tyreWear, tyreTemp, fuel, setupQuality, form, stamina. */
+export interface RaceDataPrivate {
+  drivers: { driver: string; values: Record<string, (number | null)[]> }[];
 }

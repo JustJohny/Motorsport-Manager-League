@@ -1,0 +1,21 @@
+{
+  "description": "Real 2016 looks for the AI teams of the F1 2016 career's World Motorsport Championship: colours over each team's own Team Colours row (mmsave team-mod) and the livery Enzoli's 2016 mod painted for it (pinned at every pull; the patterns need out/enzoli/Modding from tools/enzoli-port.py). Livery masks: black = primary, red = secondary, green = tertiary, blue = trim. Colours are a best match to the 2016 cars; tune them freely. Member teams are skipped automatically. Point a league file at it with \"aiLooks\": \"f1-2016-looks.json\".",
+  "teams": [
+    { "team": "Mercedes AMG F1 Team", "teamID": 0, "colorID": 1, "liveryID": 11,
+      "colours": { "primary": "#1e1e1e", "secondary": "#c6c9cc", "tertiary": "#00d2be", "trim": "#00a19c", "metallic": 0.8 } },
+    { "team": "Red Bull Racing", "teamID": 1, "colorID": 2, "liveryID": 12,
+      "colours": { "primary": "#1b2a4e", "secondary": "#ffc906", "tertiary": "#db0a40", "trim": "#c0c0c0" } },
+    { "team": "Williams Martini Racing", "teamID": 2, "colorID": 3, "liveryID": 9,
+      "colours": { "primary": "#f4f4f4", "secondary": "#e2231a", "tertiary": "#00a3e0", "trim": "#0b2a5b" } },
+    { "team": "Scuderia Ferrari", "teamID": 3, "colorID": 4, "liveryID": 15,
+      "colours": { "primary": "#d40000", "secondary": "#ffffff", "tertiary": "#d40000", "trim": "#1a1a1a" } },
+    { "team": "McLaren Honda", "teamID": 4, "colorID": 5, "liveryID": 13,
+      "colours": { "primary": "#2b2b2b", "secondary": "#ffffff", "tertiary": "#e2001a", "trim": "#8a8d8f" } },
+    { "team": "Scuderia Toro Rosso", "teamID": 6, "colorID": 7, "liveryID": 10,
+      "colours": { "primary": "#12318c", "secondary": "#c0c0c0", "tertiary": "#e10600", "trim": "#f2c200" } },
+    { "team": "Haas F1 Team", "teamID": 103, "colorID": 104, "liveryID": 28,
+      "colours": { "primary": "#e6e6e6", "secondary": "#e10600", "tertiary": "#1a1a1a", "trim": "#6f7276" } },
+    { "team": "Manor Racing MRT", "teamID": 63, "colorID": 64, "liveryID": 8,
+      "colours": { "primary": "#1a2b5e", "secondary": "#e10600", "tertiary": "#ffffff", "trim": "#1a2b5e" } }
+  ]
+}
