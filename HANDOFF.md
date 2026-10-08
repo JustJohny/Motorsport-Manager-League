@@ -869,12 +869,42 @@ The user downloaded these into ~/Downloads and asked that they work with the too
   - Code: `site/src/components/race-data.tsx`, `site/src/lib/race-data.tsx` (demo mode: `public/race-data-demo.json`, gitignored), Recharts 2.15.4.
   - Checked with headless Chromium on desktop and 390 px, with no console errors.
   - `site/public/demo-state.json` is now an FF20 extract; the old one is in `out/work/demo-state.backup.json`.
-- **Seen in the test race:** a car demoted by the post-race scrutineers has negative `lapsToLeader` (shown as "Penalty"). The Stewards' decisions card shows "Places lost −23" for it, which is wrong; still to fix.
+- **Seen in the test race:** a car demoted by the post-race scrutineers has negative `lapsToLeader` (shown as "Penalty").
+- **FF20 scrutineering (fixed 2026-10-08):** the "−23" was real: FF20 sends a caught car to the back (`mPlacesLost` 23), fines $250K per offence, checks at 10 % per risk point and **bans** the part. `SCRUTINEERING` in `src/part-design.ts` holds both games' rules. The extract adds `championship.game`, `design.rules.game` and `Part.banned`. The site shows "To the back", FF20's odds and fine, and a "Banned" marker (no fitting or improving). `setFitting` skips banned parts, so `pull` no longer refits a caught part from the stored fitting. Tested on "SaveFF20 F1 Test Post race". Needs a publish to show on the site.
 - **To go live:**
   - run migration 020;
   - add `"gameData"` to `league-f1.json`;
   - keep FF20's `config.txt` with `oneFolderPerRace = true`;
   - publish after each race.
+
+## FF20 rescale and the 3D livery picker (built 2026-10-08)
+- **Race data is live-ready.** The user ran migration 020; `league-f1.json` has `"gameData"`, and FF20's `config.txt` already has `oneFolderPerRace = true`. The 2016 `aiLooks` line was removed from `league-f1.json`: on FF20 it would have painted 2016 looks onto FF20's AI teams.
+- **`league-f1.json` still lists the 2016 career's members and teams** (Tatra Racing etc., which don't exist in FF20) and the championship name "Formula 1 World Championship". The user must set the FF20 member teams before the first pull.
+- **FF20 vs Rebirth numbers:** both DLLs' method bodies were diffed (Cecil IL dump, hashed per method). Every game rule the toolkit mirrors was checked. The differences are in `src/game-rules.ts` (`GAME_SCALE`), keyed by `save.game` / `championship.game`:
+  - Drivers: stats up to 25, ability = total / 41.4 (was 20 and / 36). Engineer stats go up to 25 too (ability still / 24). Team principal ability = total / 90 × 5 (was / 60).
+  - Buyout (`GetContractTerminationCost`): yearly wage / 8 per month left (was / 12).
+  - Car fund (`GetCarDevCost`): a smaller table, paid **after each race** (yearly / the season's races), not monthly. The site says "/race".
+  - Chassis stats are clamped to 0..20 (`chassisStatMax`).
+  - Part stats (700–1000) only matter in ratios, so equalize, promotions and team stars needed no change. Improvement rates and component boosts are the same in both games.
+- **Migration `021_ff20_scale.sql` (not yet run):**
+  - `league_settings.buyout_wage_divisor` (default 8);
+  - `public.buyout` reads it;
+  - wage bases set to FF20 F1 medians (Driver $6.0M, Engineer $4.5M, Mechanic $0.73M);
+  - the `liveries` bucket allows 8 MB and `model/gltf-binary`.
+  - The TS mirrors fall back to 8 before the migration runs.
+- **Livery picker:** FF20's `LiveryShader` (decompressed from the F1 bundle) samples base and detail at **UV0 whatever the projection**. It mixes primary → trim (B) → secondary (R) → tertiary (G).
+  - `tools/ff20-car-renders.py` exports FF20's F1 car (`Chassis_Championship0`, without sponsor quads and glass) as `ff20-f1-car.glb`. It also renders one side-view UV lookup and writes:
+    - per livery: a side mask (`ff20-f1-<key>.png`) and a 1024² UV key (`ff20-uv-<key>.png`);
+    - one shading/parts overlay.
+  - It covers 374 liveries: the table, the DLC bundle and FF20's liverypack. It takes about 2 minutes.
+  - `mmsave liveries` runs it when `Modding/Models/Vehicle/F1` exists and uploads the `.glb` too.
+  - Extract: `LiveryOption.model/texture/name/usedBy` ("FF20 design n", the teams running it).
+  - Site:
+    - The selected livery is shown on a 3D car (`livery-car-3d.tsx`, three.js 0.186.1, lazy chunk).
+    - The grid shows side renders with the overlay (lazy-loaded) and has a search by name or team.
+    - MM's own patterns are garbled on FF20's model, as in game, and sort last.
+  - Checked in demo mode (desktop and 390 px, no console errors). The My team tab bar now scrolls sideways on phones (it overflowed before).
+- **To go live:** run migration 021, then `mmsave liveries --game "<MM_Data>" --python ~/.mm-venv/bin/python` (uploads about 43 MB), then publish.
 
 ## Working notes for the assistant
 - The user plays MM under Wine on Linux (CachyOS). They test in game and report back, so give them concrete things to check.

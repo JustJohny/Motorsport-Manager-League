@@ -39,7 +39,7 @@ export function BidDialog({ auction, person, fromTeam = null, trigger }: {
   const target = auction?.person ?? person!
   const kind = (auction?.kind ?? target.kind) as Auction["kind"]
   const from = auction ? auction.from_team : fromTeam
-  const buyoutAmount = auction ? Number(auction.buyout) : from ? buyout(target, league.snapshot.gameDate) : 0
+  const buyoutAmount = auction ? Number(auction.buyout) : from ? buyout(target, league.snapshot.gameDate, t.settings) : 0
   const minBid = auction
     ? nextMinBid(Number(auction.min_wage), auction.leading_wage == null ? null : Number(auction.leading_wage), t.settings)
     : minWage(target, t.settings)

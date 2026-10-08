@@ -1,6 +1,7 @@
 import { ChevronRight, Flame, Siren, Timer } from "lucide-react"
 import { useSearchParams } from "react-router"
 import { daysBetween } from "../../../src/part-improvement.ts"
+import { TO_THE_BACK } from "../../../src/part-design.ts"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
@@ -34,6 +35,7 @@ export function ResultsPage() {
   // The extract's qualifying rows carry no position or time yet, so order them by grid slot.
   const qualifying = [...(race?.qualifying ?? [])].sort((a, b) => a.grid - b.grid)
   const breaches = ch.rulesBreaches ?? []
+  const ff20 = ch.game === "ff20"
 
   return (
     <>
@@ -129,8 +131,9 @@ export function ResultsPage() {
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><Siren className="size-4" /> Stewards' decisions</CardTitle>
           <CardDescription>
-            Parts caught by MM's scrutineers after the race this season. A caught car drops 2 places per offence that season
-            in the race result, and the team is fined $100K per offence.
+            Parts caught by MM's scrutineers after the race this season. {ff20
+              ? "A caught car is sent to the back of the race result, the part is banned, and the team is fined $250K per offence that season."
+              : "A caught car drops 2 places per offence that season in the race result, and the team is fined $100K per offence."}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -151,7 +154,7 @@ export function ResultsPage() {
                     <TableCell>{b.round} · {b.circuit}</TableCell>
                     <TableCell className="font-medium">{b.team}</TableCell>
                     <TableCell>{b.driver}</TableCell>
-                    <TableCell className="text-right tabular-nums">−{b.placesLost}</TableCell>
+                    <TableCell className="text-right tabular-nums">{b.placesLost >= TO_THE_BACK ? "To the back" : `−${b.placesLost}`}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtMoney(b.fine)}</TableCell>
                   </TableRow>
                 ))}

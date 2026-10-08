@@ -1,7 +1,7 @@
 import { cn } from "@/lib/utils"
 import { fmtNum, humanize } from "@/lib/format"
 
-/** A 0–20 game stat as a labelled bar. */
+/** A game stat (0–20; FF20 drivers and engineers 0–25) as a labelled bar. */
 export function StatBar({ label, value, max = 20 }: { label: string; value: number | null; max?: number }) {
   const pct = Math.max(0, Math.min(100, ((value ?? 0) / max) * 100))
   return (

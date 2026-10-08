@@ -71,7 +71,7 @@ export interface RaceResults {
 
 /**
  * A part caught by MM's post-race scrutineering (PenaltyDirector.ScrutinizePartRules): the car
- * dropped `placesLost` places in the race result and the team paid `fine`. Public, like a
+ * dropped `placesLost` places in the race result (FF20: 23, i.e. to the back) and the team paid `fine`. Public, like a
  * stewards' decision; which part it was stays with the team (TeamDesign.rules).
  */
 export interface RulesBreach {
@@ -140,6 +140,8 @@ export interface Championship {
   races?: RaceResults[];
   /** Every part caught this season. Missing in snapshots published before 2026-10-01. */
   rulesBreaches?: RulesBreach[];
+  /** Whose game rules apply (scrutineering etc.). Missing before 2026-10-08 (Rebirth). */
+  game?: GameRules;
   /** Rules and the season's votes. Missing in snapshots published before 2026-10-01. */
   regulations?: Regulations;
   /** The series' pit crew rule. Missing in snapshots published before 2026-10-02. */
@@ -159,9 +161,18 @@ export interface LiveryOption {
   dlc: boolean;
   /**
    * File name of the side-view mask in the site's livery image store (`tools/livery-masks.py`):
-   * black = primary, red = secondary, green = tertiary, blue = trim.
+   * black = primary, red = secondary, green = tertiary, blue = trim. With `model` it's a render of
+   * that car from the side (alpha 0 off the livery), drawn under `<model>-overlay.png`.
    */
   mask: string;
+  /** FF20: the car model's asset prefix ("ff20-f1"): `<model>-car.glb`, `<model>-overlay.png`. */
+  model?: string;
+  /** FF20: the livery's UV colour key (base + detail) for the 3D car. */
+  texture?: string;
+  /** A display name when MM's number doesn't say it (FF20's own designs). */
+  name?: string;
+  /** Teams in the save that run it now. */
+  usedBy?: string[];
 }
 
 /** Four "#rrggbb" livery colours, as members pick them (src/team-colours.ts derives the rest). */
@@ -189,7 +200,7 @@ export interface EqualizeSettings {
   parts?: Record<string, { stat: number; maxPerformance: number; reliability: number; maxReliability: number; level?: number }>;
   /** Every part type's development rate (component boosts are multiplied by it). */
   developmentRate?: number;
-  /** The lead designer's part contributions (topSpeed, acceleration, braking, …Corners), 0..20. */
+  /** The lead designer's part contributions (topSpeed, acceleration, braking, …Corners), 0..20 (FF20 0..25). */
   leadDesigner?: Record<string, number>;
   /** Every mechanic's stats (reliability, performance, concentration, speed, pitStops, leadership), 0..20. */
   mechanics?: Record<string, number>;
@@ -274,6 +285,8 @@ export interface Part {
   maxReliability: number | null;
   condition: number | null;
   rulesRisk: number | null;
+  /** Banned (FF20: caught by the scrutineers): MM won't fit or improve it. */
+  banned?: boolean;
   /** 0 or 1, or null when in storage. */
   fittedToCar: number | null;
   buildDate: string;
@@ -394,13 +407,18 @@ export interface TeamDesign {
     chassisDesign?: boolean;
     /** While MM designs the car: the suppliers its AI put on the pending chassis. */
     pending?: Record<string, SupplierOffer>;
-    /** The car fund: level 0 Low / 1 Medium / 2 High, the monthly amount per level, saved so far. */
-    investment?: { level: number; monthly: number[]; fund: number };
+    /**
+     * The car fund: level 0 Low / 1 Medium / 2 High, the amount paid in per level (`monthly`: each
+     * month, or with `per: "race"` after each race, as FF20 does), saved so far.
+     */
+    investment?: { level: number; monthly: number[]; per?: "month" | "race"; fund: number };
   };
   /** MM's scrutineering for this team (missing in snapshots published before 2026-10-01). */
   rules?: {
-    /** Offences this season: the next bust costs 2 x (this + 1) places and $100K x (this + 1). */
+    /** Offences this season: the next bust's fine (and on Rebirth its places) scale with this + 1. */
     brokenThisSeason: number;
+    /** Whose scrutineering applies (see SCRUTINEERING in src/part-design.ts); absent means Rebirth. */
+    game?: GameRules;
     /** The investor's part-risk bonus, added to every risky part's risk. */
     riskBonus: number;
     /** This team's own busts, with the part. */

@@ -143,22 +143,32 @@ export function predictPart(base: DesignBase, chosen: DesignComponent[]) {
 }
 
 // MM's post-race scrutineering (PenaltyDirector.ScrutinizePartRules): every fitted part with
-// rules risk is checked; it's caught when Random(0..99) < (risk + investor bonus) x 5.
-export const SCRUTINEERING_CHANCE_PER_RISK = 0.05;
+// rules risk is checked; it's caught when Random(0..99) < (risk + investor bonus) x scrutineeringChance.
+// Rebirth: x5, the car drops 2 places and pays $100K per offence this season.
+// FF20: x10, the car drops 23 places (to the back) and pays $250K per offence this season; the
+// part is banned (CarPart.isBanned), taken off the improvement lists and unfitted.
+export const SCRUTINEERING: Record<GameRules, { chancePerRisk: number; placesLost: (n: number) => number; finePerOffence: number; bansPart: boolean }> = {
+  rebirth: { chancePerRisk: 0.05, placesLost: (n) => 2 * n, finePerOffence: 100_000, bansPart: false },
+  ff20: { chancePerRisk: 0.1, placesLost: () => 23, finePerOffence: 250_000, bansPart: true },
+};
+
+/** A drop of this many places sends the car to the back of any MM field (FF20's busts). */
+export const TO_THE_BACK = 23;
 
 /** Chance per race that one fitted part with this risk is caught. */
-export function bustChance(risk: number, investorBonus = 0): number {
+export function bustChance(risk: number, investorBonus = 0, rules: GameRules = "rebirth"): number {
   if (!(risk > 0)) return 0;
-  return Math.min(1, Math.max(0, risk + investorBonus) * SCRUTINEERING_CHANCE_PER_RISK);
+  return Math.min(1, Math.max(0, risk + investorBonus) * SCRUTINEERING[rules].chancePerRisk);
 }
 
 /** Chance per race that at least one of a car's fitted parts is caught. */
-export function carBustChance(risks: number[], investorBonus = 0): number {
-  return 1 - risks.reduce((p, r) => p * (1 - bustChance(r, investorBonus)), 1);
+export function carBustChance(risks: number[], investorBonus = 0, rules: GameRules = "rebirth"): number {
+  return 1 - risks.reduce((p, r) => p * (1 - bustChance(r, investorBonus, rules)), 1);
 }
 
-/** What the next bust costs: MM drops the car 2 places and fines $100K per offence this season. */
-export function nextBustPenalty(brokenThisSeason: number) {
+/** What the next bust costs: places lost and the fine, both scaled by this season's offences. */
+export function nextBustPenalty(brokenThisSeason: number, rules: GameRules = "rebirth") {
   const n = brokenThisSeason + 1;
-  return { placesLost: 2 * n, fine: 100_000 * n };
+  const r = SCRUTINEERING[rules];
+  return { placesLost: r.placesLost(n), fine: r.finePerOffence * n, bansPart: r.bansPart };
 }

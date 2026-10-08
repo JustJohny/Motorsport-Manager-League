@@ -45,6 +45,7 @@ export function extractLeague(save: Save, cfg: LeagueConfig): LeagueState {
       lastRace: raceResults(save, champ).at(-1) ?? null,
       races: raceResults(save, champ),
       rulesBreaches: rulesBreaches(save, champ).map(({ part: _p, partType: _t, ...b }) => b),
+      game: save.game,
       regulations: extractRegulations(save, champ, new Set(memberTeams.map((m) => m.team.name as string))),
       pitCrew: pitCrewRules(save, champ),
       pitStops: pitStopLog(save, champ),
@@ -127,6 +128,7 @@ export function part(save: Save, p: Obj): Part {
     maxReliability: numOrNull(s.maxReliability),
     condition: numOrNull(s.partCondition?.mCondition),
     rulesRisk: numOrNull(s.rulesRisk),
+    ...(p.isBanned ? { banned: true } : {}),
     fittedToCar: fittedCar ? fittedCar.identifier : null,
     buildDate: p.buildDate,
     components: (p.components ?? []).length,
@@ -275,6 +277,7 @@ function withRules(save: Save, t: Obj, champ: Obj, design: TeamDesign): TeamDesi
     },
     rules: {
       brokenThisSeason: t.rulesBrokenThisSeason ?? 0,
+      game: save.game,
       riskBonus: investor?.partRiskBonus ?? 0,
       breaches: rulesBreaches(save, champ).filter((b) => b.team === t.name),
     },

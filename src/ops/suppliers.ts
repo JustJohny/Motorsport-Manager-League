@@ -1,5 +1,6 @@
 import { chassisStats, clampSlider, sliderRange } from "../chassis.ts";
 import { float, num } from "../codec/sav.ts";
+import { gameScale } from "../game-rules.ts";
 import type { Obj } from "../graph.ts";
 import type { Save } from "../model.ts";
 import { adjustBudget } from "./finance.ts";
@@ -193,7 +194,8 @@ export function setSuppliers(save: Save, op: SetSuppliersOp): string[] {
   }
   const cs = g.deref<Obj>(ny.mChassisStats);
   const supplied = () => SUPPLIER_TYPES.flatMap((t) => (cs[CHASSIS_FIELD[t]] ? [toOption(save, g.deref<Obj>(cs[CHASSIS_FIELD[t]]), team)] : []));
-  const before = chassisStats(supplied());
+  const max = gameScale(save.game).chassisStatMax;
+  const before = chassisStats(supplied(), 0.5, 0.5, max);
   const was = Object.fromEntries(Object.entries(CHASSIS_STAT_FIELD).map(([k, f]) => [k, num(cs[f])])) as Record<keyof typeof before, number>;
   const log: string[] = [];
   for (const [type, id] of Object.entries(op.suppliers) as [SupplierType, number][]) {
@@ -212,10 +214,10 @@ export function setSuppliers(save: Save, op: SetSuppliersOp): string[] {
   if (log.length) {
     // putSupplier shifted the stats; MM floors each at 0 after every supplier, so rebuild the four
     // chassis stats (a plain shift can go negative).
-    const after = chassisStats(supplied());
+    const after = chassisStats(supplied(), 0.5, 0.5, max);
     for (const key of Object.keys(after) as (keyof typeof after)[]) {
       const field = CHASSIS_STAT_FIELD[key];
-      cs[field] = float(Math.max(0, after[key] + was[key] - before[key]));
+      cs[field] = float(Math.min(max, Math.max(0, after[key] + was[key] - before[key])));
     }
   }
   return log.length ? log : [`${team.name}: suppliers unchanged`];
@@ -292,20 +294,21 @@ export function hasChassisDesign(save: Save, team: Obj): boolean {
   return ch.series === 0 && ch.championshipID === 0;
 }
 
-/** TeamFinanceController.GetCarDevCost: a year's car fund by championship id, per level (paid monthly). */
-const CAR_DEV_COST: number[][] = [
-  [12e6, 8.4e6, 6e6, 8.4e6, 3.6e6, 12e6, 4.8e6],
-  [18e6, 13.2e6, 8.4e6, 13.2e6, 7.2e6, 15.6e6, 8.4e6],
-  [24e6, 18e6, 12e6, 18e6, 10.8e6, 21.6e6, 12e6],
-];
-
-/** The team's car fund: level 0 Low / 1 Medium / 2 High, the monthly amount per level, and what's saved so far. */
+/**
+ * The team's car fund: level 0 Low / 1 Medium / 2 High, the amount paid in per level, and what's
+ * saved so far. TeamFinanceController.GetCarDevCost: a year's amount by championship id, paid
+ * monthly (Rebirth) or after each race (FF20: / the season's events), see GameScale.
+ */
 export function carInvestment(save: Save, team: Obj) {
   const fin = save.g.deref<Obj>(team.financeController);
-  const id = save.championship(team).championshipID as number;
+  const champ = save.championship(team);
+  const id = champ.championshipID as number;
+  const scale = gameScale(save.game);
+  const per = scale.carFundPaid === "race" ? Math.max(1, save.g.list(champ.calendar).length) : 12;
   return {
     level: (fin.mInvestement ?? 1) as number,
-    monthly: CAR_DEV_COST.map((row) => Math.round((row[id] ?? row[0]) / 12 / 1000) * 1000),
+    monthly: scale.carDevCost.map((row) => Math.round((row[id] ?? 0) / per / 1000) * 1000),
+    per: scale.carFundPaid,
     fund: num(fin.moneyForCarDev ?? 0),
   };
 }
@@ -351,7 +354,7 @@ export function setChassis(save: Save, op: SetChassisOp): string {
   const sups = SUPPLIER_TYPES.flatMap((t) => (cs[CHASSIS_FIELD[t]] ? [toOption(save, g.deref<Obj>(cs[CHASSIS_FIELD[t]]), team)] : []));
   const range = sliderRange(sups);
   const nose = clampSlider(op.nose, range.nose), rear = clampSlider(op.rear, range.rear);
-  const r = chassisStats(sups, nose, rear);
+  const r = chassisStats(sups, nose, rear, gameScale(save.game).chassisStatMax);
   cs.mTyreWear = float(r.tyreWear);
   cs.mTyreHeating = float(r.tyreHeating);
   cs.mFuelEfficiency = float(r.fuelEfficiency);

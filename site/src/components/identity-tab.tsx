@@ -1,5 +1,5 @@
-import { Check, Hourglass, ImageUp, Loader2, Lock, Paintbrush, Palette, RotateCcw, Save, Shield, TriangleAlert, X } from "lucide-react"
-import { useEffect, useRef, useState, type ReactNode } from "react"
+import { Check, Hourglass, ImageUp, Loader2, Lock, Paintbrush, Palette, RotateCcw, Save, Search, Shield, TriangleAlert, X } from "lucide-react"
+import { lazy, Suspense, useEffect, useMemo, useRef, useState, type ReactNode } from "react"
 import { CLASH_DISTANCE, colourDistance } from "../../../src/livery-tint.ts"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
@@ -19,8 +19,14 @@ const FIELDS: { key: keyof TeamColours; label: string; hint: string }[] = [
   { key: "trim", label: "Trim", hint: "Pinstripes and edges" },
 ]
 
-/** MM numbers the Livery Pack's patterns from 1 again. */
-const patternName = (l: LiveryOption) => (l.dlc ? `Livery Pack ${l.number}` : `Pattern ${l.number}`)
+// three.js is big; only the identity tab of an FF20 league loads it.
+const LiveryCar3D = lazy(() => import("@/components/livery-car-3d"))
+
+/** MM numbers the Livery Pack's patterns from 1 again; FF20's own designs carry a name. */
+const patternName = (l: LiveryOption) => l.name ?? (l.dlc ? `Livery Pack ${l.number}` : `Pattern ${l.number}`)
+
+/** FF20's designs first (the ones teams run, then the rest), then MM's patterns. */
+const liveryOrder = (l: LiveryOption) => (l.name ? 0 : 2) - (l.usedBy?.length ? 1 : 0)
 
 const FALLBACK: TeamColours = { primary: "#797979", secondary: "#f3f3f3", tertiary: "#232323", trim: "#f3f3f3" }
 const HEX = /^#[0-9a-f]{6}$/i
@@ -60,7 +66,15 @@ function LookEditor({ team, editable, isPlayer, liveries, initialColours, initia
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const livery = liveries.find((l) => l.id === liveryId) ?? liveries[0]
+  const [query, setQuery] = useState("")
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    return liveries
+      .filter((l) => !q || patternName(l).toLowerCase().includes(q) || (l.usedBy ?? []).some((t) => t.toLowerCase().includes(q)))
+      .sort((a, b) => liveryOrder(a) - liveryOrder(b) || a.id - b.id)
+  }, [liveries, query])
   const valid = Object.values(colours).every((c) => HEX.test(c))
+  const shownColours = valid ? colours : initialColours
   const dirty = liveryId !== initialLivery || FIELDS.some((f) => colours[f.key].toLowerCase() !== initialColours[f.key].toLowerCase())
   const clashes = valid ? league.snapshot.teams
     .filter((t) => t.name !== team)
@@ -94,9 +108,17 @@ function LookEditor({ team, editable, isPlayer, liveries, initialColours, initia
             </div>
             <StatusBadge status={status} dirty={dirty} />
           </div>
-          <LiveryPreview mask={livery.mask} colours={valid ? colours : initialColours} className="rounded-lg" />
+          {livery.model && livery.texture ? (
+            <Suspense fallback={<LiveryPreview livery={livery} colours={shownColours} className="rounded-lg" />}>
+              <LiveryCar3D model={livery.model} texture={livery.texture} colours={shownColours} />
+            </Suspense>
+          ) : (
+            <LiveryPreview livery={livery} colours={shownColours} className="rounded-lg" />
+          )}
           <p className="text-xs text-muted-foreground">
-            {patternName(livery)}, seen from the side. MM paints it onto the 3D car, so the race view differs in detail.
+            {livery.model
+              ? <>{patternName(livery)}{livery.usedBy?.length ? ` (run by ${livery.usedBy.join(", ")})` : ""} on FIRE Fantasy 20's car, painted the way the game paints it. Sponsor decals aren't shown.</>
+              : <>{patternName(livery)}, seen from the side. MM paints it onto the 3D car, so the race view differs in detail.</>}
           </p>
         </CardContent>
       </Card>
@@ -121,18 +143,26 @@ function LookEditor({ team, editable, isPlayer, liveries, initialColours, initia
         </Section>
 
         <Section icon={<Paintbrush className="size-4" />} title="Livery pattern" description={editable ? "Every pattern MM offers in this championship, in your colours." : "Patterns available in this championship."}>
+          {liveries.length > 12 && (
+            <div className="relative mb-2">
+              <Search className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input value={query} onChange={(e) => setQuery(e.target.value)} placeholder={`Search ${liveries.length} liveries by name or team`} className="pl-8" />
+            </div>
+          )}
           <div className="grid max-h-[28rem] grid-cols-2 gap-2 overflow-y-auto pr-1 sm:grid-cols-3">
-            {liveries.map((l) => (
+            {shown.map((l) => (
               <button key={l.id} type="button" disabled={!editable} onClick={() => setLiveryId(l.id)}
-                className={cn("flex flex-col gap-1 rounded-md p-1 text-left ring-1 ring-border transition",
+                className={cn("flex min-w-0 flex-col gap-1 rounded-md p-1 text-left ring-1 ring-border transition",
                   editable && "hover:ring-primary/60", l.id === liveryId && "ring-2 ring-primary")}>
-                <LiveryPreview mask={l.mask} colours={valid ? colours : initialColours} />
-                <span className="flex items-center justify-between px-0.5 text-xs">
-                  <span>{patternName(l)}</span>
-                  {l.id === liveryId && <Check className="size-3.5 text-primary" />}
+                <LiveryPreview livery={l} colours={shownColours} />
+                <span className="flex items-center justify-between gap-1 px-0.5 text-xs">
+                  <span className="truncate">{patternName(l)}</span>
+                  {l.id === liveryId && <Check className="size-3.5 shrink-0 text-primary" />}
                 </span>
+                {l.usedBy?.length ? <span className="truncate px-0.5 text-[11px] text-muted-foreground" title={l.usedBy.join(", ")}>{l.usedBy.join(", ")}</span> : null}
               </button>
             ))}
+            {!shown.length && <p className="col-span-full py-6 text-center text-sm text-muted-foreground">No livery matches "{query}".</p>}
           </div>
         </Section>
       </div>

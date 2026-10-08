@@ -64,7 +64,9 @@ export function effectiveFitting(priv: TeamPrivate, team: string, fitting: Fitti
   const out: Record<string, [string | null, string | null]> = {}
   for (const [type, parts] of Object.entries(priv.parts)) {
     out[type] = [0, 1].map((car) =>
-      fitting.find((f) => f.team === team && f.car === car && f.part_type === type)?.part_guid
+      fitting.find((f) => f.team === team && f.car === car && f.part_type === type
+        // A banned part stays off the car (pull skips it), so the car keeps what the save has.
+        && !parts.find((p) => p.guid === f.part_guid)?.banned)?.part_guid
       ?? parts.find((p) => p.fittedToCar === car)?.guid ?? null) as [string | null, string | null]
   }
   return out

@@ -124,11 +124,22 @@ export async function buildTeamMod(env: SupabaseEnv,
   return { colours: looks.length, logos: logos.length };
 }
 
-/** Export MM's livery masks from the game and upload them to the site's "liveries" bucket. */
-export async function uploadLiveryMasks(env: SupabaseEnv, opts: { dataDir: string; out: string; python?: string }, log: Log) {
+/**
+ * Export MM's livery masks from the game and upload them to the site's "liveries" bucket. With
+ * FIRE Fantasy 20's car models installed (MM_Data/Modding/Models/Vehicle), also its renders: the
+ * F1 car for the 3D view, side views of every livery on it and the UV textures
+ * (tools/ff20-car-renders.py, needs migration 021 for the model's size and type).
+ */
+export async function uploadLiveryMasks(env: SupabaseEnv, opts: { dataDir: string; out: string; python?: string; models?: string[] }, log: Log) {
   const py = unityPython(opts.python);
   runPython(py, "livery-masks.py", [opts.dataDir, opts.out], log);
-  const files = readdirSync(opts.out).filter((f) => f.endsWith(".png"));
-  for (const f of files) await storageUpload(env, "liveries", f, readFileSync(join(opts.out, f)), "image/png");
-  log(`uploaded ${files.length} livery masks`);
+  const vehicles = join(opts.dataDir, "Modding", "Models", "Vehicle");
+  for (const model of opts.models ?? ["F1"]) {
+    if (existsSync(join(vehicles, model))) runPython(py, "ff20-car-renders.py", [opts.dataDir, opts.out, model], log);
+  }
+  const files = readdirSync(opts.out).filter((f) => f.endsWith(".png") || f.endsWith(".glb"));
+  for (const f of files) {
+    await storageUpload(env, "liveries", f, readFileSync(join(opts.out, f)), f.endsWith(".glb") ? "model/gltf-binary" : "image/png");
+  }
+  log(`uploaded ${files.length} livery files`);
 }

@@ -125,7 +125,7 @@ export function MarketPage() {
                       {fmtMoneyShort(minWage(p, t.settings))}
                       {auctionFor(p.guid) && <Gavel className="ml-1 inline size-3 text-primary" />}
                     </TableCell>
-                    {source === "ai" && <TableCell className="hidden text-right tabular-nums md:table-cell">{fmtMoneyShort(buyout(p, date))}</TableCell>}
+                    {source === "ai" && <TableCell className="hidden text-right tabular-nums md:table-cell">{fmtMoneyShort(buyout(p, date, t.settings))}</TableCell>}
                   </TableRow>
                 ))}
                 {!list.length && (

@@ -37,10 +37,10 @@ export const clampSlider = (v: number, [lo, hi]: [number, number]) => Math.min(h
 /**
  * The chassis MM builds: the sliders' stats (nose: fuel efficiency ↔ tyre wear, rear: improvability
  * ↔ tyre heating, each pair ±5 around the base), then each supplier's stats added in MM's order,
- * every stat floored at 0 after each supplier (CarChassisStats.SetStat). `nose`/`rear` 0.5 = the
- * AI's default chassis.
+ * every stat clamped to 0..`max` after each supplier (CarChassisStats.SetStat; FF20 caps at 20,
+ * Rebirth only floors at 0: see GameScale.chassisStatMax). `nose`/`rear` 0.5 = the AI's default chassis.
  */
-export function chassisStats(suppliers: ChassisSupplier[], nose = 0.5, rear = 0.5): ChassisResult {
+export function chassisStats(suppliers: ChassisSupplier[], nose = 0.5, rear = 0.5, max = Infinity): ChassisResult {
   const half = SLIDER_AMOUNT / 2;
   const s = [
     -half + (1 - nose) * SLIDER_AMOUNT, // 0 TyreWear
@@ -51,7 +51,7 @@ export function chassisStats(suppliers: ChassisSupplier[], nose = 0.5, rear = 0.
   for (const type of ORDER) {
     const sup = suppliers.find((x) => x.type === type);
     if (!sup) continue;
-    for (let k = 0; k < 4; k++) s[k] = Math.max(0, s[k] + (sup.stats[k] ?? 0));
+    for (let k = 0; k < 4; k++) s[k] = Math.min(max, Math.max(0, s[k] + (sup.stats[k] ?? 0)));
   }
   return { tyreWear: s[0], tyreHeating: s[1], fuelEfficiency: s[2], improvability: s[3] };
 }

@@ -1,4 +1,5 @@
 import { float, num } from "../codec/sav.ts";
+import { gameScale } from "../game-rules.ts";
 import type { Obj } from "../graph.ts";
 import { BUILDING_STATES, JOB, PART_TYPES, type PartType, type Save } from "../model.ts";
 import type { EqualizeSettings } from "../league-types.ts";
@@ -28,12 +29,12 @@ function staff(save: Save, team: Obj, job: number): Obj[] {
   return save.slots(team).filter((s) => s.jobType === job && s.personHired).map((s) => save.g.deref<Obj>(s.personHired));
 }
 
-function setStats(target: Obj, values: Record<string, number> | undefined, keys: readonly string[]): number {
+function setStats(target: Obj, values: Record<string, number> | undefined, keys: readonly string[], max: number): number {
   let n = 0;
   for (const k of keys) {
     const v = values?.[k];
     if (v === undefined) continue;
-    if (!(v >= 0 && v <= 20)) throw new Error(`${k} must be 0..20`);
+    if (!(v >= 0 && v <= max)) throw new Error(`${k} must be 0..${max}`);
     target[k] = float(v);
     n++;
   }
@@ -90,10 +91,10 @@ export function equalizeTeams(save: Save, op: EqualizeOp): string[] {
     // Staff: the lead designer's part contributions and every mechanic's stats.
     for (const p of staff(save, team, JOB.EngineerLead)) {
       const pcs = g.deref<Obj>(g.deref<Obj>(p.mStats ?? p.stats).partContributionStats);
-      if (setStats(pcs, op.leadDesigner, DESIGNER_STATS)) done.push("lead designer");
+      if (setStats(pcs, op.leadDesigner, DESIGNER_STATS, gameScale(save.game).engineerStatMax)) done.push("lead designer");
     }
     let mechanics = 0;
-    for (const p of staff(save, team, JOB.Mechanic)) mechanics += setStats(g.deref<Obj>(p.mStats ?? p.stats), op.mechanics, MECHANIC_STATS) ? 1 : 0;
+    for (const p of staff(save, team, JOB.Mechanic)) mechanics += setStats(g.deref<Obj>(p.mStats ?? p.stats), op.mechanics, MECHANIC_STATS, gameScale(save.game).mechanicStatMax) ? 1 : 0;
     if (mechanics) done.push(`${mechanics} mechanics`);
 
     // Pit crew: an AI team's task values (MM rebuilds them from the mechanics' Pit stops after each

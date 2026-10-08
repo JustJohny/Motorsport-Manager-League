@@ -1,4 +1,5 @@
 import { float } from "../codec/sav.ts";
+import { gameScale } from "../game-rules.ts";
 import type { Obj } from "../graph.ts";
 import type { ContractRenewal } from "../league-types.ts";
 import { JOB, numOrNull, personKind, personName, type Save } from "../model.ts";
@@ -149,23 +150,25 @@ function hasSpecialCase(save: Save, p: Obj, kind: number): boolean {
   return traits(save, p).some((t) => save.g.list<number>(t.data.specialCases ?? []).includes(kind));
 }
 
-/** Driver.GetStats: own stats plus every trait's, each clamped to 0..20. */
+/** Driver.GetStats: own stats plus every trait's, each clamped to 0..20 (FF20: 25). */
 function driverStats(save: Save, p: Obj): { total: number; marketability: number; max: number } {
   const own = save.g.deref<Obj>(p.mStats);
   const mods = activeTraits(save, p).map(traitStats);
-  const total = DRIVER_STATS.reduce((s, k) => s + clamp(n(own[k] ?? 0) + mods.reduce((m, x) => m + n(x[k] ?? 0), 0), 0, 20), 0);
+  const cap = gameScale(save.game).driverStatMax;
+  const total = DRIVER_STATS.reduce((s, k) => s + clamp(n(own[k] ?? 0) + mods.reduce((m, x) => m + n(x[k] ?? 0), 0), 0, cap), 0);
   const marketability = clamp01(n(own.marketability ?? 0) + mods.reduce((m, x) => m + n(x.marketability ?? 0), 0));
   // MM's modified stats keep their own totalStatsMax (the save stores it); fall back to the base one.
   const max = n(p.mModifiedStats?.totalStatsMax ?? own.totalStatsMax ?? 0);
   return { total, marketability, max };
 }
 
-/** PersonStats.GetAbility (stars, 0..5), GetAbilityPotential and GetPotential. */
+/** PersonStats.GetAbility (stars, 0..5), GetAbilityPotential and GetPotential (drivers: total / 36, FF20 / 41.4). */
 export function abilities(save: Save, p: Obj): { ability: number; abilityPotential: number; potential: number } {
   const kind = personKind(p);
   if (kind === "Driver") {
     const s = driverStats(save, p);
-    return { ability: s.total / 36, abilityPotential: s.max / 36, potential: s.max - s.total };
+    const div = gameScale(save.game).driverAbilityDivisor;
+    return { ability: s.total / div, abilityPotential: s.max / div, potential: s.max - s.total };
   }
   const st = save.g.deref<Obj>(p.stats);
   const total = kind === "Engineer"
@@ -225,7 +228,7 @@ export function teamStars(save: Save, team: Obj): number {
   let staff = 0;
   if (tp && engineer && mechanics.length >= 2) {
     const tps = save.g.deref<Obj>(tp.stats);
-    const tpAbility = (n(tps.raceManagement ?? 0) + n(tps.financial ?? 0) + n(tps.loyalty ?? 0)) / 60 * 5;
+    const tpAbility = (n(tps.raceManagement ?? 0) + n(tps.financial ?? 0) + n(tps.loyalty ?? 0)) / gameScale(save.game).principalAbilityDivisor * 5;
     staff = (tpAbility + abilities(save, mechanics[0]).ability + abilities(save, mechanics[1]).ability + abilities(save, engineer).ability) / 4;
   }
   const sum = clamp01(maxCar ? carTotal / maxCar : 0) * 0.45 + clamp01(weights ? hq / weights : 0) * 0.15

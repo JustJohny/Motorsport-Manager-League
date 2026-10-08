@@ -78,8 +78,11 @@ describe.skipIf(!existsSync(SAVE))("publish", () => {
     expect(bustChance(1)).toBeCloseTo(0.05);
     expect(bustChance(2, 1)).toBeCloseTo(0.15);
     expect(carBustChance([1, 2])).toBeCloseTo(1 - 0.95 * 0.9);
-    expect(nextBustPenalty(0)).toEqual({ placesLost: 2, fine: 100_000 });
-    expect(nextBustPenalty(2)).toEqual({ placesLost: 6, fine: 300_000 });
+    expect(nextBustPenalty(0)).toEqual({ placesLost: 2, fine: 100_000, bansPart: false });
+    expect(nextBustPenalty(2)).toEqual({ placesLost: 6, fine: 300_000, bansPart: false });
+    // FF20: 10 % per risk point, to the back, $250K per offence, part banned.
+    expect(bustChance(1, 0, "ff20")).toBeCloseTo(0.1);
+    expect(nextBustPenalty(1, "ff20")).toEqual({ placesLost: 23, fine: 500_000, bansPart: true });
   });
 
   it("publishes the regulations: rules, the season's votes and the AI teams' votes", () => {

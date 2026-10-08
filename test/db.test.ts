@@ -132,7 +132,8 @@ describe.skipIf(!existsSync(SAVE))("database: snapshots and staff auction", () =
       expect(Number(r.open), p.name).toBe(minWage(p, DEFAULT_SETTINGS));
       expect(Number(r.buyout), p.name).toBe(buyout(p, state.gameDate));
       expect(Number(r.open)).toBeGreaterThanOrEqual(p.contract.yearlyWages);
-      expect(Number(r.buyout)).toBeLessThanOrEqual(Math.round(p.contract.yearlyWages / 2 / 1000) * 1000 + 1000);
+      // At most 6 months at FF20's yearly wage / 8.
+      expect(Number(r.buyout)).toBeLessThanOrEqual(Math.round(p.contract.yearlyWages * 6 / 8 / 1000) * 1000 + 1000);
     }
   });
 

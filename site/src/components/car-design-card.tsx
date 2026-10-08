@@ -4,7 +4,9 @@ import { chassisStats, clampSlider, INVESTMENT_LEVELS, sliderRange, type Chassis
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { gameScale } from "../../../src/game-rules.ts"
 import { fmtMoneyShort } from "@/lib/format"
+import { useLeague } from "@/lib/league"
 import { demoMode, supabase, watchTable } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
 import type { SupplierOffer, TeamPrivate } from "@/lib/types"
@@ -57,13 +59,15 @@ const STATS: { key: keyof ChassisResult; label: string; icon: LucideIcon }[] = [
  */
 export function CarDesignCard({ car, team, own, editable, suppliers }: { car: Car; team: string; own: boolean; editable: boolean; suppliers: SupplierOffer[] }) {
   const c = useCarChoices(team, car.season)
+  const { league } = useLeague()
+  const chassisMax = gameScale(league.snapshot.championship.game).chassisStatMax
   const sups = suppliers.map((s) => ({ type: s.type, stats: s.stats, minBound: s.minBound, maxBound: s.maxBound }))
   const range = sliderRange(sups)
   const [nose, setNose] = useState(0.5)
   const [rear, setRear] = useState(0.5)
   useEffect(() => { if (c.chassis) { setNose(c.chassis.nose); setRear(c.chassis.rear) } }, [c.chassis])
   const n = clampSlider(nose, range.nose), r = clampSlider(rear, range.rear)
-  const base = chassisStats(sups), mine = chassisStats(sups, n, r)
+  const base = chassisStats(sups, 0.5, 0.5, chassisMax), mine = chassisStats(sups, n, r, chassisMax)
   const dirty = !c.chassis || Math.abs(c.chassis.nose - nose) > 1e-3 || Math.abs(c.chassis.rear - rear) > 1e-3
   const [busy, setBusy] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -137,7 +141,7 @@ export function CarDesignCard({ car, team, own, editable, suppliers }: { car: Ca
         <CardHeader>
           <CardTitle className="flex items-center gap-2"><PiggyBank className="size-4" /> Car fund</CardTitle>
           <CardDescription>
-            As in MM's finances: every month this much moves from your budget into next year's car fund, and the fund comes back to your
+            As in MM's finances: {inv?.per === "race" ? "after every race" : "every month"} this much moves from your budget into next year's car fund, and the fund comes back to your
             budget when MM designs the car, to pay for the suppliers. It changes when the money leaves, not how good the car is.
           </CardDescription>
         </CardHeader>
@@ -148,7 +152,7 @@ export function CarDesignCard({ car, team, own, editable, suppliers }: { car: Ca
               <Button key={l} variant={i === level ? "default" : "outline"} disabled={!own || !!busy || i === level}
                 onClick={() => void run(`l${i}`, () => c.saveLevel(i))} className="h-auto flex-col py-2">
                 <span>{busy === `l${i}` ? <Loader2 className="animate-spin" /> : l}</span>
-                {inv && <span className="text-xs opacity-80 tabular-nums">{fmtMoneyShort(inv.monthly[i])}/month</span>}
+                {inv && <span className="text-xs opacity-80 tabular-nums">{fmtMoneyShort(inv.monthly[i])}/{inv.per === "race" ? "race" : "month"}</span>}
               </Button>
             ))}
           </div>

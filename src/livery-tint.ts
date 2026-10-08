@@ -11,15 +11,25 @@ export function hexRgb(hex: string): [number, number, number] {
   return [parseInt(m[1], 16), parseInt(m[2], 16), parseInt(m[3], 16)]
 }
 
-/** Tint RGBA pixels of a colour-key mask in place. */
-export function tintMask(pixels: Uint8ClampedArray, c: TeamColours) {
+/**
+ * Tint RGBA pixels of a colour-key mask in place. MM's side masks blend red, green, then blue;
+ * FIRE Fantasy 20's LiveryShader blends blue (trim) first, then red and green (`ff20`).
+ */
+export function tintMask(pixels: Uint8ClampedArray, c: TeamColours, ff20 = false) {
   const [p, s, t, tr] = [c.primary, c.secondary, c.tertiary, c.trim].map(hexRgb)
   for (let i = 0; i < pixels.length; i += 4) {
     const r = pixels[i] / 255, g = pixels[i + 1] / 255, b = pixels[i + 2] / 255
     for (let k = 0; k < 3; k++) {
-      let v = p[k] * (1 - r) + s[k] * r
-      v = v * (1 - g) + t[k] * g
-      v = v * (1 - b) + tr[k] * b
+      let v: number
+      if (ff20) {
+        v = p[k] * (1 - b) + tr[k] * b
+        v = v * (1 - r) + s[k] * r
+        v = v * (1 - g) + t[k] * g
+      } else {
+        v = p[k] * (1 - r) + s[k] * r
+        v = v * (1 - g) + t[k] * g
+        v = v * (1 - b) + tr[k] * b
+      }
       pixels[i + k] = v
     }
   }

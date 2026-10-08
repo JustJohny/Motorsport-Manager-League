@@ -122,6 +122,27 @@ Decompile a class to C# with `dotnet tool install --tool-path <dir> ilspycmd`, t
   - With parts in only one list, MM moves all mechanics to it (`UpdateMechanicsDistribution`).
 - The AI (`TeamAIController` ~734–804) refills both lists and the split by itself, and `FitPartsOnCars()` refits after every part it builds.
 
+## Post-race scrutineering (`PenaltyDirector.ScrutinizePartRules`, checked with a Cecil IL dump 2026-10-08)
+Each fitted part with `rulesRisk > 0` is caught when `Random(0..99) < (risk + investor partRiskBonus) x scrutineeringChance`. The team's `rulesBrokenThisSeason` goes up by one and the race result gets a `PenaltyPartRulesBroken{mPart, mPenaltyCashAmount, mPlacesLost}`.
+- **Rebirth:** chance x5, the car drops 2 x offences places, fine $100K x offences.
+- **FF20:** chance x10, `mPlacesLost` is always **23** (capped at the field, so the car goes to the back), fine **$250K** x offences. The part gets `isBanned = true`, is taken off both improvement lists and is unfitted. A stored league fitting must never refit it (`setFitting` skips banned parts).
+- Rules in code: `SCRUTINEERING` in `src/part-design.ts`.
+
+## FF20 vs Rebirth: game rules that differ (IL diff, 2026-10-08)
+`src/game-rules.ts` holds them. Found by hashing every method body of both `Assembly-CSharp.dll` files and reading the changed ones the toolkit mirrors:
+- `DriverStats.ClampStats` 25 and `GetAbility` / 41.4 (Rebirth 20 and / 36); `EngineerStats.ClampStats` 25; `TeamPrincipalStats.GetAbility` / 90 (Rebirth / 60).
+- `ContractPerson.GetContractTerminationCost`: `yearlyWages / 8 × clamp(months, 1, 6)` (Rebirth / 12).
+- `TeamFinanceController.GetCarDevCost`: the yearly table (FF20 = Rebirth / 1.2) / `championship.eventCount`, paid in `AddPostEventTransactions` (Rebirth: / 12 monthly).
+- `CarChassisStats.SetStat`: `Clamp(v, 0, chassisStatMax = 20)`.
+- `PenaltyDirector.ScrutinizePartRules`: see "Post-race scrutineering".
+- Unchanged: `PartImprovement` rates, `CarPart.GetPartForStatType` (matches `promotions.ts`), `TeamStatistics.GetTeamStars`.
+
+## FF20 liveries (2026-10-08)
+- FF20's `Custom/LiveryShader` (F1 bundle, GLSL in the LZ4 `m_SubProgramBlob`) samples `_BaseLivery` and `_DetailLivery` at UV0 in every projection variant. Colour: `mix(mix(mix(primary, trim, B), secondary, R), tertiary, G)`, channels of base + detail, clamped.
+- Liverypack liveries (ids 92..362, `LiveryBase_<n>`/`LiveryDetail_<n>`, detail 32²) have `friendlyNameInt` 0. FF20 adds them in code, not in the Liveries table. The textures carry a design label (e.g. "Sauber C37 (2018)") in a corner.
+- The Livery Pack DLC's liveries aren't in the Liveries table either: `DLC/GP1/LiveryN/LiveryBase|LiveryDetail` from `StreamingAssets/AssetBundles/livery_pack_dlc`.
+- F1 model: `Modding/Models/Vehicle/F1`, root `Chassis_Championship0`. The body is one 38k-vertex mesh with material `Livery`. SubMesh `firstByte` / 2 = first index (16-bit).
+
 ## Next year's car and suppliers (from Assembly-CSharp)
 - MM designs next year's car only at pre-season: `NextYearCarDesign.state` is WaitingForDesign (1) during the season, Designing (0) once the AI's `HandleCarNewChassis` has picked suppliers and called `StartDesign`, and Complete (2) when built. There's no mid-season supplier choice in MM; the league's window is its own rule.
 - Pre-season straddles New Year: the ERS 2016 championship has `currentSeasonEndDate` 2016-12-06, `currentPreSeasonStartDate` 2016-12-13 and `currentPreSeasonEndDate` 2017-03-05. The season a car is for is the year of `currentPreSeasonEndDate`, not the game date's year. (Not yet seen: when MM moves these dates on to the next season.)

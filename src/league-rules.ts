@@ -13,17 +13,20 @@ export interface LeagueSettings {
   max_contract_years: number;
   /** Multiplier on MM's HQ build times; 1 is the game's own duration. */
   hq_speed: number;
+  /** MM's buyout: yearly wage / this per month left (GameScale.buyoutWageDivisor: FF20 8, Rebirth 12). */
+  buyout_wage_divisor: number;
 }
 
 export const DEFAULT_SETTINGS: LeagueSettings = {
   sign_on_fee_pct: 0.25,
   min_increment_pct: 0.05,
-  // Median wage MM's AI teams pay per skill in the ERS (migration 007).
-  min_wage_base: { Driver: 2_240_000, Engineer: 740_000, Mechanic: 370_000 },
+  // Median wage MM's AI teams pay per skill in FF20's Formula 1 (migration 021).
+  min_wage_base: { Driver: 6_000_000, Engineer: 4_500_000, Mechanic: 730_000 },
   min_wage_exponent: 2,
   min_wage_floor: 50_000,
   max_contract_years: 3,
   hq_speed: 1,
+  buyout_wage_divisor: 8,
 };
 
 const DAY = 86_400_000;
@@ -54,13 +57,15 @@ export function nextMinBid(minWageValue: number, leadingWage: number | null, s: 
 
 /**
  * What buying someone out of an AI team's contract costs: MM's own termination cost
- * (ContractPerson.GetContractTerminationCost), the months of wage left, clamped to 1..6.
- * Mirrors public.buyout.
+ * (ContractPerson.GetContractTerminationCost), the months left, clamped to 1..6, times the yearly
+ * wage / `buyout_wage_divisor` (FF20 8, Rebirth 12). Mirrors public.buyout.
  */
-export function buyout(p: Pick<Person, "contract">, gameDate: string): number {
+export function buyout(p: Pick<Person, "contract">, gameDate: string, s: Pick<LeagueSettings, "buyout_wage_divisor"> = DEFAULT_SETTINGS): number {
   const days = Math.floor((gameTime(p.contract.end) - gameTime(gameDate)) / DAY);
   const months = Math.min(6, Math.max(1, Math.round((days / 365) * 12)));
-  return roundTo((p.contract.yearlyWages / 12) * months, 1000);
+  // Settings read before migration 021 have no divisor (and numeric columns may come as strings).
+  const divisor = Number(s.buyout_wage_divisor) || DEFAULT_SETTINGS.buyout_wage_divisor;
+  return roundTo((p.contract.yearlyWages / divisor) * months, 1000);
 }
 
 /** Fraction of the game year left; contracts and seasons end on 31 December. */

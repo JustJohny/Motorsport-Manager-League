@@ -3,8 +3,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ageAt, fmtCountry, fmtDate, fmtMoneyShort, fmtNum, humanize, statAverage } from "@/lib/format"
 import type { Person } from "@/lib/types"
 import { StatBar } from "./stat-bar"
+import { statMax } from "../../../src/game-rules.ts"
+import { useLeague } from "@/lib/league"
 
 export function PersonCard({ person, role, gameDate }: { person: Person; role?: string; gameDate: string }) {
+  const max = statMax(person.kind, useLeague().league.snapshot.championship.game)
   return (
     <Card size="sm">
       <CardHeader>
@@ -17,7 +20,7 @@ export function PersonCard({ person, role, gameDate }: { person: Person; role?: 
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-1.5">
-        {Object.entries(person.stats).map(([k, v]) => <StatBar key={k} label={k} value={v} />)}
+        {Object.entries(person.stats).map(([k, v]) => <StatBar key={k} label={k} value={v} max={max} />)}
         <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
           <span>{fmtMoneyShort(person.contract.yearlyWages)}/yr</span>
           <span>until {fmtDate(person.contract.end)}</span>

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { fmtMoneyShort, humanize } from "@/lib/format"
 import { useLeague } from "@/lib/league"
+import { statMax } from "../../../src/game-rules.ts"
 import { demoMode, supabase, watchTable } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
 import type { EqualizeSettings } from "@/lib/types"
@@ -192,7 +193,7 @@ export function EqualizeCard() {
 
           <Section area={AREAS[3]} on={on.leadDesigner} onToggle={() => setOn((o) => ({ ...o, leadDesigner: !o.leadDesigner }))}>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              {Object.entries(s.leadDesigner ?? {}).map(([k, v]) => <Num key={k} label={humanize(k)} value={v} max={20} onChange={(n) => setStat("leadDesigner", k, n)} />)}
+              {Object.entries(s.leadDesigner ?? {}).map(([k, v]) => <Num key={k} label={humanize(k)} value={v} max={statMax("Engineer", league.snapshot.championship.game)} onChange={(n) => setStat("leadDesigner", k, n)} />)}
             </div>
           </Section>
 

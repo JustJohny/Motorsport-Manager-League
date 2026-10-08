@@ -72,11 +72,40 @@ export function teamLiveries(save: Save, team: Obj): Obj[] {
     .filter((l) => (l.championshipID as number[]).includes(champId));
 }
 
+/**
+ * FF20's car model per championship ID (MM_Data/Modding/Models/Vehicle/<name>), for the renders of
+ * tools/ff20-car-renders.py. Championships without one keep the old side-texture masks.
+ */
+const FF20_MODELS: Record<number, string> = { 0: "F1", 1: "F2", 2: "F3", 3: "GT3", 4: "GT3", 5: "Endurance", 6: "Endurance" };
+
+/** Mirrors livery_key in tools/ff20-car-renders.py. */
+export function ff20LiveryKey(base: string, detail: string): string {
+  const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "");
+  return `${slug(String(base))}--${slug(String(detail))}`;
+}
+
 /** Liveries valid for a championship, for the site's picker. */
 export function liveryOptions(save: Save, champ: Obj): LiveryOption[] {
+  const model = save.game === "ff20" ? FF20_MODELS[champ.championshipID as number] : undefined;
+  const usedBy = new Map<number, string[]>();
+  for (const t of save.teams()) if (t.name) usedBy.set(t.liveryID, [...(usedBy.get(t.liveryID) ?? []), t.name]);
   return save.g.list<Obj>(save.data.liveryManager._currentLiveriesArr)
     .filter((l) => (l.championshipID as number[]).includes(champ.championshipID))
-    .map((l) => ({ id: l.id, number: l.friendlyNameInt, dlc: l.mDlcId !== 0, mask: liveryMask(l) }));
+    .map((l) => {
+      const opt: LiveryOption = { id: l.id, number: l.friendlyNameInt, dlc: l.mDlcId !== 0, mask: liveryMask(l) };
+      if (model) {
+        const c = l.chassis as Obj;
+        const key = ff20LiveryKey(c.baseLiveryTexture, c.detailLiveryTexture);
+        const tag = `ff20-${model.toLowerCase()}`;
+        Object.assign(opt, { mask: `${tag}-${key}.png`, model: tag, texture: `ff20-uv-${key}.png` });
+        // FF20's own designs (Images/liverypack) have no number of their own.
+        const pack = /^LiveryBase_(\d+)$/.exec(String(c.baseLiveryTexture));
+        if (pack) opt.name = `FF20 design ${pack[1]}`;
+      }
+      const users = usedBy.get(l.id);
+      if (users) opt.usedBy = users;
+      return opt;
+    });
 }
 
 /**

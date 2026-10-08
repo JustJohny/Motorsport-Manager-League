@@ -622,6 +622,8 @@ export function setFitting(save: Save, op: SetFittingOp): string[] {
   for (const f of op.fitting) {
     const part = save.parts(team, f.type).find((p) => p.id === f.part);
     if (!part) { log.push(`${team.name}: car ${f.car} ${f.type} ${f.part} is gone, left as it is`); continue; }
+    // FF20's scrutineers ban and unfit a caught part; the stored fitting must not put it back.
+    if (part.isBanned) { log.push(`${team.name}: car ${f.car} ${f.type} ${part.name} is banned, left as it is`); continue; }
     const car = save.cars(team)[f.car];
     if (part.isFitted && part.fittedCar && save.g.deref(part.fittedCar) === car) continue;
     if (part.isFitted && op.fitting.some((o) => o !== f && o.type === f.type && o.part === f.part && o.car !== f.car)) continue;

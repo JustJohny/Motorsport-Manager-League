@@ -43,7 +43,7 @@ export function createDemoStore(league: League) {
       if (!from && !league.freeAgents.includes(person)) throw new Error(`${person.name} is under contract at a member team`)
       const a: Auction = {
         id: ids++, window_id: windowId ?? windows[0].id, person_guid: guid, person, kind: person.kind as Auction["kind"], from_team: from,
-        min_wage: minWage(person, s), buyout: from ? buyout(person, date) : 0, opened_by: me.team,
+        min_wage: minWage(person, s), buyout: from ? buyout(person, date, s) : 0, opened_by: me.team,
         leading_team: null, leading_wage: null, leading_years: null, bid_count: 0, updated_at: new Date().toISOString(),
       }
       auctions.push(a)

@@ -71,7 +71,8 @@ export function MyTeamPage() {
       </div>
 
       <Tabs defaultValue="staff">
-        <TabsList>
+        {/* Seven tabs don't fit a phone: the bar scrolls sideways there. */}
+        <TabsList className="max-w-full justify-start overflow-x-auto">
           <TabsTrigger value="staff">Staff</TabsTrigger>
           <TabsTrigger value="hq">HQ</TabsTrigger>
           <TabsTrigger value="parts">Parts</TabsTrigger>

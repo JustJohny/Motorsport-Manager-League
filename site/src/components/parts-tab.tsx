@@ -1,12 +1,12 @@
 import {
-  Bot, CalendarClock, Car, ChevronsUp, Gavel, Clock, Coins, Cog, Disc3, Eye, Fan, Fuel, Gauge, Hammer, HeartPulse, Layers, Loader2, Lock,
+  Ban, Bot, CalendarClock, Car, ChevronsUp, Gavel, Clock, Coins, Cog, Disc3, Eye, Fan, Fuel, Gauge, Hammer, HeartPulse, Layers, Loader2, Lock,
   Package, PencilRuler, Settings2, ShieldCheck, ShieldPlus, Siren, Sparkles, Star, Timer, TriangleAlert, User, Waves, Wind,
   WindArrowDown, Wrench, type LucideIcon,
 } from "lucide-react"
 import { Fragment, useMemo, useState, type ReactNode } from "react"
 import { hqName } from "../../../src/hq-info.ts"
 import { daysBetween, improvementEstimate, type ListEstimate } from "../../../src/part-improvement.ts"
-import { bustChance, carBustChance, nextBustPenalty, planDesign, predictPart, type DesignPlan } from "../../../src/part-design.ts"
+import { bustChance, carBustChance, nextBustPenalty, planDesign, TO_THE_BACK, predictPart, type DesignPlan } from "../../../src/part-design.ts"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -23,7 +23,7 @@ import { useSponsors } from "@/lib/sponsors"
 import { useContracts } from "@/lib/contracts"
 import { useTransfers } from "@/lib/transfers"
 import { cn } from "@/lib/utils"
-import type { DesignComponent, Part, PartDesignOptions, TeamPrivate } from "@/lib/types"
+import type { DesignComponent, GameRules, Part, PartDesignOptions, TeamPrivate } from "@/lib/types"
 
 // ---------------------------------------------------------------------------------------------
 // Icons and tiers, after MM's own design screen: a symbol per part, per stat and per tier.
@@ -659,17 +659,19 @@ function PartCard({ type, parts, priv, team, own }: { type: string; parts: Part[
           <TableBody>
             {sorted.map((part) => {
               const ai = isAiPart(part, type, team, p.orders, p.leagueStart)
+              const banned = !!part.banned
               const perfDone = (part.performance ?? 0) >= (part.maxPerformance ?? 0)
               const relDone = (part.reliability ?? 0) >= (part.maxReliability ?? 0)
               return (
-                <TableRow key={part.guid} className={cn(ai && "opacity-60")}>
+                <TableRow key={part.guid} className={cn((ai || banned) && "opacity-60")}>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <span className="font-mono text-xs">{part.name}</span>
-                      {(part.rulesRisk ?? 0) > 0 && <RiskBadge risk={part.rulesRisk!} bonus={priv.design?.rules?.riskBonus ?? 0} />}
+                      {(part.rulesRisk ?? 0) > 0 && <RiskBadge risk={part.rulesRisk!} bonus={priv.design?.rules?.riskBonus ?? 0} game={priv.design?.rules?.game} />}
                       {part.level > 0 && <Tier level={part.level} />}
                     </div>
                     {ai && <div className="flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400"><Bot className="size-3" /> AI-built · removed at next apply</div>}
+                    {banned && <div className="flex items-center gap-1 text-[11px] text-destructive"><Ban className="size-3" /> Banned by the scrutineers · can't be fitted or improved</div>}
                   </TableCell>
                   <TableCell className={cn("text-right tabular-nums", part.stat === best && "font-semibold text-primary")}>{fmtNum(part.stat)}</TableCell>
                   <TableCell className="text-right tabular-nums">{fmtNum(part.performance)}/{fmtNum(part.maxPerformance)}</TableCell>
@@ -684,8 +686,8 @@ function PartCard({ type, parts, priv, team, own }: { type: string; parts: Part[
                         return (
                           <Button
                             key={car} size="sm" variant={on ? "default" : "outline"} className="h-6 px-2 text-xs disabled:opacity-100"
-                            disabled={on || ai || busy != null || onOther}
-                            title={on ? `Runs on car ${car + 1}` : onOther ? `On car ${2 - car}: fit another part there first` : `Fit to car ${car + 1}`}
+                            disabled={on || ai || banned || busy != null || onOther}
+                            title={on ? `Runs on car ${car + 1}` : banned ? "Banned: can't be fitted" : onOther ? `On car ${2 - car}: fit another part there first` : `Fit to car ${car + 1}`}
                             onClick={() => void run(`fit${car}${part.guid}`, () => p.setFitting(car, type, part.guid))}
                           >
                             {car + 1}
@@ -707,8 +709,8 @@ function PartCard({ type, parts, priv, team, own }: { type: string; parts: Part[
                           return (
                             <Button
                               key={list} size="sm" variant={on ? "default" : "outline"} className="size-6 p-0"
-                              disabled={ai || isSpec || busy != null || (!on && (full || done))}
-                              title={`${name}${isSpec ? ": spec part, can't be improved" : done && !on ? ": already at its max" : full ? `: list full (${imp.slots})` : ""}`}
+                              disabled={ai || isSpec || banned || busy != null || (!on && (full || done))}
+                              title={`${name}${isSpec ? ": spec part, can't be improved" : banned ? ": banned part" : done && !on ? ": already at its max" : full ? `: list full (${imp.slots})` : ""}`}
                               aria-label={name}
                               onClick={() => void toggleImprove(list, part.guid)}
                             >
@@ -733,29 +735,32 @@ function PartCard({ type, parts, priv, team, own }: { type: string; parts: Part[
 // Rules risk: MM's post-race scrutineering
 
 const RISK_NAMES = ["None", "Low", "Medium", "High"]
+const dropText = (places: number) => places >= TO_THE_BACK ? "the car is sent to the back" : `the car drops ${places} places`
 const riskName = (r: number) => RISK_NAMES[Math.min(3, Math.max(0, Math.round(r)))]
 
-function RiskBadge({ risk, bonus }: { risk: number; bonus: number }) {
+function RiskBadge({ risk, bonus, game }: { risk: number; bonus: number; game?: GameRules }) {
   return (
     <span
       className={cn("inline-flex items-center gap-0.5 rounded px-1 text-[10px] font-medium", risk >= 2 ? "bg-destructive/15 text-destructive" : "bg-amber-500/15 text-amber-600 dark:text-amber-400")}
-      title={`Rules risk ${riskName(risk)} (${risk}): when fitted, ${fmtPct(bustChance(risk, bonus))} chance per race of being caught by the scrutineers`}
+      title={`Rules risk ${riskName(risk)} (${risk}): when fitted, ${fmtPct(bustChance(risk, bonus, game))} chance per race of being caught by the scrutineers`}
     >
-      <TriangleAlert className="size-3" /> {fmtPct(bustChance(risk, bonus))}
+      <TriangleAlert className="size-3" /> {fmtPct(bustChance(risk, bonus, game))}
     </span>
   )
 }
 
 function RiskWarning({ risk, rules }: { risk: number; rules?: NonNullable<TeamPrivate["design"]>["rules"] }) {
-  const chance = bustChance(risk, rules?.riskBonus ?? 0)
-  const next = nextBustPenalty(rules?.brokenThisSeason ?? 0)
+  const chance = bustChance(risk, rules?.riskBonus ?? 0, rules?.game)
+  const next = nextBustPenalty(rules?.brokenThisSeason ?? 0, rules?.game)
   return (
     <div className="flex gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-2 text-xs">
       <TriangleAlert className="mt-px size-4 shrink-0 text-amber-500" />
       <span>
         <strong className="font-medium">Grey-area part: rules risk {riskName(risk)}.</strong> While fitted, it has a {fmtPct(chance)} chance per race
-        of being caught. If caught, the car drops {next.placesLost} places in the race result, you pay {fmtMoney(next.fine)},
-        and the part loses its gained performance and reliability.
+        of being caught. If caught, {dropText(next.placesLost)} in the race result and you pay {fmtMoney(next.fine)}.
+        {next.bansPart
+          ? " The part is banned: it comes off the car and can't be fitted or improved again."
+          : " The part loses its gained performance and reliability."}
       </span>
     </div>
   )
@@ -766,20 +771,20 @@ function ScrutineeringCard({ priv, team }: { priv: TeamPrivate; team: string }) 
   const p = useParts()
   const rules = priv.design!.rules!
   const fit = effectiveFitting(priv, team, p.fitting)
-  const next = nextBustPenalty(rules.brokenThisSeason)
+  const next = nextBustPenalty(rules.brokenThisSeason, rules.game)
   const cars = ([0, 1] as const).map((car) => {
     const risky = Object.entries(fit).flatMap(([type, guids]) => {
       const part = priv.parts[type]?.find((x) => x.guid === guids[car])
       return part && (part.rulesRisk ?? 0) > 0 ? [{ type, part }] : []
     })
-    return { car, risky, chance: carBustChance(risky.map((r) => r.part.rulesRisk!), rules.riskBonus) }
+    return { car, risky, chance: carBustChance(risky.map((r) => r.part.rulesRisk!), rules.riskBonus, rules.game) }
   })
   return (
     <Card size="sm">
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><Siren className="size-4" /> Scrutineering</CardTitle>
         <CardDescription>
-          After every race MM checks each fitted part with rules risk: {fmtPct(bustChance(1, rules.riskBonus))} per risk point.
+          After every race MM checks each fitted part with rules risk: {fmtPct(bustChance(1, rules.riskBonus, rules.game))} per risk point.
           Grey-area components (Risk +1, +2) give more performance but can get you caught. Busts are public on the Calendar &amp; results page.
         </CardDescription>
       </CardHeader>
@@ -792,7 +797,7 @@ function ScrutineeringCard({ priv, team }: { priv: TeamPrivate; team: string }) 
             </StatPill>
           ))}
           <StatPill icon={Gavel} label="Offences this season">{rules.brokenThisSeason}</StatPill>
-          <StatPill icon={TriangleAlert} label="Next bust costs">{next.placesLost} places · {fmtMoneyShort(next.fine)}</StatPill>
+          <StatPill icon={TriangleAlert} label="Next bust costs">{next.placesLost >= TO_THE_BACK ? "To the back" : `${next.placesLost} places`} · {fmtMoneyShort(next.fine)}{next.bansPart && " · part banned"}</StatPill>
           {rules.riskBonus !== 0 && <StatPill icon={Coins} label="Investor risk bonus">{rules.riskBonus > 0 ? "+" : ""}{rules.riskBonus}</StatPill>}
         </div>
         {rules.breaches.length > 0 && (
@@ -802,7 +807,7 @@ function ScrutineeringCard({ priv, team }: { priv: TeamPrivate; team: string }) 
               <span key={i} className="flex items-center gap-2">
                 <Siren className="size-3.5 text-destructive" />
                 Round {b.round} {b.circuit}: {humanize(b.partType)} <span className="font-mono text-xs">{b.part}</span> on {b.driver}'s car,
-                −{b.placesLost} places, {fmtMoney(b.fine)}
+                {b.placesLost >= TO_THE_BACK ? "sent to the back" : `−${b.placesLost} places`}, {fmtMoney(b.fine)}
               </span>
             ))}
           </div>
