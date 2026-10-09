@@ -72,6 +72,8 @@ export async function pullDecisions(env: SupabaseEnv, opts: { force?: boolean; a
 
   // Real circuit countries (src/circuit-names.ts): does nothing once a save has them.
   changes.push({ op: "realCircuitCountries" });
+  // The league's fuel suppliers (src/extra-suppliers.ts): FF20 saves only, a no-op once in the save.
+  changes.push({ op: "addFuelSuppliers" });
 
   // The organizer's equalization: after undoing the AI, before members' own orders.
   const eq = await fetchEqualize(env);

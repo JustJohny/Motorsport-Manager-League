@@ -51,7 +51,7 @@ export function unityPython(explicit?: string): string {
   return py;
 }
 
-function runPython(py: string, script: string, args: string[], log: Log) {
+export function runPython(py: string, script: string, args: string[], log: Log) {
   const r = spawnSync(py, [join(TOOLS, script), ...args], { encoding: "utf8" });
   for (const line of `${r.stdout}${r.stderr}`.split("\n").filter(Boolean)) log(`  ${line}`);
   if (r.status !== 0) throw new Error(`${script} failed (exit ${r.status})`);

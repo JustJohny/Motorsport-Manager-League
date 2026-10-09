@@ -157,3 +157,21 @@ describe.skipIf(!existsSync(SAVE))("real circuit countries", () => {
     expect(applyChanges(r, { changes: [{ op: "realCircuitCountries" }] })).toEqual(["circuit countries already real"]);
   }, 180_000);
 });
+
+describe.skipIf(!existsSync(SAVE))("league fuel suppliers", () => {
+  it("adds Orlen and Slovnaft to every tier, offered to F1 teams, once", async () => {
+    const { supplierOptions } = await import("../src/ops/suppliers.ts");
+    const save = Save.load(SAVE);
+    const log = applyChanges(save, { changes: [{ op: "addFuelSuppliers" }] });
+    expect(log).toContain("tier 1: Orlen fuel +3, improvability +3, $6.0M");
+    expect(log).toContain("tier 1: Slovnaft fuel +4, improvability +1, $4.0M");
+    expect(log.filter((l) => l.includes("Orlen"))).toHaveLength(7);
+    const r = reload(save);
+    expect(r.g.validate()).toEqual([]);
+    const fuel = supplierOptions(r, r.team(TEAM)).Fuel!.map((o) => o.name);
+    expect(fuel).toEqual(expect.arrayContaining(["Orlen", "Slovnaft", "Petronas"]));
+    const ids = r.g.list<Obj>(r.data.supplierManager.fuelSuppliers).map((s) => s.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(applyChanges(r, { changes: [{ op: "addFuelSuppliers" }] })).toEqual(["fuel suppliers already added"]);
+  }, 180_000);
+});
