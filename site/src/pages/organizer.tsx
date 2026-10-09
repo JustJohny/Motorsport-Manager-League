@@ -5,6 +5,7 @@ import { PageHeader } from "@/components/page-header"
 import { Archive, Flag, Plus } from "lucide-react"
 import { CopyCommand, RaceCycle } from "@/components/race-cycle"
 import { seriesFiles } from "../../../src/race-cycle.ts"
+import { circuitName } from "../../../src/circuit-names.ts"
 import { WindowControls } from "@/components/window-controls"
 import { PreseasonControls } from "@/components/preseason-controls"
 import { EqualizeCard } from "@/components/equalize-card"
@@ -35,7 +36,7 @@ export function OrganizerPage() {
           <CardContent className="grid grid-cols-2 gap-y-1 text-sm">
             <span className="text-muted-foreground">Published</span><span>{new Date(league.publishedAt).toLocaleString()}</span>
             <span className="text-muted-foreground">Game date</span><span>{fmtDate(league.snapshot.gameDate)}</span>
-            <span className="text-muted-foreground">Last race</span><span>{ch.lastRace ? `Round ${ch.lastRace.round}, ${ch.lastRace.circuit}` : "—"}</span>
+            <span className="text-muted-foreground">Last race</span><span>{ch.lastRace ? `Round ${ch.lastRace.round}, ${circuitName(ch.lastRace.circuit)}` : "—"}</span>
             <span className="text-muted-foreground">Free agents</span><span>{league.freeAgents.length}</span>
           </CardContent>
         </Card>

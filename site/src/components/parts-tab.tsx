@@ -24,6 +24,7 @@ import { useContracts } from "@/lib/contracts"
 import { useTransfers } from "@/lib/transfers"
 import { cn } from "@/lib/utils"
 import type { DesignComponent, GameRules, Part, PartDesignOptions, TeamPrivate } from "@/lib/types"
+import { circuitName } from "../../../src/circuit-names.ts"
 
 // ---------------------------------------------------------------------------------------------
 // Icons and tiers, after MM's own design screen: a symbol per part, per stat and per tier.
@@ -806,7 +807,7 @@ function ScrutineeringCard({ priv, team }: { priv: TeamPrivate; team: string }) 
             {rules.breaches.map((b, i) => (
               <span key={i} className="flex items-center gap-2">
                 <Siren className="size-3.5 text-destructive" />
-                Round {b.round} {b.circuit}: {humanize(b.partType)} <span className="font-mono text-xs">{b.part}</span> on {b.driver}'s car,
+                Round {b.round} {circuitName(b.circuit)}: {humanize(b.partType)} <span className="font-mono text-xs">{b.part}</span> on {b.driver}'s car,
                 {b.placesLost >= TO_THE_BACK ? "sent to the back" : `−${b.placesLost} places`}, {fmtMoney(b.fine)}
               </span>
             ))}

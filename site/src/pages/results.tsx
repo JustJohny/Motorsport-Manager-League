@@ -13,6 +13,7 @@ import { useRaceData } from "@/lib/race-data"
 import { Classification, driverStyles, LapTimes, RaceTrace, SectorsSpeed, TeamTelemetry } from "@/components/race-data"
 import type { PitStopRound, SessionResult } from "@/lib/types"
 import { cn } from "@/lib/utils"
+import { circuitName } from "../../../src/circuit-names.ts"
 
 /** Game days until a race, from the published game date. */
 function inDays(days: number) {
@@ -66,7 +67,7 @@ export function ResultsPage() {
                   )}
                 >
                   <span className="w-5 text-right tabular-nums">{e.round}</span>
-                  <span className="flex-1 font-medium">{e.circuit}</span>
+                  <span className="flex-1 font-medium">{circuitName(e.circuit)}</span>
                   <span className="flex flex-col items-end text-xs leading-tight">
                     {fmtDate(e.date)}
                     {!e.ended && <span className="tabular-nums text-muted-foreground">{inDays(daysBetween(league.snapshot.gameDate, e.date))}</span>}
@@ -83,7 +84,7 @@ export function ResultsPage() {
         {race ? (
           <Card size="sm">
             <CardHeader>
-              <CardTitle>Round {race.round} · {race.circuit}</CardTitle>
+              <CardTitle>Round {race.round} · {circuitName(race.circuit)}</CardTitle>
               <CardDescription>
                 {fmtDate(race.date)}{race.round === races.at(-1)?.round ? " · latest race" : ""}
                 {races.length < ch.calendar.filter((e) => e.ended).length && " · earlier rounds appear after the organizer's next publish"}
@@ -151,7 +152,7 @@ export function ResultsPage() {
               <TableBody>
                 {breaches.map((b, i) => (
                   <TableRow key={i} className={cn(b.team === me.team && "bg-destructive/10")}>
-                    <TableCell>{b.round} · {b.circuit}</TableCell>
+                    <TableCell>{b.round} · {circuitName(b.circuit)}</TableCell>
                     <TableCell className="font-medium">{b.team}</TableCell>
                     <TableCell>{b.driver}</TableCell>
                     <TableCell className="text-right tabular-nums">{b.placesLost >= TO_THE_BACK ? "To the back" : `−${b.placesLost}`}</TableCell>

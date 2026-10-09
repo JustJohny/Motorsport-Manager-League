@@ -11,6 +11,7 @@ import { useLeague, useLeagueContext } from "@/lib/league"
 import { demoMode } from "@/lib/supabase"
 import { useTheme } from "@/lib/theme"
 import { useTransfers } from "@/lib/transfers"
+import { circuitName } from "../../../src/circuit-names.ts"
 
 const NAV = [
   { to: "/", label: "My team", icon: Wrench },
@@ -52,7 +53,7 @@ export function AppSidebar() {
                     <div className="truncate text-sm font-semibold">{current.name}</div>
                     <div className="truncate text-xs text-muted-foreground">
                       {current.name !== ch.name && `${ch.name} · `}
-                      {ch.lastRace ? `After round ${ch.lastRace.round} · ${ch.lastRace.circuit}` : "Pre-season"}
+                      {ch.lastRace ? `After round ${ch.lastRace.round} · ${circuitName(ch.lastRace.circuit)}` : "Pre-season"}
                     </div>
                   </div>
                   {series.length > 1 && <ChevronsUpDown className="size-4 text-muted-foreground" />}

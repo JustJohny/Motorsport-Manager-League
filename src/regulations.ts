@@ -5,6 +5,7 @@ import type { Obj } from "./graph.ts";
 import type { Regulations, Rule, RuleVote } from "./league-types.ts";
 import type { Save } from "./model.ts";
 import { num } from "./codec/sav.ts";
+import { circuitName } from "./circuit-names.ts";
 import { predictAiVote, teamCharacteristics } from "./politics.ts";
 
 /** The game's MM_Data folder: MM_GAME_DIR, or the install this project was built against. */
@@ -48,7 +49,8 @@ function fillText(save: Save, v: Obj, text: string, strict = false): string | nu
   const imps = save.g.list<Obj>(v.impacts ?? []).map((i) => save.g.deref<Obj>(i));
   const track = (key: string) => {
     const imp = imps.find((i) => i?.$type === "PoliticalImpactChangeTrack" && i[key]);
-    return imp ? save.g.deref<Obj>(imp[key])?.locationName : undefined;
+    const name = imp ? save.g.deref<Obj>(imp[key])?.locationName : undefined;
+    return name ? circuitName(name) : undefined;
   };
   const effectNumber = /\((\d+)\)/.exec(String(v.effectType))?.[1];
   const fuel = imps.find((i) => i?.$type === "PoliticalImpactFuelSettings" && num(i.fuelLimit) > 0);

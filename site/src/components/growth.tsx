@@ -8,6 +8,7 @@ import { useLeague } from "@/lib/league"
 import { demoMode, supabase } from "@/lib/supabase"
 import { cn } from "@/lib/utils"
 import type { Person } from "@/lib/types"
+import { circuitName } from "../../../src/circuit-names.ts"
 
 const SERIES: Record<number, SeriesKind> = { 0: "single", 1: "gt", 2: "endurance", 4: "endurance" }
 const signed = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : "±"}${Math.abs(Math.round(v * 10) / 10)}`
@@ -81,7 +82,7 @@ export function DriverDevelopment({ person }: { person: Person }) {
             <p className="text-muted-foreground">
               MM tries to give each driver a new trait every few months, one at a time. If that roll falls in the week after a race, the result
               decides the reward, with these odds.
-              {g.nextRoll && <> Next roll: <b className="text-foreground">{fmtDate(g.nextRoll)}</b>{rollRace ? <>, the week after <b className="text-foreground">{rollRace.circuit}</b>: that race counts.</> : ", not right after a race."}</>}
+              {g.nextRoll && <> Next roll: <b className="text-foreground">{fmtDate(g.nextRoll)}</b>{rollRace ? <>, the week after <b className="text-foreground">{circuitName(rollRace.circuit)}</b>: that race counts.</> : ", not right after a race."}</>}
             </p>
             <table className="w-full">
               <tbody>

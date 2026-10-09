@@ -13,6 +13,7 @@ import { useLeague } from "@/lib/league"
 import { useParts } from "@/lib/parts"
 import { useTransfers } from "@/lib/transfers"
 import { cn } from "@/lib/utils"
+import { circuitName } from "../../../src/circuit-names.ts"
 
 const CRASH_LOG = "~/Downloads/Motorsport.Manager.v1.53.ALL.DLCs/Motorsport Manager v1.53/MM_Data/output_log.txt"
 
@@ -113,8 +114,8 @@ export function RaceCycle() {
         {/* Where we are */}
         <div className="flex flex-wrap items-center gap-2 text-sm">
           {([
-            ["after", `A · After race ${lastRound}${last ? ` (${last.circuit})` : ""}`],
-            ["before", `B · Before race ${nextRound}${next ? ` (${next.circuit}, ${fmtDate(next.date)})` : ""}`],
+            ["after", `A · After race ${lastRound}${last ? ` (${circuitName(last.circuit)})` : ""}`],
+            ["before", `B · Before race ${nextRound}${next ? ` (${circuitName(next.circuit)}, ${fmtDate(next.date)})` : ""}`],
           ] as const).map(([key, label], i) => (
             <span key={key} className="flex items-center gap-2">
               {i > 0 && <ArrowRight className="size-4 text-muted-foreground" />}
