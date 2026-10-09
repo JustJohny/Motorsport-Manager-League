@@ -3,6 +3,7 @@ import { gameScale } from "../game-rules.ts";
 import type { Obj } from "../graph.ts";
 import type { ContractRenewal, MoraleTrait, RenewalReason } from "../league-types.ts";
 import { gameTextName } from "../regulations.ts";
+import { traitDisplayName } from "../development.ts";
 import { JOB, numOrNull, personKind, personName, type Save } from "../model.ts";
 
 /** Save numbers may be wrapped floats. */
@@ -194,6 +195,14 @@ const FIGHT_WITH_TEAMMATE = 20;
 
 function traitName(t: Obj): string {
   return (t.data.nameID && gameTextName(t.data.nameID)) || t.data.mCustomTraitName || "A personality trait";
+}
+
+/** Active traits that changed potential (FF20 driver development), with their end date. */
+export function potentialTraits(save: Save, p: Obj): { name: string; value: number; permanent: boolean; until?: string }[] {
+  return traits(save, p).filter((t) => n(t.data.potentialModifier ?? 0)).map((t) => ({
+    name: traitDisplayName(traitName(t)), value: n(t.data.potentialModifier), permanent: t.data.type !== 1,
+    ...(t.data.type === 1 && t.mTraitEndTime && !String(t.mTraitEndTime).startsWith("0001") ? { until: t.mTraitEndTime as string } : {}),
+  }));
 }
 
 /**

@@ -101,3 +101,42 @@ describe.skipIf(!existsSync(SAVE))("pre-season line-up and supplier ops (FF20)",
     expect(reload(save).g.validate()).toEqual([]);
   }, 180_000);
 });
+
+describe.skipIf(!existsSync(SAVE))("FF20 signing traits (league rule)", () => {
+  it("gives a young signing +12 potential and an older one +1, as MM's AddPersonalityTrait would", async () => {
+    const { extractLeague } = await import("../src/extract.ts");
+    const { signingTraitChanges } = await import("../src/signing-traits.ts");
+    const save = Save.load(SAVE);
+    const state = extractLeague(save, { championship: 0, members: [] });
+    const age = (p: { dateOfBirth: string }) => Number(save.now.slice(0, 4)) - Number(p.dateOfBirth.slice(0, 4)) - 1;
+    const young = state.freeAgents.find((p) => p.kind === "Driver" && age(p) < 19 && p.growth?.room === 0)!;
+    const older = state.freeAgents.find((p) => p.kind === "Driver" && age(p) > 25 && p.growth?.room === 0)!;
+    const [d1, d2] = drivers(save);
+    const hires = [
+      { op: "hire" as const, team: TEAM, person: young.guid, replacing: d1!.id, yearlyWages: 1_000_000, endDate: "2021-12-31T00:00:00.0000000" },
+      { op: "hire" as const, team: TEAM, person: older.guid, replacing: d2!.id, yearlyWages: 1_000_000, endDate: "2021-12-31T00:00:00.0000000" },
+    ];
+    applyChanges(save, { changes: hires });
+    // Force both rolls to succeed: pick the trait directly, as the seeded roll would on success.
+    applyChanges(save, { changes: [
+      { op: "grantTrait", person: young.guid, trait: 724, weeks: 3 },
+      { op: "grantTrait", person: older.guid, trait: 723, weeks: 4 },
+    ] });
+    // Not twice: a non-repeatable trait stays in the history.
+    expect(applyChanges(save, { changes: [{ op: "grantTrait", person: young.guid, trait: 724, weeks: 3 }] })[0]).toMatch(/skipped/);
+    const r = reload(save);
+    expect(r.g.validate()).toEqual([]);
+    const after = extractLeague(r, { championship: 0, members: [] });
+    const find = (guid: string) => after.teams.flatMap((t) => t.staff).find((s) => s.person?.guid === guid)!.person!;
+    // MM's ceiling is (int)total + potential, so a fractional total leaves a little less room.
+    const g = find(young.guid).growth!;
+    expect(g.room).toBeCloseTo(12 - (g.total % 1), 5);
+    expect(g.traits).toEqual([expect.objectContaining({ name: "Young Driver Signed", value: 12 })]);
+    const o = find(older.guid).growth!;
+    expect(o.room).toBeCloseTo(1 - (o.total % 1), 5);
+    expect(find(older.guid).growth!.traits.map((t) => t.name)).toContain("New Contract Signed");
+    // The seeded roll is the same every time.
+    const a = signingTraitChanges([{ person: young, team: TEAM }], save.now), b = signingTraitChanges([{ person: young, team: TEAM }], save.now);
+    expect(a).toEqual(b);
+  }, 240_000);
+});

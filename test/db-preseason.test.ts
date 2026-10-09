@@ -128,3 +128,23 @@ describe.skipIf(!existsSync(SAVE))("database: the league's pre-season", () => {
     expect(l2.seats.find((s) => s.role === "car1")!.person!.guid).toBe(fa.guid);
   });
 });
+
+describe.skipIf(!existsSync(SAVE))("database: person history", () => {
+  it("returns a driver's stats at every publish, to series members only", async () => {
+    const save = Save.load(SAVE);
+    const league = { championship: "Formula 1", members: [{ member: "alice", team: ALICE, discord: "alice" }] };
+    const state = extractLeague(save, league);
+    const t = await leagueDb();
+    for (let i = 0; i < 2; i++) {
+      expect((await t.service("select public.publish_snapshot($1, $2)", [JSON.stringify(memberRows(league, state)), JSON.stringify(splitSnapshot(state))])).error).toBeNull();
+    }
+    const driver = state.teams.find((x) => x.name === ALICE)!.staff.find((s) => s.job === "Driver")!.person!;
+    const free = state.freeAgents.find((p) => p.kind === "Driver")!;
+    const rows = (await t.member("alice").query<{ team: string | null; stats: Record<string, number>; growth: unknown }>("select * from public.person_history($1)", [driver.guid])).rows;
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ team: ALICE, stats: driver.stats });
+    expect(rows[0].growth).toEqual(driver.growth);
+    expect((await t.member("alice").query<{ team: string | null }>("select * from public.person_history($1)", [free.guid])).rows[0].team).toBeNull();
+    expect((await t.member("stranger").query("select * from public.person_history($1)", [driver.guid])).error).toMatch(/not in this league/);
+  }, 180_000);
+});

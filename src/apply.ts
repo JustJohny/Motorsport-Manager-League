@@ -19,6 +19,7 @@ import {
   type HireOp, type PromoteDriverOp, type ReleasePersonOp, type SwapCarDriversOp, type SwapMechanicsOp,
 } from "./ops/staff.ts";
 import { renamePerson, type RenamePersonOp } from "./ops/people.ts";
+import { grantTrait, type GrantTraitOp } from "./ops/traits.ts";
 import { renameTeam, setTeamCountry, setTeamLook, type RenameTeamOp, type SetTeamCountryOp, type SetTeamLookOp } from "./ops/team.ts";
 import { syncTeam, type SyncTeamOp } from "./ops/sync.ts";
 import { setPitCrew, type SetPitCrewOp } from "./ops/pit-crew.ts";
@@ -34,7 +35,7 @@ export type Change = SetBuildingOp | StartBuildingOp | CancelBuildingOp | Cancel
   | ConcludeVoteOp | SetNextRuleOp | SetSuppliersOp | RenamePersonOp | RenameTeamOp | SetTeamCountryOp | SetTeamLookOp
   | SetCurrentSupplierOp | RenameSupplierOp | SetPitCrewOp | EqualizeOp | SignSponsorOp | DropSponsorOp | SetChassisOp | SetCarInvestmentOp | RenewContractOp
   | HoldPromotionsOp | ProtectTeamsOp | RepairCircuitsOp | RepairOldFormatOp
-  | PromoteDriverOp | SwapCarDriversOp | SwapMechanicsOp | ReleasePersonOp;
+  | PromoteDriverOp | SwapCarDriversOp | SwapMechanicsOp | ReleasePersonOp | GrantTraitOp;
 
 export interface ChangeSet {
   /** Optional note, e.g. "Before round 6 - Munich". */
@@ -72,6 +73,7 @@ function run(save: Save, c: Change): string | string[] {
     case "swapCarDrivers": return swapCarDrivers(save, c);
     case "swapMechanics": return swapMechanics(save, c);
     case "releasePerson": return releasePerson(save, c);
+    case "grantTrait": return grantTrait(save, c);
     case "renamePerson": return renamePerson(save, c);
     case "renameTeam": return renameTeam(save, c);
     case "setTeamCountry": return setTeamCountry(save, c);

@@ -29,19 +29,25 @@ export async function fetchPreseason(env: SupabaseEnv) {
 export function preseasonChanges(moves: PreseasonMove[], suppliers: PreseasonSupplierRow[], snapshot: PublicSnapshot | null) {
   const changes: Change[] = [];
   const warnings: string[] = [];
+  /** Moves that didn't fit (and weren't applied). */
+  const skipped = new Set<number>();
   const teams = [...new Set(moves.map((m) => m.team))];
   for (const team of teams) {
     const staff = snapshot?.teams.find((t) => t.name === team)?.staff;
-    if (!staff) { warnings.push(`${team}: not in the latest snapshot, pre-season moves skipped`); continue; }
+    if (!staff) {
+      warnings.push(`${team}: not in the latest snapshot, pre-season moves skipped`);
+      for (const m of moves) if (m.team === team) skipped.add(m.id);
+      continue;
+    }
     const l = replay(team, staff, moves.filter((m) => m.team === team));
     changes.push(...l.changes);
-    for (const [id, why] of l.invalid) warnings.push(`${team}: move #${id} skipped: ${why}`);
+    for (const [id, why] of l.invalid) { warnings.push(`${team}: move #${id} skipped: ${why}`); skipped.add(id); }
     for (const p of l.kept) warnings.push(`${team}: ${p.name} stays: nobody was signed into the seat`);
   }
   for (const s of suppliers) {
     changes.push({ op: "setCurrentSupplier", team: s.team, type: s.supplier_type as never, id: Number(s.supplier_id) });
   }
-  return { changes, warnings, teams };
+  return { changes, warnings, teams, skipped };
 }
 
 export async function markPreseasonApplied(env: SupabaseEnv, moveIds: number[], suppliers: PreseasonSupplierRow[]) {

@@ -6,7 +6,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { fmtMoney, fmtNum, humanize, statAverage } from "@/lib/format"
+import { ageAt, fmtMoney, fmtNum, humanize, statAverage } from "@/lib/format"
+import { signingBonusText } from "../../../src/development.ts"
 import { useHqOrders } from "@/lib/hq"
 import { useParts } from "@/lib/parts"
 import { usePitCrew } from "@/lib/pit-crew"
@@ -146,6 +147,9 @@ export function BidDialog({ auction, person, fromTeam = null, trigger }: {
           <p className="text-xs text-muted-foreground">
             Only the fee and any buyout are taken when the window closes; wages are paid by the game over the season.
           </p>
+          {kind === "Driver" && league.snapshot.championship.game === "ff20" && (
+            <p className="text-xs text-muted-foreground">League bonus on signing: {signingBonusText(ageAt(target.dateOfBirth, league.snapshot.gameDate))}.</p>
+          )}
           {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
         </div>
 

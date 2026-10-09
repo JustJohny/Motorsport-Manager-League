@@ -10,6 +10,7 @@ import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/page-header"
 import { BidDialog } from "@/components/bid-dialog"
 import { SignDialog } from "@/components/sign-dialog"
+import { AgeWindowBadge } from "@/components/growth"
 import { usePreseason } from "@/lib/preseason"
 import { PersonCard } from "@/components/person-card"
 import { ageAt, fmtCountry, fmtMoneyShort, fmtNum, statAverage } from "@/lib/format"
@@ -21,11 +22,13 @@ import { cn } from "@/lib/utils"
 
 type Kind = "Driver" | "Engineer" | "Mechanic"
 type Source = "free" | "ai"
-type Sort = "avg" | "potential" | "wageAsc" | "age"
+type Sort = "avg" | "potential" | "growth" | "wageAsc" | "age"
 
 const SORTS: Record<Sort, { label: string; fn: (a: Person, b: Person, date: string) => number }> = {
   avg: { label: "Best average", fn: (a, b) => statAverage(b.stats) - statAverage(a.stats) },
   potential: { label: "Highest potential", fn: (a, b) => (b.potential ?? 0) - (a.potential ?? 0) },
+  // FF20: potential starts at 0 for everyone; what matters is the room left to grow.
+  growth: { label: "Most room to grow", fn: (a, b) => (b.growth?.room ?? 0) - (a.growth?.room ?? 0) },
   wageAsc: { label: "Cheapest", fn: (a, b) => a.contract.yearlyWages - b.contract.yearlyWages },
   age: { label: "Youngest", fn: (a, b, d) => ageAt(a.dateOfBirth, d) - ageAt(b.dateOfBirth, d) },
 }
@@ -58,7 +61,8 @@ export function MarketPage() {
   }, [pool, kind, sort, query, date])
   const auctionFor = (guid: string) => t.auctions.find((a) => a.person_guid === guid)
   const current = list.find((p) => p.guid === selected) ?? list[0]
-  const sorts = (Object.keys(SORTS) as Sort[]).filter((s) => s !== "potential" || kind === "Driver")
+  const ff20 = league.snapshot.championship.game === "ff20"
+  const sorts = (Object.keys(SORTS) as Sort[]).filter((s) => kind === "Driver" ? s !== (ff20 ? "potential" : "growth") : s !== "potential" && s !== "growth")
 
   return (
     <>
@@ -73,7 +77,7 @@ export function MarketPage() {
             <TabsTrigger value="ai">AI teams</TabsTrigger>
           </TabsList>
         </Tabs>
-        <Tabs value={kind} onValueChange={(v) => { setKind(v as Kind); setSelected(null); if (v !== "Driver" && sort === "potential") setSort("avg") }}>
+        <Tabs value={kind} onValueChange={(v) => { setKind(v as Kind); setSelected(null); if (v !== "Driver" && (sort === "potential" || sort === "growth")) setSort("avg") }}>
           <TabsList>
             {(["Driver", "Engineer", "Mechanic"] as const).map((k) => (
               <TabsTrigger key={k} value={k}>
@@ -104,7 +108,7 @@ export function MarketPage() {
                   <TableHead className="text-right">Age</TableHead>
                   {source === "free" && <TableHead className="hidden sm:table-cell">Nationality</TableHead>}
                   <TableHead className="text-right">Avg</TableHead>
-                  {kind === "Driver" && <TableHead className="text-right">Potential</TableHead>}
+                  {kind === "Driver" && <TableHead className="text-right">{ff20 ? "Growth" : "Potential"}</TableHead>}
                   {source === "ai" && <TableHead>Team</TableHead>}
                   <TableHead className="text-right">{source === "ai" ? "Wage" : "Asking"}</TableHead>
                   <TableHead className="text-right">Opening bid</TableHead>
@@ -120,12 +124,17 @@ export function MarketPage() {
                   >
                     <TableCell className="font-medium">
                       {p.name}
+                      {kind === "Driver" && <AgeFlag person={p} />}
                       {pre.signedBy(p.guid) && <span className="ml-1.5 text-xs text-muted-foreground">signed by {pre.signedBy(p.guid)}</span>}
                     </TableCell>
                     <TableCell className="text-right tabular-nums">{ageAt(p.dateOfBirth, date)}</TableCell>
                     {source === "free" && <TableCell className="hidden sm:table-cell">{fmtCountry(p.nationality)}</TableCell>}
                     <TableCell className="text-right tabular-nums">{fmtNum(statAverage(p.stats))}</TableCell>
-                    {kind === "Driver" && <TableCell className="text-right tabular-nums">{fmtNum(p.potential, 0)}</TableCell>}
+                    {kind === "Driver" && (
+                      <TableCell className="text-right tabular-nums">
+                        {ff20 ? (p.growth?.room ? <span className="text-emerald-600 dark:text-emerald-400">+{fmtNum(p.growth.room, 1)}</span> : <span className="text-muted-foreground">—</span>) : fmtNum(p.potential, 0)}
+                      </TableCell>
+                    )}
                     {source === "ai" && <TableCell className="max-w-40 truncate">{p.contract.team}</TableCell>}
                     <TableCell className="text-right tabular-nums text-muted-foreground">{fmtMoneyShort(p.contract.yearlyWages)}</TableCell>
                     <TableCell className="text-right tabular-nums">
@@ -164,4 +173,9 @@ export function MarketPage() {
       </div>
     </>
   )
+}
+
+/** The age-window badge, inline in a table row. */
+function AgeFlag({ person }: { person: Person }) {
+  return <span className="ml-1.5 inline-flex align-middle"><AgeWindowBadge person={person} /></span>
 }

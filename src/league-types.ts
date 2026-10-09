@@ -142,6 +142,11 @@ export interface Championship {
   rulesBreaches?: RulesBreach[];
   /** Whose game rules apply (scrutineering etc.). Missing before 2026-10-08 (Rebirth). */
   game?: GameRules;
+  /** Championship.Series (0 single-seater, 1 GT, 2/4 endurance) and order in it (0 = top). Missing before 2026-10-09. */
+  series?: number;
+  order?: number;
+  /** Drivers MM's AI hires and renews here (FF20 History Min/Max Start Age; F1 18–37). Missing before 2026-10-09. */
+  ageWindow?: { min: number; max: number };
   /** Rules and the season's votes. Missing in snapshots published before 2026-10-01. */
   regulations?: Regulations;
   /** The series' pit crew rule. Missing in snapshots published before 2026-10-02. */
@@ -467,6 +472,8 @@ export interface Person {
   status?: "Equal" | "One" | "Two" | "Reserve";
   /** Mechanics: the car they work on (0 or 1). Missing before 2026-10-09. */
   mechanicCar?: number | null;
+  /** Drivers in FF20: room to grow and where it came from (src/development.ts). Missing before 2026-10-09. */
+  growth?: DriverGrowth;
   contract: {
     team: string | null;
     job: string;
@@ -474,6 +481,17 @@ export interface Person {
     start: string;
     end: string;
   };
+}
+
+export interface DriverGrowth {
+  /** Points the driver can still gain from training: MM's totalStatsMax − total (0 = not growing). */
+  room: number;
+  /** Their stat total (FF20's training ceiling is 207). */
+  total: number;
+  /** Active traits that added or removed potential. */
+  traits: { name: string; value: number; permanent: boolean; until?: string }[];
+  /** When MM next tries to give them a new trait (PersonalityTraitController.cooldownPeriodEnd). */
+  nextRoll?: string;
 }
 
 export interface StaffSlot {

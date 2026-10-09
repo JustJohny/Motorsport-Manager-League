@@ -10,6 +10,7 @@ import { fetchRegulationContext, recordVoteResults, regulationChanges } from "..
 import { fetchSponsorOrders, markSponsorOrders, sponsorChanges } from "../sponsor-orders.ts";
 import { fetchRenewals, markRenewalsApplied, renewalChanges } from "../renewal-orders.ts";
 import { fetchPreseason, markPreseasonApplied, preseasonChanges } from "../preseason-orders.ts";
+import { signingTraitChanges } from "../signing-traits.ts";
 import { aiLiveryChanges, aiOnly, type AiLook } from "../ai-looks.ts";
 import { fetchTeamLooks, teamLookChanges } from "../team-look-orders.ts";
 import { rest, type SupabaseEnv } from "../supabase.ts";
@@ -198,6 +199,14 @@ export async function pullDecisions(env: SupabaseEnv, opts: { force?: boolean; a
   for (const s of pre.suppliers) say(`  ${s.team}: ${s.supplier_type.toLowerCase()} ${s.supplier_name} on this season's cars`);
   for (const w of pc.warnings) say(`  WARNING: ${w}`);
   changes.push(...pc.changes);
+  // FF20's signing traits for the drivers signed (the league's rule): after their hire.
+  const ff20 = pre.snapshot?.championship.game === "ff20";
+  if (ff20 && pre.snapshot) {
+    const signed = pre.moves.filter((m) => m.kind === "sign" && m.person && !pc.skipped.has(m.id)).map((m) => ({ person: m.person!, team: m.team }));
+    const st = signingTraitChanges(signed, pre.snapshot.gameDate);
+    for (const l of st.lines) say(`  Signing trait: ${l}`);
+    changes.push(...st.changes);
+  }
   if (pre.moves.length) notes.push(`pre-season moves for ${pc.teams.length} team${pc.teams.length === 1 ? "" : "s"}`);
   if (pre.suppliers.length) notes.push(`${pre.suppliers.length} pre-season supplier${pre.suppliers.length > 1 ? "s" : ""}`);
 
@@ -230,6 +239,11 @@ export async function pullDecisions(env: SupabaseEnv, opts: { force?: boolean; a
         + ` (fee $${s.signOnFee.toLocaleString()}${s.buyout ? `, buyout $${s.buyout.toLocaleString()}` : ""})`);
     }
     changes.push(...windowChanges(w.window.id, w.gameDate, w.auctions, w.bids, w.settings).changes);
+    if (ff20) {
+      const st = signingTraitChanges(won.map((x) => ({ person: x.person, team: x.team })), w.gameDate);
+      for (const l of st.lines) say(`  Signing trait: ${l}`);
+      changes.push(...st.changes);
+    }
     notes.push(`transfer window #${w.window.id}`);
     windowDone = true;
   }

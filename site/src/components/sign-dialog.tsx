@@ -5,12 +5,13 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { fmtMoney } from "@/lib/format"
+import { ageAt, fmtMoney } from "@/lib/format"
 import { useLeague } from "@/lib/league"
 import { SEAT_LABEL, usePreseason } from "@/lib/preseason"
 import { contractEnd, minWage } from "@/lib/rules"
 import { useTransfers } from "@/lib/transfers"
 import type { Person } from "@/lib/types"
+import { signingBonusText } from "../../../src/development.ts"
 
 const JOB_FOR: Record<string, string> = { Driver: "Driver", Engineer: "EngineerLead", Mechanic: "Mechanic" }
 const EMPTY = "empty"
@@ -81,6 +82,9 @@ export function SignDialog({ person, trigger }: { person: Person; trigger: React
             <span className="text-muted-foreground">Yearly wage</span><span className="text-right">{fmtMoney(wage)}</span>
             <span className="text-muted-foreground">Sign-on fee</span><span className="text-right">{fmtMoney(0)}</span>
           </div>
+          {person.kind === "Driver" && league.snapshot.championship.game === "ff20" && (
+            <p className="text-xs text-muted-foreground">League bonus on signing: {signingBonusText(ageAt(person.dateOfBirth, league.snapshot.gameDate))}.</p>
+          )}
           {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
         </div>
         <DialogFooter>

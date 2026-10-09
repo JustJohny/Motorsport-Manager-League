@@ -1,13 +1,14 @@
 import type { Obj } from "./graph.ts";
 import type {
-  Building, CalendarEvent, Championship, LeagueConfig, LeagueState, Part, Person, RaceResults, RulesBreach, SessionResult, TeamDesign, TeamState,
+  Building, CalendarEvent, Championship, DriverGrowth, LeagueConfig, LeagueState, Part, Person, RaceResults, RulesBreach, SessionResult, TeamDesign, TeamState,
 } from "./league-types.ts";
+import { num } from "./codec/sav.ts";
 import { isSpecPart, teamDesign } from "./ops/design.ts";
 import { DRIVER_STATUS } from "./ops/staff.ts";
 import { gameCrew, pitCrewRules, pitStopLog } from "./ops/pit-crew.ts";
 import { teamSponsors } from "./ops/sponsors.ts";
 import { liveryOptions, teamLook } from "./ops/team.ts";
-import { teamRenewals } from "./ops/contracts.ts";
+import { potentialTraits, teamRenewals } from "./ops/contracts.ts";
 import { extractRegulations } from "./regulations.ts";
 import { carInvestment, currentSuppliers, hasChassisDesign, nextCarSeason, nextYearDesignState, pendingSuppliers, seasonOver, supplierOptions } from "./ops/suppliers.ts";
 import { BUILDING_STATES, JOBS, PART_TYPES, Save, numOrNull, personKind, personName, type PartType } from "./model.ts";
@@ -47,6 +48,9 @@ export function extractLeague(save: Save, cfg: LeagueConfig): LeagueState {
       races: raceResults(save, champ),
       rulesBreaches: rulesBreaches(save, champ).map(({ part: _p, partType: _t, ...b }) => b),
       game: save.game,
+      series: champ.series,
+      order: champ.championshipOrder,
+      ...(champ.historyMaxStartAge ? { ageWindow: { min: champ.historyMinStartAge, max: champ.historyMaxStartAge } } : {}),
       regulations: extractRegulations(save, champ, new Set(memberTeams.map((m) => m.team.name as string))),
       pitCrew: pitCrewRules(save, champ),
       pitStops: pitStopLog(save, champ),
@@ -162,6 +166,7 @@ export function person(save: Save, p: Obj): Person {
     carID: p.mCarID ?? null,
     ...(kind === "Driver" ? { status: DRIVER_STATUS_NAMES[c.mCurrentStatus] ?? "Reserve" } : {}),
     ...(kind === "Mechanic" ? { mechanicCar: typeof p.driver === "number" ? p.driver : null } : {}),
+    ...(kind === "Driver" && save.game === "ff20" ? { growth: growth(save, p) } : {}),
     contract: {
       team: employer?.name ?? null,
       job: JOBS[c.job] ?? String(c.job),
@@ -169,6 +174,22 @@ export function person(save: Save, p: Obj): Person {
       start: c.startDate,
       end: c.mEndDate,
     },
+  };
+}
+
+const DRIVER_STATS = ["braking", "cornering", "smoothness", "overtaking", "consistency", "adaptability", "fitness", "feedback", "focus"];
+
+/** FF20 driver development: room to grow (DriverStats.GetPotential), the traits behind it, the next trait roll. */
+function growth(save: Save, p: Obj): DriverGrowth {
+  const st = save.g.deref<Obj>(p.mStats ?? p.stats) ?? {};
+  const total = DRIVER_STATS.reduce((a, k) => a + num(st[k] ?? 0), 0);
+  const ctl = p.personalityTraitController ? save.g.deref<Obj>(p.personalityTraitController) : null;
+  const next = ctl?.cooldownPeriodEnd as string | undefined;
+  return {
+    room: Math.max(0, Math.round((num(st.totalStatsMax ?? 0) - total) * 10) / 10),
+    total: Math.round(total * 10) / 10,
+    traits: potentialTraits(save, p),
+    ...(next && !next.startsWith("0001") ? { nextRoll: next } : {}),
   };
 }
 
