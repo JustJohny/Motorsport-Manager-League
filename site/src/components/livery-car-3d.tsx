@@ -13,26 +13,30 @@ import type { TeamColours } from "@/lib/types"
 // fetched once per page.
 const models = new Map<string, Promise<GLTF>>()
 const keys = new Map<string, Promise<ImageData>>()
-const stickerTextures = new Map<string, Promise<THREE.Texture>>()
+const stickerImages = new Map<string, Promise<HTMLImageElement>>()
 // Decal meshes are "SponsorNN": sticker slot NN - 1, as the league game patch maps them in game.
 const SPONSOR = /^Sponsor0([1-6])$/
+// MM's decals are 2:1; stickers are drawn at their size onto one this big.
+const DECAL_W = 1024, DECAL_H = 512
 
-function loadSticker(url: string): Promise<THREE.Texture> {
-  let p = stickerTextures.get(url)
+function loadSticker(url: string): Promise<HTMLImageElement> {
+  let p = stickerImages.get(url)
   if (!p) {
-    const loader = new THREE.TextureLoader()
-    loader.setCrossOrigin("anonymous")
-    p = loader.loadAsync(url).then((t) => {
-      t.flipY = false
-      t.colorSpace = THREE.SRGBColorSpace
-      t.anisotropy = 4
-      return t
+    p = new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image()
+      img.crossOrigin = "anonymous"
+      img.onload = () => resolve(img)
+      img.onerror = () => reject(new Error(`No sticker ${url}`))
+      img.src = url
     })
-    stickerTextures.set(url, p)
-    p.catch(() => stickerTextures.delete(url))
+    stickerImages.set(url, p)
+    p.catch(() => stickerImages.delete(url))
   }
   return p
 }
+
+/** A car sticker: its image and its size as a share of the spot (1 = fitted to it). */
+export interface CarSticker { url: string; scale: number }
 
 function loadModel(model: string): Promise<GLTF> {
   let p = models.get(model)
@@ -68,11 +72,11 @@ function loadKey(file: string): Promise<ImageData> {
 }
 
 /**
- * The car in 3D, in the given colours; drag to turn it, scroll or pinch to zoom. `stickers` are image
- * URLs by decal slot (STICKER_SPOTS order); a slot without one is blank, as in game.
+ * The car in 3D, in the given colours; drag to turn it, scroll or pinch to zoom. `stickers` are by
+ * decal slot (stickerSpots order); a slot without one is blank, as in game.
  */
 export default function LiveryCar3D({ model, texture, colours, stickers = [], className }: {
-  model: string; texture: string; colours: TeamColours; stickers?: (string | null | undefined)[]; className?: string
+  model: string; texture: string; colours: TeamColours; stickers?: (CarSticker | null | undefined)[]; className?: string
 }) {
   const host = useRef<HTMLDivElement>(null)
   const body = useRef<THREE.MeshStandardMaterial | null>(null)
@@ -81,7 +85,7 @@ export default function LiveryCar3D({ model, texture, colours, stickers = [], cl
   const map = useRef<THREE.CanvasTexture | null>(null)
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading")
   const colourKey = `${colours.primary}${colours.secondary}${colours.tertiary}${colours.trim}`
-  const stickerKey = Array.from({ length: 6 }, (_, i) => stickers[i] ?? "").join("|")
+  const stickerKey = Array.from({ length: 6 }, (_, i) => (stickers[i] ? `${stickers[i]!.url}@${stickers[i]!.scale}` : "")).join("|")
 
   // Scene, camera and the model: once per model.
   useEffect(() => {
@@ -181,7 +185,7 @@ export default function LiveryCar3D({ model, texture, colours, stickers = [], cl
       renderer.dispose()
       body.current?.dispose()
       body.current = null
-      for (const d of decals.current) d.dispose()
+      for (const d of decals.current) { d.map?.dispose(); d.dispose() }
       decals.current = []
       map.current?.dispose()
       map.current = null
@@ -217,20 +221,34 @@ export default function LiveryCar3D({ model, texture, colours, stickers = [], cl
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [texture, colourKey, state])
 
-  // Stickers on their decal slots.
+  // Stickers on their decal slots, shrunk around the centre like the league game patch does.
   useEffect(() => {
     let live = true
     decals.current.forEach((mat, slot) => {
-      const url = stickers[slot]
-      if (!url) {
+      const sticker = stickers[slot]
+      if (!sticker) {
         mat.visible = false
-        mat.map = null
-        mat.needsUpdate = true
         return
       }
-      loadSticker(url).then((tex) => {
+      loadSticker(sticker.url).then((img) => {
         if (!live) return
-        mat.map = tex
+        let tex = mat.map as THREE.CanvasTexture | null
+        if (!tex) {
+          const c = document.createElement("canvas")
+          c.width = DECAL_W
+          c.height = DECAL_H
+          tex = new THREE.CanvasTexture(c)
+          tex.flipY = false
+          tex.colorSpace = THREE.SRGBColorSpace
+          tex.anisotropy = 4
+          mat.map = tex
+        }
+        const c = tex.image as HTMLCanvasElement
+        const ctx = c.getContext("2d")!
+        const w = DECAL_W * sticker.scale, h = DECAL_H * sticker.scale
+        ctx.clearRect(0, 0, DECAL_W, DECAL_H)
+        ctx.drawImage(img, (DECAL_W - w) / 2, (DECAL_H - h) / 2, w, h)
+        tex.needsUpdate = true
         mat.visible = true
         mat.needsUpdate = true
       }, () => {})

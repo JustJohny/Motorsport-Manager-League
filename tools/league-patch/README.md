@@ -19,7 +19,8 @@ edits saves or mod files.
   side pods, end plates, air intake) is a member team's sticker on that decal spot. A team with a folder
   shows only its stickers (MM's sponsor deals still pay); teams without one keep MM's decals. Applied after
   `FrontendCar.SetSponsorTexture` (menus and car screens) and `UnityVehicle.OnStart` (cars on track, whose
-  `SponsorXX` materials MM never sets). `mmsave stickers` writes the folder from the site.
+  `SponsorXX` materials MM never sets). `<slot>.scale` beside a sticker (e.g. `0.5`) shrinks it around
+  its centre. `mmsave stickers` writes the folder from the site.
 
 - **Team names:** FF20 resets every team's name, short name and nationality from `Databases/Teams.txt`
   on each load (`TeamManager.ValidateTeamData`), which undoes a league's renames. Hooks at both ends of

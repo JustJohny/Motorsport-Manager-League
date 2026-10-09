@@ -10,10 +10,11 @@ export interface StickerRow {
   status: "pending" | "approved" | "rejected" | "withdrawn" | "replaced" | "removed"
   note: string | null
   created_at: string
+  /** Share of the spot, 0.25..1 (migration 027; missing before it). */
+  scale?: number
 }
 
-/** MM's six decal spots, in SponsorSlot order (src/stickers.ts). */
-export const STICKER_SPOTS = ["Rear wing", "Front wing", "Nose", "Side pods", "End plates", "Air intake"] as const
+export { STICKER_SCALE, stickerSpots, type StickerSpot } from "../../../src/sticker-spots.ts"
 /** MM's car decals are 2:1 (FF20's are 2048 x 1024); uploads are padded to this. */
 const W = 1024, H = 512
 const MAX_BYTES = 2 * 1024 * 1024
@@ -101,6 +102,11 @@ export function useStickers(team: string | null, me: string) {
     remove: async (slot: number) => {
       if (demoMode) return demo((rs) => rs.filter((r) => !(r.team === me && r.slot === slot && r.status === "approved")))
       await check(supabase!.rpc("remove_sticker", { slot }))
+      await reload()
+    },
+    setScale: async (id: number, scale: number) => {
+      if (demoMode) return demo((rs) => rs.map((r) => (r.id === id ? { ...r, scale } : r)))
+      await check(supabase!.rpc("set_sticker_scale", { sticker_id: id, scale }))
       await reload()
     },
     review: async (id: number, approve: boolean, note?: string) => {

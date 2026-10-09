@@ -67,7 +67,7 @@ function LookEditor({ team, own, editable, isPlayer, liveries, initialColours, i
   const stickers = Array.from({ length: 6 }, (_, slot) => {
     const row = (own ? stickerRows.find((r) => r.slot === slot && r.status === "pending") : undefined)
       ?? stickerRows.find((r) => r.slot === slot && r.status === "approved")
-    return row ? stickerUrl(row.path) : null
+    return row ? { url: stickerUrl(row.path), scale: row.scale ?? 1 } : null
   })
   const tl = useTeamLook()
   const [colours, setColours] = useState(initialColours)

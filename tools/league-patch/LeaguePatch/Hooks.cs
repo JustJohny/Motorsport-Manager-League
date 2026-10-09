@@ -121,16 +121,47 @@ namespace LeaguePatch
         {
             string file = Path.Combine(StickerDir(teamID), slot + ".png");
             if (!File.Exists(file)) return null;
-            string key = file + "|" + File.GetLastWriteTimeUtc(file).Ticks;
+            float scale = StickerScale(Path.Combine(StickerDir(teamID), slot + ".scale"));
+            string key = file + "|" + File.GetLastWriteTimeUtc(file).Ticks + "|" + scale;
             Texture2D tex;
             if (!sStickers.TryGetValue(key, out tex))
             {
                 tex = new Texture2D(2, 2, TextureFormat.ARGB32, true);
                 tex.LoadImage(File.ReadAllBytes(file));
+                if (scale < 0.999f) tex = Shrunk(tex, scale);
                 tex.name = "LeagueSticker_" + teamID + "_" + slot;
                 sStickers[key] = tex;
             }
             return tex;
+        }
+
+        /// <summary>"&lt;slot&gt;.scale" beside a sticker: its size as a share of the spot (0.25..1), 1 without one.</summary>
+        private static float StickerScale(string file)
+        {
+            float scale;
+            if (!File.Exists(file) || !float.TryParse(File.ReadAllText(file).Trim(), System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out scale)) return 1f;
+            return Mathf.Clamp(scale, 0.25f, 1f);
+        }
+
+        /// <summary>The sticker shrunk around its centre on a transparent decal of the same size.</summary>
+        private static Texture2D Shrunk(Texture2D src, float scale)
+        {
+            int w = src.width, h = src.height;
+            int sw = Mathf.Max(1, Mathf.RoundToInt(w * scale)), sh = Mathf.Max(1, Mathf.RoundToInt(h * scale));
+            int x0 = (w - sw) / 2, y0 = (h - sh) / 2;
+            Color32[] pixels = new Color32[w * h];
+            for (int y = 0; y < sh; y++)
+            {
+                for (int x = 0; x < sw; x++)
+                    pixels[(y0 + y) * w + x0 + x] = src.GetPixelBilinear((x + 0.5f) / sw, (y + 0.5f) / sh);
+            }
+            Texture2D dst = new Texture2D(w, h, TextureFormat.ARGB32, true);
+            dst.wrapMode = TextureWrapMode.Clamp;
+            dst.SetPixels32(pixels);
+            dst.Apply(true);
+            UnityEngine.Object.Destroy(src);
+            return dst;
         }
 
         private static void LogStickers(int teamID, string where)

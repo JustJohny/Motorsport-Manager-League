@@ -50,6 +50,14 @@ describe.skipIf(!existsSync(SAVE))("database: car stickers", () => {
     const all = (await t.service<{ team: string; team_id: number; slot: number | null; sponsor_name: string | null }>("select * from public.all_team_stickers() order by team, slot")).rows;
     expect(all.find((r) => r.team === ALICE)).toMatchObject({ team_id: teamIds[ALICE], slot: 3, sponsor_name: "Globex" });
     expect(all.find((r) => r.team === BOB)).toMatchObject({ team_id: teamIds[BOB], slot: null });
+    // Size: the team's own sticker only, 25..100 %, no new approval; the command gets it.
+    expect((await alice().query("select public.set_sticker_scale($1, 0.1)", [id2])).error).toMatch(/25%/);
+    expect((await bob().query("select public.set_sticker_scale($1, 0.5)", [id2])).error).toMatch(/No such sticker/);
+    expect((await alice().query("select public.set_sticker_scale($1, 0.5)", [id])).error).toMatch(/No such sticker/);
+    expect((await alice().query("select public.set_sticker_scale($1, 0.5)", [id2])).error).toBeNull();
+    const scaled = (await t.service<{ team: string; scale: number; status?: string }>("select * from public.all_team_stickers()")).rows;
+    expect(scaled.find((r) => r.team === ALICE)!.scale).toBe(0.5);
+    expect((await bob().query<{ scale: number }>("select scale from team_stickers")).rows).toEqual([{ scale: 0.5 }]);
     expect((await alice().query("select public.remove_sticker(3)")).error).toBeNull();
     expect((await alice().query("select public.remove_sticker(3)")).error).toMatch(/No sticker/);
     expect((await bob().query("select * from team_stickers")).rows).toEqual([]);
