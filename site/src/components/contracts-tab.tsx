@@ -11,6 +11,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useContracts } from "@/lib/contracts"
 import { fmtDate, fmtMoney, fmtMoneyShort } from "@/lib/format"
 import { useLeague } from "@/lib/league"
+import { RenewalWhy } from "@/components/renewal-why"
 import { cn } from "@/lib/utils"
 import type { ContractRenewal, TeamPrivate } from "@/lib/types"
 
@@ -97,9 +98,12 @@ function Renewals({ team, own, isPlayer, contracts, budget }: {
                         <div className="text-xs text-muted-foreground">{r.signOnFee ? `${fmtMoneyShort(r.signOnFee)} sign-on` : "no sign-on fee"} · likes {r.preferredYears} season{r.preferredYears > 1 ? "s" : ""}</div>
                       </TableCell>
                       <TableCell>
-                        {r.refusal
-                          ? <Badge variant="outline" className="gap-1 text-destructive"><UserX className="size-3" /> {r.refusal}</Badge>
-                          : <Badge variant="secondary" className="gap-1"><UserCheck className="size-3" /> Willing</Badge>}
+                        <div className="flex flex-wrap items-center gap-1">
+                          {r.refusal
+                            ? <Badge variant="outline" className="gap-1 text-destructive"><UserX className="size-3" /> {r.refusal}</Badge>
+                            : <Badge variant="secondary" className="gap-1"><UserCheck className="size-3" /> Willing</Badge>}
+                          <RenewalWhy r={r} />
+                        </div>
                         {order && <div className="mt-1 text-xs">Renewing {order.years} season{order.years > 1 ? "s" : ""}, until {fmtDate(order.new_end)}</div>}
                         {applied && !order && <div className="mt-1 text-xs text-muted-foreground">Renewed until {fmtDate(applied.new_end)}; shows after the next publish</div>}
                       </TableCell>

@@ -503,7 +503,7 @@ export interface TeamState {
    * This season's engine supplier on the team's cars. Public, as in MM's team screens. Missing in
    * snapshots published before 2026-10-02.
    */
-  engine?: { name: string; stats: Record<number, number> } | null;
+  engine?: { name: string; stats: Record<number, number>; /** Engine level (missing before 2026-10-09). */ level?: number } | null;
   /** Sponsors on the car, by slot. Public, as rival cars show them in game. Missing before 2026-10-03. */
   sponsors?: SponsorOnCar[];
   /** Colours and livery pattern. Public, as in game. Missing before 2026-10-05. */
@@ -540,6 +540,37 @@ export interface ContractRenewal {
   preferredYears: number;
   /** Why they won't talk (MM's reaction), or null when they will. */
   refusal: string | null;
+  /** How MM reached the answer and what would change it. Missing before 2026-10-09. */
+  why?: RenewalReason;
+}
+
+/** A morale change MM counts in Driver.GetMorale: a personality trait of the driver or a teammate. */
+export interface MoraleTrait {
+  name: string;
+  /** Change to morale, as a fraction (−0.6 = −60 points). */
+  value: number;
+  /** The teammate whose trait it is (a "teammate morale" effect). */
+  via?: string;
+  /** Temporary traits wear off with time (injuries, fights). */
+  temporary: boolean;
+  /** When it applies, if only in some situations ("while the teammate earns more"). */
+  condition?: string;
+  /** Temporary traits: when MM ends it (C# date). */
+  until?: string;
+}
+
+export interface RenewalReason {
+  /** MM's reaction as a key (REFUSALS in src/ops/contracts.ts), null when willing. */
+  key: string | null;
+  /** Drivers: morale as MM counts it for renewals (own morale plus traits), 0..1. */
+  morale?: { base: number; total: number; traits: MoraleTrait[] };
+  /**
+   * MM's "will they talk" score for a renewal (ContractDesiredValuesHelper.CalculateWantsToTalk):
+   * they talk when the total is below `threshold`. Positive parts push them away.
+   */
+  score?: { total: number; threshold: number; parts: { label: string; value: number }[] };
+  /** What would change the answer, as MM computes it. */
+  tips: string[];
 }
 
 /** MM's SponsorSlot.SlotType, in slot order. */

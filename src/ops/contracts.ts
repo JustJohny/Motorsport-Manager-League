@@ -1,7 +1,8 @@
 import { float } from "../codec/sav.ts";
 import { gameScale } from "../game-rules.ts";
 import type { Obj } from "../graph.ts";
-import type { ContractRenewal } from "../league-types.ts";
+import type { ContractRenewal, MoraleTrait, RenewalReason } from "../league-types.ts";
+import { gameTextName } from "../regulations.ts";
 import { JOB, numOrNull, personKind, personName, type Save } from "../model.ts";
 
 /** Save numbers may be wrapped floats. */
@@ -178,13 +179,57 @@ export function abilities(save: Save, p: Obj): { ability: number; abilityPotenti
   return { ability: total / 24, abilityPotential: max / 24, potential: max - total };
 }
 
-/** Driver.GetMorale: own morale plus traits, and teammates' traits that lift or drop it. */
-function morale(save: Save, p: Obj, team: Obj | null): number {
-  let m = n(p.mMorale ?? 0) + traitSum(save, p, "moraleModifier");
+/** Conditions of trait special cases, as the site words them (PersonalityTrait.SpecialCaseType). */
+const CASE_TEXT: Record<number, string> = {
+  20: "while they're fighting with their teammate",
+  27: "while they aren't the number 1 driver",
+  28: "while their mechanic is rated lower than them",
+  29: "while their teammate is rated higher",
+  30: "while their teammate earns more",
+  31: "until the neck injury heals",
+  32: "until the face injury heals",
+};
+/** PersonalityTrait.SpecialCaseType.FightWithTeammate: the only case that reaches a teammate (CanBeAppliedToOtherPerson). */
+const FIGHT_WITH_TEAMMATE = 20;
+
+function traitName(t: Obj): string {
+  return (t.data.nameID && gameTextName(t.data.nameID)) || t.data.mCustomTraitName || "A personality trait";
+}
+
+/**
+ * Driver.GetMorale: own morale plus the driver's applicable traits (PersonalityTraitController
+ * .GetSingleModifierForStat(Morale)), plus every teammate trait that reaches them
+ * (CanBeAppliedToOtherPerson: no special case, or a fight with this driver) with a teammate effect.
+ * MM adds such a trait's morale modifier as well as its teammate modifier, as its code does.
+ */
+export function moraleBreakdown(save: Save, p: Obj, team: Obj | null): { base: number; total: number; traits: MoraleTrait[] } {
+  const base = n(p.mMorale ?? 0);
+  const out: MoraleTrait[] = [];
+  const describe = (t: Obj, value: number, via?: string): MoraleTrait => {
+    const cases = save.g.list<number>(t.data.specialCases ?? []);
+    const condition = cases.map((k) => CASE_TEXT[k]).find(Boolean);
+    return { name: traitName(t), value, temporary: t.data.type === 1, ...(via ? { via } : {}), ...(condition ? { condition } : {}),
+      ...(t.data.type === 1 && t.mTraitEndTime && !String(t.mTraitEndTime).startsWith("0001") ? { until: t.mTraitEndTime } : {}) };
+  };
+  for (const t of activeTraits(save, p)) if (n(t.data.moraleModifier ?? 0)) out.push(describe(t, n(t.data.moraleModifier)));
   if (personKind(p) === "Driver" && team) {
-    for (const d of teamDrivers(save, team)) if (d !== p) m += traitSum(save, d, "teammateModifier");
+    for (const d of teamDrivers(save, team)) {
+      if (d === p) continue;
+      for (const t of traits(save, d)) {
+        const mate = n(t.data.teammateModifier ?? 0);
+        if (!mate) continue;
+        const cases = save.g.list<number>(t.data.specialCases ?? []);
+        const fight = t.specialCaseBehaviour ? save.g.deref<Obj>(t.specialCaseBehaviour)?.mFightTeammateDriver : null;
+        if (cases.length && !(cases.includes(FIGHT_WITH_TEAMMATE) && fight && save.g.deref(fight) === p)) continue;
+        out.push(describe(t, mate + n(t.data.moraleModifier ?? 0), personName(d)));
+      }
+    }
   }
-  return clamp01(m);
+  return { base, total: clamp01(base + out.reduce((a, x) => a + x.value, 0)), traits: out };
+}
+
+function morale(save: Save, p: Obj, team: Obj | null): number {
+  return moraleBreakdown(save, p, team).total;
 }
 
 function slotPeople(save: Save, team: Obj, job: number): Obj[] {
@@ -349,42 +394,113 @@ export function renewalTerms(save: Save, team: Obj, p: Obj): Omit<ContractRenewa
     length = w < -1 ? 3 : w < 2 ? 2 : 1;
   }
 
+  const ans = answer(save, team, p, { ability, stars, years, morale: m, marketability, loyalty, financial, main });
+  const mb = isDriver ? moraleBreakdown(save, p, team) : undefined;
   return {
     guid: p.id, name: personName(p), kind, wage: current, end: c.mEndDate, monthsLeft: monthsRemaining(c.mEndDate, now),
     askingWage: Math.round(asking / 1000) * 1000, signOnFee: Math.round(signOnFee / 1000) * 1000, preferredYears: length,
-    refusal: refusal(save, team, p, { ability, stars, years, morale: m, marketability, loyalty, financial, main }),
+    refusal: ans.key ? REFUSALS[ans.key] : null,
+    why: { key: ans.key, ...(mb ? { morale: mb } : {}), ...(ans.score ? { score: ans.score } : {}), tips: tips(ans, mb, { morale: m, main, ability, stars }, isDriver) },
   };
 }
 
 /** Person.GetInterestedToTalkReaction for a renewal at an AI-run team; null when they'll talk. */
-function refusal(save: Save, team: Obj, p: Obj, x: {
+type RefusalKey = keyof typeof REFUSALS;
+interface Answer { key: RefusalKey | null; score?: RenewalReason["score"]; rival?: string }
+
+/** MM's age table: the bands of EXISTING_DRIVER_AGE as the site words them. */
+const pct = (v: number) => Math.round(v * 100);
+
+/**
+ * Person.GetInterestedToTalkReaction for a renewal, in MM's order, then CalculateWantsToTalk
+ * (RenewDriver / RenewStaff) with its parts.
+ */
+function answer(save: Save, team: Obj, p: Obj, x: {
   ability: number; stars: number; years: number; morale: number; marketability: number; loyalty: number; financial: number; main: boolean;
-}): string | null {
+}): Answer {
   const isDriver = personKind(p) === "Driver";
   const ch = save.championship(team);
-  if (n(p.retirementAge ?? 0) > 0) return REFUSALS.retired;
-  if (isDriver && !p.mJoinsAnySeries && !save.g.list<number>(p.mDriverPreferedSeries ?? []).includes(ch.series)) return REFUSALS.series;
-  if (isDriver && wantsToRetire(save, p, save.now)) return REFUSALS.retiring;
-  if (n(ch.championshipOrder ?? 0) > DESIRED_CHAMPIONSHIP[clamp(Math.floor(x.ability), 0, 5)]) return REFUSALS.higher;
+  if (n(p.retirementAge ?? 0) > 0) return { key: "retired" };
+  if (isDriver && !p.mJoinsAnySeries && !save.g.list<number>(p.mDriverPreferedSeries ?? []).includes(ch.series)) return { key: "series" };
+  if (isDriver && wantsToRetire(save, p, save.now)) return { key: "retiring" };
+  if (n(ch.championshipOrder ?? 0) > DESIRED_CHAMPIONSHIP[clamp(Math.floor(x.ability), 0, 5)]) return { key: "higher" };
   const others = teamDrivers(save, team).filter((d) => d !== p);
   if (isDriver) {
     const rival = rivalOf(save, p);
     const rivalHere = !!rival && others.includes(rival);
-    if (hasSpecialCase(save, p, WILL_NOT_RENEW) && rivalHere) return REFUSALS.wontRenew;
-    if (hasSpecialCase(save, p, WILL_NOT_JOIN_RIVAL) && rivalHere) return REFUSALS.rival;
-    if (others.some((d) => hasSpecialCase(save, d, WILL_NOT_JOIN_RIVAL) && rivalOf(save, d) === p)) return REFUSALS.rival;
-    if (x.morale <= 0.2) return REFUSALS.morale;
+    if (hasSpecialCase(save, p, WILL_NOT_RENEW) && rivalHere) return { key: "wontRenew", rival: personName(rival!) };
+    if (hasSpecialCase(save, p, WILL_NOT_JOIN_RIVAL) && rivalHere) return { key: "rival", rival: personName(rival!) };
+    const hater = others.find((d) => hasSpecialCase(save, d, WILL_NOT_JOIN_RIVAL) && rivalOf(save, d) === p);
+    if (hater) return { key: "rival", rival: personName(hater) };
+    if (x.morale <= 0.2) return { key: "morale" };
   }
   // CalculateWantsToTalk (RenewDriver / RenewStaff). Staff use the drivers' age table, as MM does.
-  if (isDriver) {
-    if (x.years > 44) return REFUSALS.notInterested;
-    const w = lookup(EXISTING_DRIVER_MORALE, Math.round(x.morale * 100)) + lookup(EXISTING_DRIVER_AGE, x.years) + (x.main ? 0 : -3)
-      + Math.floor(x.marketability * 100 * 0.08) - Math.floor(x.loyalty / 8) - Math.floor(x.financial / 8);
-    return w < 3 ? null : REFUSALS.notInterested;
+  const tooOld = isDriver ? x.years > 44 : x.years > 55;
+  const parts = tooOld ? [{ label: `Age ${x.years} (MM's limit is ${isDriver ? 44 : 55})`, value: 10 }]
+    : isDriver ? [
+      { label: `Morale ${pct(x.morale)}`, value: lookup(EXISTING_DRIVER_MORALE, Math.round(x.morale * 100)) },
+      { label: `Age ${x.years}`, value: lookup(EXISTING_DRIVER_AGE, x.years) },
+      { label: x.main ? "Race driver" : "Reserve driver", value: x.main ? 0 : -3 },
+      { label: `Marketability ${pct(x.marketability)}`, value: Math.floor(x.marketability * 100 * 0.08) },
+      { label: `Career manager's loyalty ${x.loyalty.toFixed(1)}`, value: -Math.floor(x.loyalty / 8) || 0 },
+      { label: `Career manager's finances ${x.financial.toFixed(1)}`, value: -Math.floor(x.financial / 8) || 0 },
+    ] : [
+      { label: `Age ${x.years}`, value: lookup(EXISTING_DRIVER_AGE, x.years) },
+      { label: `Their stars ${x.ability.toFixed(1)} against the team's ${x.stars.toFixed(1)}`, value: x.ability - x.stars },
+      { label: `Career manager's loyalty ${x.loyalty.toFixed(1)}`, value: -Math.floor(x.loyalty / 2) || 0 },
+      { label: `Career manager's finances ${x.financial.toFixed(1)}`, value: -Math.floor(x.financial / 2) || 0 },
+    ];
+  const threshold = isDriver ? 3 : 1;
+  const total = parts.reduce((a, b) => a + b.value, 0);
+  return { key: total < threshold ? null : "notInterested", score: { total, threshold, parts } };
+}
+
+const fmtPts = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : "±"}${Math.abs(Math.round(v * 100))}`;
+
+/** What would change MM's answer, in MM's own terms. */
+function tips(a: Answer, morale: RenewalReason["morale"] | undefined, x: { morale: number; main: boolean; ability: number; stars: number }, isDriver: boolean): string[] {
+  const out: string[] = [];
+  const moraleWays = "Morale rises after sessions where they beat the position MM expects of them (at most +20 a weekend, so a win " +
+    "helps little if they were expected near the front), and by +40 when they get a better contract status or are promoted from reserve.";
+  switch (a.key) {
+    case "morale": {
+      out.push(`MM won't even talk while morale is 20 or lower; it's ${pct(x.morale)}.`);
+      for (const t of (morale?.traits ?? []).filter((t) => t.value < 0)) {
+        const src = t.via ? `${t.via}'s ${t.name}` : t.name;
+        if (t.temporary) out.push(`${src} (${fmtPts(t.value)}) is temporary${t.until ? ` and ends on ${t.until.slice(0, 10)}` : ""}.`);
+        else if (t.condition) out.push(`${src} (${fmtPts(t.value)}) only counts ${t.condition}: change that and it goes.`);
+        else out.push(`${src} (${fmtPts(t.value)}) is permanent.`);
+      }
+      out.push(moraleWays);
+      break;
+    }
+    case "notInterested": {
+      const sc = a.score!;
+      const need = sc.total - (sc.threshold - 1);
+      out.push(`MM's score is ${sc.total.toFixed(1)}; they talk below ${sc.threshold}, so it has to drop by ${need.toFixed(1)}.`);
+      if (isDriver && sc.parts[0].label.startsWith("Morale")) {
+        const now = sc.parts[0].value;
+        const band = EXISTING_DRIVER_MORALE.find(([, v]) => now - v >= need);
+        if (band) {
+          const from = EXISTING_DRIVER_MORALE[EXISTING_DRIVER_MORALE.indexOf(band) - 1]?.[0] ?? 0;
+          out.push(`Morale of ${from} or more would be enough (now ${pct(x.morale)}).`);
+        } else out.push("Even top morale wouldn't be enough on its own.");
+        out.push(moraleWays);
+        if (x.main && need <= 3) out.push("As the reserve driver the score would be 3 lower: MM's reserves are keener to stay.");
+      }
+      if (!isDriver) out.push("Each star your team gains takes 1 off: the car, HQ, drivers and staff make up MM's team rating.");
+      out.push("Marketable drivers want to test the market, and the career manager's loyalty and finances (MM uses the organizer's for every team) only help in steps of 8.");
+      break;
+    }
+    case "retiring": out.push("Past their peak and declining, or with their career goals met (wins, titles, wage): MM won't renew them."); break;
+    case "retired": out.push("Retired: they won't race again."); break;
+    case "series": out.push("They only race in other series, so MM won't renew them here."); break;
+    case "higher": out.push(`At ${x.ability.toFixed(1)} stars they want a higher championship.`); break;
+    case "wontRenew": case "rival": out.push(`Changes if ${a.rival ?? "their rival"} leaves the team.`); break;
+    default: break;
   }
-  if (x.years > 55) return REFUSALS.notInterested;
-  const w = lookup(EXISTING_DRIVER_AGE, x.years) + (x.ability - x.stars) - Math.floor(x.loyalty / 2) - Math.floor(x.financial / 2);
-  return w < 1 ? null : REFUSALS.notInterested;
+  if (a.key) out.push("MM's answer is worked out again at every publish.");
+  return out;
 }
 
 /**

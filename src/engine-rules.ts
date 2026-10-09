@@ -3,6 +3,7 @@
 // supplier: engine level (added to engine parts at the season change where engines aren't spec)
 // plus chassis stats. Only type imports: the site bundles this file.
 
+import type { GameRules } from "./league-types.ts";
 import { roll } from "./politics.ts";
 
 export type EngineConcept = "power" | "efficient" | "balanced";
@@ -26,6 +27,23 @@ export const ENGINE_SETTINGS = {
   customerDetune: 0.85,
   finalRoll: 0.05,
 };
+
+/**
+ * What changes with the game. Money is on the same scale in both (ERS 2016 budgets $2–9M, FF20 F1
+ * $1–11M at the start), but the engine level isn't: Rebirth's 2016 F1 engines are level 34–53 on
+ * engine parts worth 5, so the level is nearly the whole engine; FF20's F1 engines are level 15–128
+ * (A engines 40–150, B engines 0–35) on parts worth 626–1000. A new FF20 programme starts at the
+ * bottom of the A engines, above every B engine. Engineer stats go up to 20 (FF20 25).
+ */
+export const ENGINE_GAME: Record<GameRules, { newLevel: number; engineerStatMax: number }> = {
+  rebirth: { newLevel: ENGINE_SETTINGS.newEngine.level, engineerStatMax: 20 },
+  ff20: { newLevel: 40, engineerStatMax: 25 },
+};
+
+/** A new programme's engine in this game (absent game = Rebirth, as older snapshots). */
+export function newEngine(game: GameRules = "rebirth"): EngineStats {
+  return { ...ENGINE_SETTINGS.newEngine, level: ENGINE_GAME[game].newLevel };
+}
 
 export const CONCEPTS: Record<EngineConcept, { name: string; description: string; levelPerPoint: number; statPerPoint: number; statCap: number }> = {
   power: { name: "High-revving power unit", description: "Lots of engine level per point; fuel and improvability barely move.", levelPerPoint: 6, statPerPoint: 0.5, statCap: 5 },
@@ -85,9 +103,10 @@ export function developEngine(start: EngineStats, plan: SeasonPlan): EngineStats
   };
 }
 
-/** Chance a project succeeds: base + up to 15 % from the lead engineer (stat 0..20) and 2.5 % per Design Centre level. */
-export function projectChance(p: ResearchProject, engineerSkill: number, designCentreLevel: number): number {
-  return Math.min(0.95, p.chance + Math.min(1, Math.max(0, engineerSkill) / 20) * 0.15 + 0.025 * Math.max(0, designCentreLevel));
+/** Chance a project succeeds: base + up to 15 % from the lead engineer (stat 0..20, FF20 0..25) and 2.5 % per Design Centre level. */
+export function projectChance(p: ResearchProject, engineerSkill: number, designCentreLevel: number, game: GameRules = "rebirth"): number {
+  const max = ENGINE_GAME[game].engineerStatMax;
+  return Math.min(0.95, p.chance + Math.min(1, Math.max(0, engineerSkill) / max) * 0.15 + 0.025 * Math.max(0, designCentreLevel));
 }
 
 const add = (a: EngineStats, b: Partial<EngineStats>): EngineStats => ({
@@ -99,14 +118,14 @@ const add = (a: EngineStats, b: Partial<EngineStats>): EngineStats => ({
  * checked), then a small roll on the result. Returns the legal engine (customers, and the works
  * team after a bust) and the works engine (with illegal gains).
  */
-export function buildEngine(start: EngineStats, plan: SeasonPlan, engineerSkill: number, designCentreLevel: number, seed: (string | number)[]) {
+export function buildEngine(start: EngineStats, plan: SeasonPlan, engineerSkill: number, designCentreLevel: number, seed: (string | number)[], game: GameRules = "rebirth") {
   let legal = developEngine(start, plan);
   let works = legal;
   const outcomes: { project: string; success: boolean }[] = [];
   for (const id of plan.projects) {
     const p = PROJECTS.find((x) => x.id === id);
     if (!p) continue;
-    const success = roll(...seed, id) < projectChance(p, engineerSkill, designCentreLevel);
+    const success = roll(...seed, id) < projectChance(p, engineerSkill, designCentreLevel, game);
     outcomes.push({ project: id, success });
     const effect = success ? p.success : p.failure;
     works = add(works, effect);
@@ -120,9 +139,9 @@ export function buildEngine(start: EngineStats, plan: SeasonPlan, engineerSkill:
 }
 
 /** Next season's starting point: a share of this season's legal engine. */
-export function carryOver(legal: EngineStats, s = ENGINE_SETTINGS): EngineStats {
+export function carryOver(legal: EngineStats, s = ENGINE_SETTINGS, game: GameRules = "rebirth"): EngineStats {
   return {
-    level: Math.max(s.newEngine.level, Math.round(legal.level * s.carryOver)),
+    level: Math.max(ENGINE_GAME[game].newLevel, Math.round(legal.level * s.carryOver)),
     fuel: legal.fuel * s.carryOver, improvability: legal.improvability * s.carryOver, tyreWear: legal.tyreWear * s.carryOver,
   };
 }

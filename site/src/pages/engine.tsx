@@ -1,7 +1,7 @@
 import { ChevronsUp, Coins, Factory, Fan, FlaskConical, Fuel, Gauge, Loader2, Lock, Plus, ShoppingCart, Siren, Store, Wrench } from "lucide-react"
 import { useCallback, useEffect, useState, type ReactNode } from "react"
 import {
-  carryOver, CONCEPTS, developEngine, ENGINE_SETTINGS, illegalDetection, pointsCost, projectChance, PROJECTS,
+  carryOver, CONCEPTS, developEngine, ENGINE_SETTINGS, illegalDetection, newEngine, pointsCost, projectChance, PROJECTS,
   type EngineArea, type EngineConcept, type EngineStats,
 } from "../../../src/engine-rules.ts"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -76,6 +76,33 @@ function EngineStatsView({ e, label }: { e: EngineStats; label: string }) {
   )
 }
 
+/**
+ * MM's engines in this championship with their engine level, the yardstick for a programme's own:
+ * the level is what MM adds to the engine parts when next year's car is built.
+ */
+function FieldEngines({ level }: { level: number }) {
+  const { league } = useLeague()
+  const engines = new Map<string, number>()
+  for (const t of league.snapshot.teams) if (t.engine?.level != null) engines.set(t.engine.name, t.engine.level)
+  if (!engines.size) return null
+  const rows = [...engines].sort((a, b) => b[1] - a[1])
+  return (
+    <div className="flex flex-col gap-1.5">
+      <span className="text-xs font-medium text-muted-foreground">Against MM's engines in this championship (engine level, added to the engine parts)</span>
+      <div className="flex flex-wrap gap-2 text-sm tabular-nums">
+        {rows.map(([name, l]) => (
+          <span key={name} className={cn("rounded-md border px-2 py-1", level >= l ? "border-emerald-500/50 text-emerald-500" : "text-muted-foreground")}>
+            {name} {l}
+          </span>
+        ))}
+      </div>
+      <span className="text-xs text-muted-foreground">
+        Your projected level {level.toFixed(0)} {rows.every(([, l]) => level >= l) ? "beats every one of them" : `beats ${rows.filter(([, l]) => level >= l).length} of ${rows.length}`}.
+      </span>
+    </div>
+  )
+}
+
 export function EnginePage() {
   const { me, league } = useLeague()
   const d = useEngineData()
@@ -142,7 +169,8 @@ function Programme({ me, programme, plan, builds, customers, season, busy, run }
 }) {
   const { league } = useLeague()
   const last = builds[0]
-  const start = last ? carryOver(last.legal) : ENGINE_SETTINGS.newEngine
+  const game = league.snapshot.championship.game
+  const start = last ? carryOver(last.legal, undefined, game) : newEngine(game)
   const p: Plan = plan ?? { team: me, season, concept: "balanced", points: { power: 0, fuel: 0, improvability: 0, tyres: 0 }, projects: [] }
   const bought = Object.values(p.points).reduce((a, b) => a + b, 0)
   const projected = developEngine(start, p)
@@ -175,6 +203,7 @@ function Programme({ me, programme, plan, builds, customers, season, busy, run }
             <EngineStatsView e={start} label={last ? "This season's starting point (80 % of last season's engine)" : "A new engine"} />
             <EngineStatsView e={projected} label="After this season's development (before research)" />
           </div>
+          <FieldEngines level={projected.level} />
           <div className="flex flex-col gap-2">
             <span className="text-xs font-medium text-muted-foreground">
               Development points this season: {bought}. Next point costs {fmtMoneyShort(pointsCost(bought, 1))}. More power costs fuel and tyre wear.
@@ -208,7 +237,7 @@ function Programme({ me, programme, plan, builds, customers, season, busy, run }
               <div key={pr.id} className={cn("flex flex-col gap-1.5 rounded-lg border p-3", pr.illegal && "border-destructive/40", running && "bg-primary/5")}>
                 <span className="flex items-center gap-2 text-sm font-medium">{pr.illegal && <Siren className="size-4 text-destructive" />}{pr.name}</span>
                 <span className="text-xs text-muted-foreground">{pr.description}</span>
-                <span className="text-xs">Success ({fmtPct(projectChance(pr, skill, dc))}): {fx(pr.success)} · failure: {fx(pr.failure)}</span>
+                <span className="text-xs">Success ({fmtPct(projectChance(pr, skill, dc, game))}): {fx(pr.success)} · failure: {fx(pr.failure)}</span>
                 {pr.illegal && <span className="text-xs text-destructive">Caught after a race: {fmtPct(illegalDetection(pr, 1))} the first race, +{fmtPct(pr.illegal.growthPerRace)} each race. If caught: back to the legal engine, that race's points lost, and a fine.</span>}
                 <Button size="sm" variant={running ? "secondary" : "outline"} className="self-start" disabled={running || busy != null}
                   onClick={() => void run(pr.id, () => supabase!.rpc("choose_engine_project", { project_id: pr.id }))}>

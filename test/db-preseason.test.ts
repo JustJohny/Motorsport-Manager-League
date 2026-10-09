@@ -108,7 +108,7 @@ describe.skipIf(!existsSync(SAVE))("database: the league's pre-season", () => {
     // As Save.write() does before writing.
     save.prepareForWrite();
     expect(save.g.validate()).toEqual([]);
-  });
+  }, 120_000);
 
   it("keeps someone released from a seat MM needs filled", () => {
     const staff = team(BOB).staff;

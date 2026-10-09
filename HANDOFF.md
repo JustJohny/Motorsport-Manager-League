@@ -1,6 +1,6 @@
 # Handoff: MM League Toolkit
 
-_Last updated 2026-10-09 (league pre-season built: free signings, line-up moves, this season's suppliers, migration 022 run; third-party mods: Enzoli 2016 liveries, sponsor decals, track movies and facepack ported into the staging mod, AI teams' real 2016 looks, Enhanced Graphics checked; promotions: member teams protected, AI teams move; game patch: player team retires at the start, verified in game; team identity: colours, livery and logo on the site, migration 019; pre-season saves checked; sponsors built; pit crews built; auction, HQ orders, part development, organizer race guide and grey-area parts live; regulations, engine programmes and illegal engines designed, not built). Read this first in a new session, then `README.md` and `docs/save-schema.md`._
+_Last updated 2026-10-09 (engine programme calibrated for FF20; renewal refusals explained on the site, teammate-trait morale bug fixed; league pre-season built: free signings, line-up moves, this season's suppliers, migration 022 run; third-party mods: Enzoli 2016 liveries, sponsor decals, track movies and facepack ported into the staging mod, AI teams' real 2016 looks, Enhanced Graphics checked; promotions: member teams protected, AI teams move; game patch: player team retires at the start, verified in game; team identity: colours, livery and logo on the site, migration 019; pre-season saves checked; sponsors built; pit crews built; auction, HQ orders, part development, organizer race guide and grey-area parts live; regulations, engine programmes and illegal engines designed, not built). Read this first in a new session, then `README.md` and `docs/save-schema.md`._
 
 ## The goal
 Run a **Motorsport Manager 1 (v1.53)** online league the way F1 Manager 24 community leagues run:
@@ -526,6 +526,12 @@ A member invests in their own engine programme, becomes an engine supplier, and 
   2. It creates league `Supplier` objects (works and customer spec) and sets them on the owner's and customers' pending `mChassisStats` (stat shift + `mEngineModifier`), refunding the AI's engine payment.
   3. Illegal tech: after each race with a works engine carrying a successful illegal project, roll `illegalDetection` (seeded, public log). If caught: strip the gain (set the legal supplier), remove that race's points (research the standings edit), fine.
 
+**FF20 calibration (2026-10-09, user: "fix it"):**
+- Money stays as is: budgets are on the same scale (ERS 2016 $2–9M, FF20 F1 $1–11M at the career start, one team $57M each), so no migration.
+- The engine level isn't: Rebirth's 2016 F1 engines are level 34–53 on engine parts worth 5; FF20's F1 engines are level 15–128 (A engines 40–150, B engines 0–35) on parts worth 626–1000. `ENGINE_GAME` / `newEngine(game)` in `src/engine-rules.ts`: a new FF20 programme starts at level 40 (Rebirth 10), and `projectChance` reads engineer stats out of 25 on FF20 (20 on Rebirth). `carryOver` never drops below the game's start level.
+- The Engine page benchmarks the projected level against MM's engines in the championship (the extract now publishes `engine.level`).
+- **For the season-change step on FF20:** FF20 has no supplier draw, so every team is offered every supplier of its tier (`supplierOptions`). A league engine supplier must list every non-customer team in `mTeamsThatCannotBuy`, or MM's AI teams will buy it.
+
 **Economics (the user's choices, 2026-10-01):**
 - Founding a programme costs **$30M** (one-off).
 - Development costs **$1M per point, rising within a season** (the 1st point $1M, the 2nd $2M, …; n points cost n(n+1)/2 $M).
@@ -928,6 +934,14 @@ The user downloaded these into ~/Downloads and asked that they work with the too
 
 **To go live:** publish the pre-race save (the extract adds the new fields); open the pre-season on the Organizer page; members act; `pull --mark-applied` + apply; close it.
 **To check in game:** a promoted reserve races in the right car; swapped mechanics show on the right drivers; a pre-season signing's wage and contract end; the engine switch shows in the car's stats (chassis and engine).
+
+## Renewal refusals explained on the site (2026-10-09)
+- The user asked why drivers wouldn't re-sign after winning a race. Checked against MM's code on the 2016 F1 saves: MM's renewal check never counts wins directly. A race moves morale by at most ±0.2 (`UpdateSessionMorale`, against the *expected* position: a win from an expected 3rd is about +0.08), while temporary traits (fights −0.6 each way, injuries, "Losing Hope" −0.3) and promotions/status changes (±0.4) move it far more. Marketability pushes drivers away (+8 % per point), and the career manager's loyalty/finances (used for every team) only help in steps of 8.
+- **Port bug fixed:** teammates' traits reached every teammate. MM (`CanBeAppliedToOtherPerson`) only lets a teammate trait through without special cases, or a fight with *this* driver; such a trait adds its morale modifier as well as its teammate modifier (MM's code does both). Ocon and Massa (2016 R2) were wrongly "Morale too low" because of Hamilton and Rosberg's fight.
+- `ContractRenewal.why` (`RenewalReason`): morale with every trait (name from MM's localisation via `gameTextName`, temporary end date, condition, teammate), MM's score parts against the threshold, and tips (the morale band that would be enough, which traits wear off when). Contracts tab → "Why?" dialog (`site/src/components/renewal-why.tsx`). Checked in demo mode, desktop and 390 px.
+- Seen while checking: `extractLeague` on the 2016 WMC in "SaveLeague Test 10" crashes in `rulesBreaches` (`r.penalties` isn't an array there). Old Rebirth save only; not fixed.
+- Possible league rules if MM's behaviour is unwanted: ignore "Morale too low", count wins or podiums, or a fixed manager loyalty/finance. Not asked for.
+- Note: the pre-season `promoteDriver` op skips MM's ±0.4 morale change for promotion/demotion.
 
 ## Working notes for the assistant
 - The user plays MM under Wine on Linux (CachyOS). They test in game and report back, so give them concrete things to check.

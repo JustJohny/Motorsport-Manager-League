@@ -36,6 +36,11 @@ function loadGameText() {
   return gameText;
 }
 
+/** MM's English text for a localisation ID (e.g. a personality trait's name), if the game is installed. */
+export function gameTextName(id: string): string | null {
+  return loadGameText().names.get(id) ?? null;
+}
+
 const LENGTHS = ["Short", "Medium", "Long"];
 
 /** Fill the placeholders MM fills from a rule's impacts ("Replacing {RuleOldTrack:Name} GP …"). */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildEngine, carryOver, customerEngine, developEngine, ENGINE_SETTINGS, illegalDetection, pointsCost, PROJECTS } from "../src/engine-rules.ts";
+import { buildEngine, carryOver, customerEngine, developEngine, ENGINE_SETTINGS, illegalDetection, newEngine, pointsCost, projectChance, PROJECTS } from "../src/engine-rules.ts";
 
 const plan = (concept: "power" | "efficient" | "balanced", power: number, fuel = 0, projects: string[] = []) =>
   ({ concept, points: { power, fuel, improvability: 0, tyres: 0 }, projects });
@@ -34,5 +34,16 @@ describe("works engine rules", () => {
     const p = PROJECTS.find((x) => x.id === "fuelflow")!;
     expect(illegalDetection(p, 1)).toBeCloseTo(0.04);
     expect(illegalDetection(p, 3)).toBeCloseTo(0.1);
+  });
+
+  it("starts FF20 programmes among MM's A engines and reads FF20's engineer scale", () => {
+    expect(newEngine().level).toBe(10);
+    // FF20 F1: B engines are level 0–35, A engines 40–150.
+    expect(newEngine("ff20").level).toBe(40);
+    expect(carryOver({ level: 30, fuel: 0, improvability: 0, tyreWear: 0 }, undefined, "ff20").level).toBe(40);
+    const p = PROJECTS.find((x) => x.id === "combustion")!;
+    // A 20-rated engineer maxes the bonus on Rebirth's 0..20 scale but not on FF20's 0..25.
+    expect(projectChance(p, 20, 0)).toBeCloseTo(0.55 + 0.15);
+    expect(projectChance(p, 20, 0, "ff20")).toBeCloseTo(0.55 + 0.12);
   });
 });

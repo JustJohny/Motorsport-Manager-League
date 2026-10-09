@@ -90,7 +90,7 @@ export function team(save: Save, t: Obj, champ: Obj, member: string | null): Tea
 
 function engineOf(save: Save, t: Obj): TeamState["engine"] {
   const e = currentSuppliers(save, t).Engine;
-  return e ? { name: e.name, stats: e.stats } : null;
+  return e ? { name: e.name, stats: e.stats, ...(e.level != null ? { level: e.level } : {}) } : null;
 }
 
 export function building(save: Save, b: Obj): Building {
