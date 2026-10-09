@@ -1,7 +1,6 @@
 // League fuel suppliers added to FIRE Fantasy 20 (the user's request, 2026-10-09): Orlen and
-// Slovnaft, with their real logos (out/supplier-logos: Orlen's wordmark from Wikimedia Commons,
-// Slovnaft's shield and wordmark from slovnaft.sk). F1 numbers are the user's pick; other tiers
-// scale them by that tier's median fuel supplier against F1's, as FF20's own fuel rows scale.
+// Slovnaft, with their real logos (assets/supplier-logos: the user's files, 2026-10-09). F1
+// numbers are the user's pick; other tiers scale them by that tier's median fuel supplier against F1's, as FF20's own fuel rows scale.
 // Only type imports: the site may bundle this.
 
 export interface ExtraFuelSupplier {
