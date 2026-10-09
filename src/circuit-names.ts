@@ -22,6 +22,17 @@ export const REAL_CIRCUITS: Record<string, string> = {
   Yokohama: "Suzuka",
 };
 
+/**
+ * Where the real circuit is, when that isn't MM's country: the country key (flag, dialogue
+ * "CurrentCircuitCountry", home-race form) and its name's text ID, as MM's database gives them.
+ */
+export const REAL_COUNTRIES: Record<string, { key: string; countryID: string; name: string }> = {
+  Dubai: { key: "Bahrain", countryID: "PSG_10000895", name: "Bahrain" },
+  Tondela: { key: "Spain", countryID: "PSG_10001048", name: "Spain" },
+  "Cape Town": { key: "Monaco", countryID: "PSG_10000999", name: "Monaco" },
+  Doha: { key: "UnitedArabEmirates", countryID: "PSG_10001068", name: "United Arab Emirates" },
+};
+
 /** The name to show for MM's location name (Singapore is already real). */
 export const circuitName = (location: string): string => REAL_CIRCUITS[location] ?? location;
 

@@ -140,3 +140,20 @@ describe.skipIf(!existsSync(SAVE))("FF20 signing traits (league rule)", () => {
     expect(a).toEqual(b);
   }, 240_000);
 });
+
+describe.skipIf(!existsSync(SAVE))("real circuit countries", () => {
+  it("moves Dubai, Tondela, Cape Town and Doha to their real circuit's country, once", () => {
+    const save = Save.load(SAVE);
+    const log = applyChanges(save, { changes: [{ op: "realCircuitCountries" }] });
+    expect(log.some((l) => l.startsWith("Tondela") && l.endsWith("Spain"))).toBe(true);
+    const r = reload(save);
+    expect(r.g.validate()).toEqual([]);
+    const champ = r.g.list<Obj>(r.data.championshipManager.mEntities).find((c) => c.championshipID === 0)!;
+    const byName = new Map(r.g.list<Obj>(champ.calendar).map((e) => r.g.deref<Obj>(e.circuit)).map((c) => [c.locationName, c]));
+    expect(byName.get("Dubai")).toMatchObject({ mNationalityKey: "Bahrain", countryNameID: "PSG_10000895" });
+    expect(byName.get("Cape Town")!.mNationalityKey).toBe("Monaco");
+    expect(byName.get("Doha")!.mNationalityKey).toBe("UnitedArabEmirates");
+    expect(byName.get("Sydney")!.mNationalityKey).toBe("Australia");
+    expect(applyChanges(r, { changes: [{ op: "realCircuitCountries" }] })).toEqual(["circuit countries already real"]);
+  }, 180_000);
+});

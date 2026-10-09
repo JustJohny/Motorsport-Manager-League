@@ -70,6 +70,9 @@ export async function pullDecisions(env: SupabaseEnv, opts: { force?: boolean; a
   // effect on a save from between season end and pre-season start.
   if (ctx.memberTeams.length) changes.push({ op: "protectTeams", teams: ctx.memberTeams });
 
+  // Real circuit countries (src/circuit-names.ts): does nothing once a save has them.
+  changes.push({ op: "realCircuitCountries" });
+
   // The organizer's equalization: after undoing the AI, before members' own orders.
   const eq = await fetchEqualize(env);
   if (eq.row && eq.snapshot) {
