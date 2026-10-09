@@ -28,7 +28,8 @@ function loadGameText() {
   const file = join(gameDataDir(), "resources.assets");
   if (!existsSync(file)) return gameText;
   const text = readFileSync(file).toString("latin1");
-  for (const m of text.matchAll(/"HUDText","((?:[^"\r\n]|"")*)","(PSG_\d+)"/g)) {
+  // A quoted text may span lines (part components: "{Stat}: +10\nReliability: +10%").
+  for (const m of text.matchAll(/"HUDText","((?:[^"]|"")*)","(PSG_\d+)"/g)) {
     if (m[1] && !gameText.names.has(m[2])) gameText.names.set(m[2], Buffer.from(m[1].replace(/""/g, '"'), "latin1").toString("utf8"));
   }
   for (const m of text.matchAll(/(PSG_\d+),([^,\r\n]*),PSG_\d+,Source = /g)) {

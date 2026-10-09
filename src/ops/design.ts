@@ -8,6 +8,7 @@ import { addDays, delayedEvents, insertByDate } from "./calendar.ts";
 import { findBuilding } from "./hq.ts";
 import { adjustBudget } from "./finance.ts";
 import { fitPart } from "./parts.ts";
+import { gameTextName } from "../regulations.ts";
 
 /** Single-seater part types that can be designed, with the carPartDesign field of their components. */
 const COMPONENT_LISTS: Partial<Record<PartType, string>> = {
@@ -73,7 +74,30 @@ function leadEngineer(save: Save, team: Obj): Obj | null {
   return slot ? save.g.deref(slot.personHired) : null;
 }
 
-export function toDesignComponent(save: Save, c: Obj): DesignComponent {
+/** The stat each part type's "{Stat}" stands for (CarPart.GetStatForPartType; GT and GET types as their base), in MM's English. */
+const STAT_NAMES: Record<string, string> = {
+  Brakes: "Braking", Engine: "Top Speed", FrontWing: "Low Speed Corners",
+  Gearbox: "Acceleration", RearWing: "High Speed Corners", Suspension: "Medium Speed Corners",
+};
+
+/**
+ * MM's text for a component (CarPartComponent.GetName): its custom name if it has one (Rebirth saves
+ * keep the rich text there), else the game's localised text for its name ID (FF20, where the custom
+ * name is "0"). Bold font tags become <b>, which the site renders.
+ */
+function componentText(c: Obj, type: PartType): string {
+  const custom = String(c.mCustomComponentName ?? "");
+  if (custom && custom !== "0") return custom;
+  const text = c.mNameID ? gameTextName(String(c.mNameID)) : null;
+  if (!text) return "";
+  return text
+    .replace(/<font="[^"]*Bold[^"]*">(.*?)<\/font>/g, "<b>$1</b>")
+    .replace(/<(?!\/?b>)[^>]*>/g, "")
+    .replace(/\{Stat\}/g, STAT_NAMES[type.replace(/GE?T$/, "")] ?? "Performance")
+    .replace(/\{ComponentCost\}/g, `$${Math.trunc(num(c.cost)).toLocaleString("en-US")}`);
+}
+
+export function toDesignComponent(save: Save, c: Obj, type: PartType): DesignComponent {
   return {
     id: c.id,
     level: c.level,
@@ -86,7 +110,7 @@ export function toDesignComponent(save: Save, c: Obj): DesignComponent {
     days: num(c.productionTime),
     risk: num(c.riskLevel),
     bonuses: (c.mBonuses ?? []).map((b: Json) => save.g.deref<Obj>(b)).map((b: Obj) => ({ type: b.$type ?? "", value: num(b.bonusValue ?? 0) })),
-    summary: String(c.mCustomComponentName ?? ""),
+    summary: componentText(c, type),
   };
 }
 
@@ -138,8 +162,8 @@ export function designOptions(save: Save, team: Obj, type: PartType): DesignOpti
       // a Great component needs the level-3 facility like every other Great one.
       const open = levelOpen(i) && levelOpen(obj.level - 1)
         && !(obj.unlockRequirements ?? []).some((r: Json) => isLocked(save, team, r));
-      if (open) available.push({ component: toDesignComponent(save, obj), obj });
-      else lockedComponents.push(toDesignComponent(save, obj));
+      if (open) available.push({ component: toDesignComponent(save, obj, type), obj });
+      else lockedComponents.push(toDesignComponent(save, obj, type));
     }
   }
 

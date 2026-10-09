@@ -47,6 +47,14 @@ describe.skipIf(!existsSync(SAVE))("FIRE Fantasy 20 save", () => {
     expect(ai.gameCost).toBeLessThan(player.cost);
   });
 
+  it("describes components with the game's texts, {Stat} as the part's stat", () => {
+    const design = teamDesign(save, save.team("Williams Grand Prix"));
+    const comps = Object.values(design.types).flatMap((t) => t!.components);
+    // FF20 components have no custom name ("0"); their text is the localised name ID.
+    expect(comps.filter((c) => !c.summary || c.summary === "0" || /[{}]|<font/.test(c.summary))).toEqual([]);
+    expect(design.types.Brakes!.components.some((c) => c.summary.includes("<b>Braking:</b>"))).toBe(true);
+  });
+
   it("uses FF20's scale: car fund per race, drivers' ability / 41.4 with stats up to 25", () => {
     const team = save.team("Williams Grand Prix");
     const inv = carInvestment(save, team);

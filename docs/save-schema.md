@@ -130,6 +130,8 @@ Decompile a class to C# with `dotnet tool install --tool-path <dir> ilspycmd`, t
   - With parts in only one list, MM moves all mechanics to it (`UpdateMechanicsDistribution`).
 - The AI (`TeamAIController` ~734–804) refills both lists and the split by itself, and `FitPartsOnCars()` refits after every part it builds.
 
+- **Component texts (FF20):** `CarPartComponent.GetName` returns `mCustomComponentName` unless it's empty or "0", else `Localisation.LocaliseID(mNameID)` with `{Stat}` = the part's stat (`CarPart.GetStatForPartType`: Brakes Braking, Engine Top Speed, Front wing Low Speed Corners, Gearbox Acceleration, Rear wing High Speed Corners, Suspension Medium Speed Corners) and `{ComponentCost}` = the cost as money. Rebirth saves keep the rich text in `mCustomComponentName`; FF20's is "0". The texts are multi-line `HUDText` rows in `resources.assets`, with `<font="CooperHewitt-Bold">` for bold.
+
 ## Post-race scrutineering (`PenaltyDirector.ScrutinizePartRules`, checked with a Cecil IL dump 2026-10-08)
 Each fitted part with `rulesRisk > 0` is caught when `Random(0..99) < (risk + investor partRiskBonus) x scrutineeringChance`. The team's `rulesBrokenThisSeason` goes up by one and the race result gets a `PenaltyPartRulesBroken{mPart, mPenaltyCashAmount, mPlacesLost}`.
 - **Rebirth:** chance x5, the car drops 2 x offences places, fine $100K x offences.

@@ -1000,6 +1000,9 @@ The user downloaded these into ~/Downloads and asked that they work with the too
 - **Faces:** `mmsave renamed-faces <save> --game <MM_Data> --python ~/.mm-venv/bin/python [--dry-run]` (`src/renamed-faces.ts`, `tools/hide-portraits.py`) compares each portrait type's people with their database row and renames those people's textures in `Modding/Images/portraits` to `Hidden_<name>`, so MM draws their faces (from the save's look). Rebuilt from `portraits.orig` each run; the bundle serves every career, so it follows the save it was run on. Run on the user's game for PreS: `TeamPrincipal_5`, `_6`, `_8`. **To check in game:** those three show MM's drawn faces; other principals keep FF20's photos.
 - Rename people in a save with care: their mod photo goes with the index, not the name. Run `renamed-faces` after any rename.
 
+## Part components showed "0" on FF20 (2026-10-09)
+- **The user's report:** every component in the parts tab's "Design new parts" showed "0" and no effect. FF20 components keep "0" as their custom name, and the game's text reader skipped multi-line texts. `toDesignComponent` now uses the game's text for `mNameID` (`{Stat}` and `{ComponentCost}` filled, bold font tags as `<b>`); `loadGameText` reads multi-line `HUDText` rows. All 1350 F1 components in "PreS" have a text. Test in `test/ff20.test.ts`. **Live needs a publish** (the texts are in the snapshot, read from the organizer's game install).
+
 ## Working notes for the assistant
 - The user plays MM under Wine on Linux (CachyOS). They test in game and report back, so give them concrete things to check.
 - Never overwrite the user's own saves. Write new `SaveLeague Test N.sav` files.
