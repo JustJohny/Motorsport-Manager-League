@@ -916,6 +916,8 @@ The user downloaded these into ~/Downloads and asked that they work with the too
   - The upload failed on "bad record mac" TLS errors (about 1 in 50 requests, more for the 3 MB `.glb`). Storage requests now retry 6 times, and `mmsave liveries` uploads every file it can before naming the failed ones, so running it again is enough.
 
 ## League pre-season (built 2026-10-09; migration 022 run by the user the same day; needs a publish and an in-game check)
+- **Opening it failed on the live site (2026-10-09):** "UPDATE requires a WHERE clause": Supabase's safeupdate refuses `set_preseason`'s UPDATE without WHERE (PGlite in the tests doesn't). Fixed in migration `026_preseason_where.sql` (**the user must run it**). `test/db-safeupdate.test.ts` now checks every function's UPDATE/DELETE for a WHERE.
+
 **The user's rules (2026-10-09):** on a save a few days before round 1 the organizer opens a pre-season on the site (Organizer page switch, not automatic). While open:
 - **Free-agent signings, instant:** first come wins (no auction), no sign-on fee, at the market's opening wage (`min_wage`), 1..`max_contract_years` seasons. Free agents only (no AI or member staff). The replaced person becomes a free agent. Only free agents of the latest publish can be signed: people released now reach the market at the next publish.
 - **Own-team moves:** promote the reserve (to car 1 or 2), swap the drivers' cars, swap the mechanics, release anyone.
