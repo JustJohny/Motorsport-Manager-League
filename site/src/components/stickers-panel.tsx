@@ -8,11 +8,20 @@ import { Input } from "@/components/ui/input"
 import { useLeague } from "@/lib/league"
 import { STICKER_SCALE, stickerSpots, stickerUrl, useStickers, type StickerRow, type StickerSpot } from "@/lib/stickers"
 
+// A checkerboard from two linear gradients: a repeating conic gradient garbled the page on some
+// Android GPUs (Brave on a phone, 2026-10-09).
+const CHECKER = {
+  backgroundImage: "linear-gradient(45deg, var(--muted) 25%, transparent 25%, transparent 75%, var(--muted) 75%),"
+    + " linear-gradient(45deg, var(--muted) 25%, transparent 25%, transparent 75%, var(--muted) 75%)",
+  backgroundSize: "16px 16px",
+  backgroundPosition: "0 0, 8px 8px",
+}
+
 /** A sticker image in MM's 2:1 decal shape at its size, on a checkerboard so transparency shows. */
 function Decal({ row, scale }: { row?: StickerRow; scale?: number }) {
   const size = `${(scale ?? row?.scale ?? 1) * 100}%`
   return (
-    <div className="flex aspect-[2/1] w-full items-center justify-center overflow-hidden rounded-md border bg-[repeating-conic-gradient(var(--muted)_0_25%,transparent_0_50%)] bg-[length:16px_16px]">
+    <div className="flex aspect-[2/1] w-full items-center justify-center overflow-hidden rounded-md border" style={CHECKER}>
       {row ? <img src={stickerUrl(row.path)} alt={row.sponsor_name} className="object-contain" style={{ width: size, height: size }} /> : <span className="text-xs text-muted-foreground">Blank</span>}
     </div>
   )
