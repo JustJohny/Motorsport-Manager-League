@@ -15,6 +15,12 @@ edits saves or mod files.
   language, `~Guildford=Silverstone` renames a whole word or phrase in every text.
   `tools/enzoli-port.py` writes both files from Enzoli's 2016 mod.
 
+- **Car stickers:** `MM_Data/league-stickers/<teamID>/<slot>.png` (slot 0-5: rear wing, front wing, nose,
+  side pods, end plates, air intake) is a member team's sticker on that decal spot. A team with a folder
+  shows only its stickers (MM's sponsor deals still pay); teams without one keep MM's decals. Applied after
+  `FrontendCar.SetSponsorTexture` (menus and car screens) and `UnityVehicle.OnStart` (cars on track, whose
+  `SponsorXX` materials MM never sets). `mmsave stickers` writes the folder from the site.
+
 **Why that way:** in MM, yellow flags, safety cars and VSCs come only from crashes and spins
 (`CrashDirector.OnCrashIncident`, `AISpinBehaviour`). A retirement for parts (`AIRetiredBehaviour`,
 reason `Parts`) sets no flag, and a car that's out of the race is never picked for a crash. A save

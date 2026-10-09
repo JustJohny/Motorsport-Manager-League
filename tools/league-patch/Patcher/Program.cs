@@ -68,6 +68,8 @@ var targets = new (string Type, string Method, int Params, int Arg, string Hook)
     ("SessionManager", "StartSession", 0, 0, HookMethod),
     ("AtlasManager", "UpdateAtlasesWithMods", 0, 0, "OnAtlasesUpdated"),
     ("LocalisationReader", "LoadFromFile", 3, 1, "OnTextLoaded"),
+    ("FrontendCar", "SetSponsorTexture", 2, 0, "OnFrontendCarSponsors"),
+    ("UnityVehicle", "OnStart", 1, 0, "OnRaceCarStart"),
 };
 
 using (var asm = AssemblyDefinition.ReadAssembly(orig, new ReaderParameters { AssemblyResolver = resolver }))

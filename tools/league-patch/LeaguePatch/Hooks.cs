@@ -9,8 +9,9 @@ namespace LeaguePatch
 {
     /// <summary>
     /// Called by the patched game: at the end of SessionManager.StartSession (a session goes green),
-    /// AtlasManager.UpdateAtlasesWithMods (UI sprites (re)built) and LocalisationReader.LoadFromFile
-    /// (a text table loaded).
+    /// AtlasManager.UpdateAtlasesWithMods (UI sprites (re)built), LocalisationReader.LoadFromFile
+    /// (a text table loaded), FrontendCar.SetSponsorTexture (a car's sponsor decals set) and
+    /// UnityVehicle.OnStart (a car put on track).
     /// </summary>
     public static class Hooks
     {
@@ -92,6 +93,106 @@ namespace LeaguePatch
                     }
                 }
                 Debug.Log("LeaguePatch: " + replaced + " UI sprites from " + SpritesFolder);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("LeaguePatch: " + e);
+            }
+        }
+
+        // MM_Data/league-stickers/<teamID>/<slot>.png, slot 0-5 in MM's SponsorSlot order (rear wing,
+        // front wing, nose, side pods, end plates, air intake): a member team's stickers. A team with a
+        // folder shows its stickers, and nothing on spots without one: its MM sponsors still pay but
+        // don't show. Teams without a folder keep MM's decals.
+        private const string StickersFolder = "league-stickers";
+        private static readonly Dictionary<string, Texture2D> sStickers = new Dictionary<string, Texture2D>();
+        private static readonly HashSet<int> sStickerTeamsLogged = new HashSet<int>();
+        private static readonly Regex sSponsorMaterial = new Regex(@"^Sponsor\s*(\d\d)", RegexOptions.IgnoreCase);
+        private const BindingFlags Private = BindingFlags.NonPublic | BindingFlags.Instance;
+
+        private static string StickerDir(int teamID)
+        {
+            return Path.Combine(Path.Combine(Application.dataPath, StickersFolder), teamID.ToString());
+        }
+
+        /// <summary>The team's sticker for a slot, or null for a blank spot (cached until the file changes).</summary>
+        private static Texture2D Sticker(int teamID, int slot)
+        {
+            string file = Path.Combine(StickerDir(teamID), slot + ".png");
+            if (!File.Exists(file)) return null;
+            string key = file + "|" + File.GetLastWriteTimeUtc(file).Ticks;
+            Texture2D tex;
+            if (!sStickers.TryGetValue(key, out tex))
+            {
+                tex = new Texture2D(2, 2, TextureFormat.ARGB32, true);
+                tex.LoadImage(File.ReadAllBytes(file));
+                tex.name = "LeagueSticker_" + teamID + "_" + slot;
+                sStickers[key] = tex;
+            }
+            return tex;
+        }
+
+        private static void LogStickers(int teamID, string where)
+        {
+            if (sStickerTeamsLogged.Add(teamID)) Debug.Log("LeaguePatch: stickers for team " + teamID + " (" + where + ")");
+        }
+
+        /// <summary>
+        /// After FrontendCar.SetSponsorTexture (menus, car screens, team screens): every sponsor spot of a
+        /// member team's car gets its sticker, or none.
+        /// </summary>
+        public static void OnFrontendCarSponsors(FrontendCar car)
+        {
+            try
+            {
+                int team = (int)typeof(FrontendCar).GetField("mTeamID", Private).GetValue(car);
+                if (team < 0 || !Directory.Exists(StickerDir(team))) return;
+                foreach (string field in new[] { "chassisSponsorMaterials", "frontWingSponsorMaterials", "rearWingSponsorMaterials" })
+                {
+                    Material[] materials = (Material[])typeof(FrontendCar).GetField(field, Private).GetValue(car);
+                    for (int i = 0; i < materials.Length; i++)
+                    {
+                        if (materials[i] != null) materials[i].SetTexture("_MainTex", Sticker(team, i));
+                    }
+                }
+                LogStickers(team, "car");
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("LeaguePatch: " + e);
+            }
+        }
+
+        /// <summary>
+        /// After UnityVehicle.OnStart (a car on track): its "SponsorXX" materials, which MM never sets
+        /// for race cars, get the team's stickers (slot XX - 1, as FrontendCar maps them), or none.
+        /// </summary>
+        public static void OnRaceCarStart(UnityVehicle car)
+        {
+            try
+            {
+                RacingVehicle vehicle = typeof(UnityVehicle).GetField("mVehicle", Private).GetValue(car) as RacingVehicle;
+                Team team = vehicle == null || vehicle.driver == null ? null : vehicle.driver.contract.GetTeam();
+                if (team == null || !Directory.Exists(StickerDir(team.teamID))) return;
+                foreach (Renderer renderer in car.GetComponentsInChildren<Renderer>(true))
+                {
+                    Material[] materials = renderer.sharedMaterials;
+                    bool changed = false;
+                    for (int i = 0; i < materials.Length; i++)
+                    {
+                        if (materials[i] == null) continue;
+                        Match m = sSponsorMaterial.Match(materials[i].name);
+                        if (!m.Success) continue;
+                        int slot = int.Parse(m.Groups[1].Value) - 1;
+                        if (slot < 0 || slot > 5) continue;
+                        // Its own copy: the model's materials are shared by every car on track.
+                        materials[i] = new Material(materials[i]);
+                        materials[i].SetTexture("_MainTex", Sticker(team.teamID, slot));
+                        changed = true;
+                    }
+                    if (changed) renderer.sharedMaterials = materials;
+                }
+                LogStickers(team.teamID, "race");
             }
             catch (Exception e)
             {

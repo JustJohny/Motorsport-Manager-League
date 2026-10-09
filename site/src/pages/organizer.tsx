@@ -9,6 +9,7 @@ import { WindowControls } from "@/components/window-controls"
 import { PreseasonControls } from "@/components/preseason-controls"
 import { EqualizeCard } from "@/components/equalize-card"
 import { LogoReviewCard } from "@/components/logo-review-card"
+import { StickerReviewCard } from "@/components/stickers-panel"
 import { fmtDate } from "@/lib/format"
 import { useLeague } from "@/lib/league"
 
@@ -52,6 +53,7 @@ export function OrganizerPage() {
       </div>
       <EqualizeCard />
       <LogoReviewCard />
+      <StickerReviewCard />
       <SeriesCard />
       <Card size="sm">
         <CardHeader><CardTitle>Members</CardTitle></CardHeader>

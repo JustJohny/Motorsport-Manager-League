@@ -1,6 +1,7 @@
+import { StickersPanel } from "@/components/stickers-panel"
 import {
   BadgeDollarSign, Banknote, Bot, CalendarClock, Check, Coins, Columns2, Fan, Handshake, Hourglass, Loader2, Lock, Megaphone,
-  PanelBottom, PanelTop, Square, Star, TriangleAlert, Trophy, Triangle, Undo2, X, type LucideIcon,
+  PanelBottom, PanelTop, Square, Star, Sticker, TriangleAlert, Trophy, Triangle, Undo2, X, type LucideIcon,
 } from "lucide-react"
 import { useState, type ReactNode } from "react"
 import { SPONSOR_SLOTS } from "../../../src/league-types.ts"
@@ -54,7 +55,7 @@ export function SponsorsTab({ team, priv, own }: { team: string; priv: TeamPriva
   const pub = league.snapshot.teams.find((t) => t.name === team)
   const isPlayer = !!pub?.isPlayerTeam
   if (!pub?.sponsors) return <Alert><AlertDescription>The latest publish has no sponsor data yet; it appears after the organizer publishes again.</AlertDescription></Alert>
-  if (!priv?.sponsorship) return <PublicCar sponsors={pub.sponsors} />
+  if (!priv?.sponsorship) return <div className="flex flex-col gap-4"><StickersPanel team={team} own={false} /><PublicCar sponsors={pub.sponsors} /></div>
   return <TeamSponsors team={team} own={own && !isPlayer} isPlayer={isPlayer} sponsorship={priv.sponsorship} budget={priv.budget ?? 0} />
 }
 
@@ -129,7 +130,8 @@ function TeamSponsors({ team, own, isPlayer, sponsorship, budget }: {
       {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
       <Tabs defaultValue="car">
         <TabsList variant="line">
-          <TabsTrigger value="car"><Handshake /> On the car</TabsTrigger>
+          <TabsTrigger value="car"><Handshake /> Deals</TabsTrigger>
+          <TabsTrigger value="stickers"><Sticker /> Stickers</TabsTrigger>
           <TabsTrigger value="offers"><Megaphone /> Offers <Badge variant="secondary" className="h-4 px-1.5 text-[10px] tabular-nums">{offers.length}</Badge></TabsTrigger>
         </TabsList>
         <TabsContent value="car" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -137,6 +139,7 @@ function TeamSponsors({ team, own, isPlayer, sponsorship, budget }: {
             <SlotCard key={slot} slot={slot} deal={deals.find((d) => d.slot === slot)} offers={offers.filter((o) => o.slot === slot).length} ctx={ctx} />
           ))}
         </TabsContent>
+        <TabsContent value="stickers"><StickersPanel team={team} own={own || isPlayer} /></TabsContent>
         <TabsContent value="offers">
           <OffersTable offers={offers} deals={deals} ctx={ctx} />
         </TabsContent>

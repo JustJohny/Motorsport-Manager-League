@@ -1,6 +1,6 @@
 # Handoff: MM League Toolkit
 
-_Last updated 2026-10-09 (FF20 driver development on the site, needs migration 023 and a publish; engine programme calibrated for FF20; renewal refusals explained on the site, teammate-trait morale bug fixed; league pre-season built: free signings, line-up moves, this season's suppliers, migration 022 run; third-party mods: Enzoli 2016 liveries, sponsor decals, track movies and facepack ported into the staging mod, AI teams' real 2016 looks, Enhanced Graphics checked; promotions: member teams protected, AI teams move; game patch: player team retires at the start, verified in game; team identity: colours, livery and logo on the site, migration 019; pre-season saves checked; sponsors built; pit crews built; auction, HQ orders, part development, organizer race guide and grey-area parts live; regulations, engine programmes and illegal engines designed, not built). Read this first in a new session, then `README.md` and `docs/save-schema.md`._
+_Last updated 2026-10-09 (car stickers built: needs migration 024, the game patch re-applied, `mmsave stickers`; FF20 driver development on the site, needs migration 023 and a publish; engine programme calibrated for FF20; renewal refusals explained on the site, teammate-trait morale bug fixed; league pre-season built: free signings, line-up moves, this season's suppliers, migration 022 run; third-party mods: Enzoli 2016 liveries, sponsor decals, track movies and facepack ported into the staging mod, AI teams' real 2016 looks, Enhanced Graphics checked; promotions: member teams protected, AI teams move; game patch: player team retires at the start, verified in game; team identity: colours, livery and logo on the site, migration 019; pre-season saves checked; sponsors built; pit crews built; auction, HQ orders, part development, organizer race guide and grey-area parts live; regulations, engine programmes and illegal engines designed, not built). Read this first in a new session, then `README.md` and `docs/save-schema.md`._
 
 ## The goal
 Run a **Motorsport Manager 1 (v1.53)** online league the way F1 Manager 24 community leagues run:
@@ -962,6 +962,19 @@ The user downloaded these into ~/Downloads and asked that they work with the too
 - Tests: `test/development.test.ts`, person history in `test/db-preseason.test.ts`.
 
 **To go live:** run migration 023, publish. The trend fills in from the snapshots already stored.
+
+## Car stickers (built 2026-10-09; needs migration 024, `mmsave game-patch` again, `mmsave stickers`, and an in-game check)
+**The user's rules:** MM's sponsor deals stay as they are (they pay) but no longer show on member teams' cars. Instead each member team puts "stickers" (a sponsor name + logo, no game effect) on MM's six decal spots. Uploads need the organizer's approval (like team logos). An empty spot is blank. Money sponsors stay public on the site. Defaults I picked: AI teams' cars keep MM's decals; the career team can have stickers too.
+
+**How MM draws decals (FF20 decompile):** menus and car screens go through `FrontendCar.SetSponsorTexture(slot, logoIndex)` (6 slots, materials `chassis/frontWing/rearWingSponsorMaterials`, team in `mTeamID`); the decal texture is the slot's sponsor's `SponsorCar_<logoIndex-1>`. Race cars in FF20 are the mod's model (`AssetManager.GetRaceCarModMesh`, `Chassis_RaceSim_Championship0` in `Modding/Models/Vehicle/F1`, one model for all teams); `UnityVehicle.UpdateLiveries` only colours the body, so its `Sponsor01..06` materials (slot = number − 1, as `FrontendCar.ReplaceSponsorMaterialsOnObject` maps them) show the bundle's defaults on every car. Decals are 2:1 (2048×1024).
+
+**Built:**
+- League game patch: hooks `OnFrontendCarSponsors` (end of `FrontendCar.SetSponsorTexture`) and `OnRaceCarStart` (end of `UnityVehicle.OnStart`, own material copies). Built and injected into a copy of the game DLLs; not run in game yet.
+- Migration `024_team_stickers.sql`: `team_stickers` (per team and spot; pending / approved / rejected / withdrawn / replaced / removed), RPCs `submit_sticker`, `withdraw_sticker`, `remove_sticker`, `review_sticker`, `all_team_stickers` (service role), bucket `team-stickers` (PNG, 2 MB). Test: `test/db-stickers.test.ts`.
+- `mmsave stickers --league league.json --game <MM_Data>` (`src/stickers.ts`): rebuilds `MM_Data/league-stickers` for that series (every member team gets a folder).
+- Site: Sponsors tab → "Deals" (was "On the car") and "Stickers" (6 spots, upload padded to 2:1 in the browser, pending/rejected states, take off); rivals see approved stickers; Organizer page → "Car stickers to approve". Checked in demo mode.
+
+**To go live:** run migration 024; re-run `mmsave game-patch --game "<MM_Data>"` (adds the two hooks); after approving stickers, `mmsave stickers --league league-f1.json --game "<MM_Data>"` before playing. **To check in game:** a member team's car in the car screen and on track shows its stickers and blank spots; an AI team's car still shows MM's decals; `output_log.txt` has "LeaguePatch: stickers for team N".
 
 ## Working notes for the assistant
 - The user plays MM under Wine on Linux (CachyOS). They test in game and report back, so give them concrete things to check.

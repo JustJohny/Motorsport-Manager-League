@@ -1,4 +1,5 @@
 #!/usr/bin/env -S npx tsx
+import { writeStickers } from "./stickers.ts";
 import { readFileSync, writeFileSync } from "node:fs";
 import { basename, dirname, join } from "node:path";
 import { parseArgs, type ParseArgsConfig } from "node:util";
@@ -30,6 +31,7 @@ const USAGE = `mmsave - Motorsport Manager league save toolkit
   mmsave archive  --league league.json [-o backup.json] [--end]   back up the league's series; --end then deletes it from the site
   mmsave restore  <backup.json> [--as <series id>]               put an archived series back on the site
   mmsave team-mod --league league.json [-o out/team-mod] [--logos-base teamlogos] [--python py]   members' colours and logos as MM mod files
+  mmsave stickers --league league.json --game <MM_Data>   approved car stickers for the league game patch (rebuilds MM_Data/league-stickers)
   mmsave liveries --game <MM_Data> [--python py]      upload MM's livery masks for the site's livery previews (once)
   mmsave game-patch --game <MM_Data> [--retire on|off] [--status] [--restore]   the player team's cars retire as qualifying and races start (patches the game, original backed up)
   mmsave drivers  <save.sav> [--championships 0,1,2] [-o drivers.json]   drivers for portrait photos (contracted + free agents) with their portrait index
@@ -198,6 +200,13 @@ switch (cmd) {
     }, console.log);
     console.log(`wrote ${join(out, "Modding")}. Copy its Databases and Images files into MM_Data/Modding, `
       + "restart MM and switch the staging mod on in the Workshop screen.");
+    break;
+  }
+  case "stickers": {
+    // Member teams' car stickers, for the league game patch (src/stickers.ts).
+    if (!opt.game) fail("stickers needs --game <path to MM_Data>");
+    const cfg = leagueConfig("stickers");
+    await writeStickers(seriesEnv(cfg), opt.game, console.log);
     break;
   }
   case "liveries": {
