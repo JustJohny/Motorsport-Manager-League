@@ -115,3 +115,38 @@ export function storageUpload(env: SupabaseEnv, bucket: string, name: string, da
 export function storageDownload(env: SupabaseEnv, bucket: string, name: string): Promise<Buffer> {
   return storage(env, "GET", `object/${bucket}/${name.split("/").map(encodeURIComponent).join("/")}`);
 }
+
+export interface SeriesBackup {
+  series: { id: string; name: string; created_at: string };
+  exportedAt: string;
+  tables: Record<string, unknown[]>;
+}
+
+/**
+ * The same backup as the export_series() RPC, read a page of one table at a time
+ * (export_series_rows, migration 025): one statement for everything hits Supabase's statement
+ * timeout on a long league. A page that still times out is retried at half the size.
+ */
+export async function exportSeries(env: SupabaseEnv, log: (line: string) => void = () => {}): Promise<SeriesBackup> {
+  const [series] = await rest<SeriesBackup["series"][]>(env, "GET", `series?id=eq.${encodeURIComponent(env.series ?? "")}`);
+  if (!series) throw new Error(`No series ${env.series ?? "(none: set \"series\" in the league file)"}`);
+  const backup: SeriesBackup = { series, exportedAt: new Date().toISOString(), tables: {} };
+  for (const t of await rest<string[]>(env, "POST", "rpc/series_tables", {})) {
+    const rows: unknown[] = [];
+    for (let take = 200; ;) {
+      let page: unknown[];
+      try {
+        page = await rest<unknown[]>(env, "POST", "rpc/export_series_rows", { t, skip: rows.length, take });
+      } catch (e) {
+        if (!/57014/.test(String(e)) || take === 1) throw e;
+        take = Math.max(1, take >> 1);
+        log(`${t}: timed out, retrying ${take} rows at a time`);
+        continue;
+      }
+      rows.push(...page);
+      if (page.length < take) break;
+    }
+    backup.tables[t] = rows;
+  }
+  return backup;
+}

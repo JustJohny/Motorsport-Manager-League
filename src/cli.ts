@@ -14,7 +14,7 @@ import { diffObjects } from "./diff.ts";
 import { extractLeague, type LeagueConfig } from "./extract.ts";
 import { Save } from "./model.ts";
 import { defaultSavesDir } from "./paths.ts";
-import { rest, supabaseEnv, type SupabaseEnv } from "./supabase.ts";
+import { exportSeries, rest, supabaseEnv, type SupabaseEnv } from "./supabase.ts";
 import { buildTeamMod, uploadLiveryMasks } from "./team-look-orders.ts";
 import { readAiLooks } from "./ai-looks.ts";
 import { gamePatch } from "./game-patch.ts";
@@ -250,7 +250,7 @@ switch (cmd) {
     // A full JSON backup of the series; with --end, the series is then deleted from the site.
     const cfg = leagueConfig("archive");
     const env = seriesEnv(cfg);
-    const backup = await rest<{ series: { name: string }; tables: Record<string, unknown[]> }>(env, "POST", "rpc/export_series", {});
+    const backup = await exportSeries(env, console.log);
     const out = opt.out ?? `backup-${env.series}-${new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-")}.json`;
     writeFileSync(out, JSON.stringify(backup));
     const counts = Object.entries(backup.tables).filter(([, rows]) => rows.length).map(([t, rows]) => `${t} ${rows.length}`);

@@ -298,6 +298,7 @@ npx tsx src/cli.ts validate "<save>"
   - `bid_history` reads `league.bids` directly; through the invoker view it would apply the member's own row rules.
   - New functions: `publish_snapshot(members, snapshot, series_name)` (creates the series and its `league_settings` row), `my_series()` for the switcher, `export_series()`, `import_series(backup, as_id)`, `end_series(id)`.
   - Existing data becomes the series `main`.
+  - `mmsave archive` no longer calls `export_series()`: on a long league that one statement hit Supabase's statement timeout (57014, 2026-10-09). It reads each table a page at a time through `export_series_rows(t, skip, take)` (migration `025_export_pages.sql`, run 2026-10-09), halving the page on a timeout. The backup file is the same, so `restore` is unchanged.
 - Toolkit:
   - The league file has `"series": {"id", "name"}`. `SupabaseEnv.series` sends `x-series` on every REST call.
   - `pull` now needs `--league`. New `archive --league f [-o file] [--end]` and `restore backup.json [--as id]`.

@@ -82,6 +82,17 @@ describe.skipIf(!existsSync(SAVE))("database: several series", () => {
     expect(backup.series).toMatchObject({ id: "open", name: "Open-wheel league" });
     expect(backup.tables.hq_orders).toHaveLength(1);
     expect(backup.tables.snapshots[0].series).toBeUndefined();
+    // `mmsave archive` reads the same rows a page at a time.
+    for (const [table, rows] of Object.entries(backup.tables) as [string, unknown[]][]) {
+      const paged: unknown[] = [];
+      for (let skip = 0; ; skip++) {
+        const page = (await t.service<{ r: unknown[] }>("select public.export_series_rows($1, $2, 1) as r", [table, skip], "open")).rows[0].r;
+        if (!page.length) break;
+        paged.push(...page);
+      }
+      expect(paged, table).toEqual(rows);
+    }
+    expect((await t.service("select public.export_series_rows('series', 0, 1)", [], "open")).error).toMatch(/Not a series table/);
     expect((await t.service("select public.import_series($1)", [JSON.stringify(backup)], null)).error).toMatch(/already exists/);
     expect((await t.service("select public.end_series('open')", [], null)).error).toBeNull();
     expect((await t.service("select public.import_series($1)", [JSON.stringify(backup)], null)).error).toBeNull();
