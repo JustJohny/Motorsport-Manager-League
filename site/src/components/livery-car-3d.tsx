@@ -9,9 +9,30 @@ import { cn } from "@/lib/utils"
 import type { TeamColours } from "@/lib/types"
 
 // FIRE Fantasy 20's car (tools/ff20-car-renders.py) with a livery's UV colour key, tinted like
-// FF20's LiveryShader. Models and keys are fetched once per page.
+// FF20's LiveryShader, and the team's stickers on the decal meshes. Models, keys and stickers are
+// fetched once per page.
 const models = new Map<string, Promise<GLTF>>()
 const keys = new Map<string, Promise<ImageData>>()
+const stickerTextures = new Map<string, Promise<THREE.Texture>>()
+// Decal meshes are "SponsorNN": sticker slot NN - 1, as the league game patch maps them in game.
+const SPONSOR = /^Sponsor0([1-6])$/
+
+function loadSticker(url: string): Promise<THREE.Texture> {
+  let p = stickerTextures.get(url)
+  if (!p) {
+    const loader = new THREE.TextureLoader()
+    loader.setCrossOrigin("anonymous")
+    p = loader.loadAsync(url).then((t) => {
+      t.flipY = false
+      t.colorSpace = THREE.SRGBColorSpace
+      t.anisotropy = 4
+      return t
+    })
+    stickerTextures.set(url, p)
+    p.catch(() => stickerTextures.delete(url))
+  }
+  return p
+}
 
 function loadModel(model: string): Promise<GLTF> {
   let p = models.get(model)
@@ -46,14 +67,21 @@ function loadKey(file: string): Promise<ImageData> {
   return p
 }
 
-/** The car in 3D, in the given colours; drag to turn it, scroll or pinch to zoom. */
-export default function LiveryCar3D({ model, texture, colours, className }: { model: string; texture: string; colours: TeamColours; className?: string }) {
+/**
+ * The car in 3D, in the given colours; drag to turn it, scroll or pinch to zoom. `stickers` are image
+ * URLs by decal slot (STICKER_SPOTS order); a slot without one is blank, as in game.
+ */
+export default function LiveryCar3D({ model, texture, colours, stickers = [], className }: {
+  model: string; texture: string; colours: TeamColours; stickers?: (string | null | undefined)[]; className?: string
+}) {
   const host = useRef<HTMLDivElement>(null)
   const body = useRef<THREE.MeshStandardMaterial | null>(null)
+  const decals = useRef<THREE.MeshStandardMaterial[]>([])
   const canvas = useRef<HTMLCanvasElement>(document.createElement("canvas"))
   const map = useRef<THREE.CanvasTexture | null>(null)
   const [state, setState] = useState<"loading" | "ready" | "failed">("loading")
   const colourKey = `${colours.primary}${colours.secondary}${colours.tertiary}${colours.trim}`
+  const stickerKey = Array.from({ length: 6 }, (_, i) => stickers[i] ?? "").join("|")
 
   // Scene, camera and the model: once per model.
   useEffect(() => {
@@ -105,14 +133,23 @@ export default function LiveryCar3D({ model, texture, colours, className }: { mo
     loadModel(model).then((gltf) => {
       if (!live) return
       const car = gltf.scene.clone(true)
+      // One material per decal slot, hidden until it has a sticker; drawn over the body it sits on.
+      decals.current = Array.from({ length: 6 }, () => new THREE.MeshStandardMaterial({
+        transparent: true, alphaTest: 0.02, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2,
+        roughness: 0.5, metalness: 0.1, visible: false,
+      }))
       car.traverse((o) => {
         const mesh = o as THREE.Mesh
         if (!mesh.isMesh) return
         const mat = mesh.material as THREE.MeshStandardMaterial
+        const slot = SPONSOR.exec(mat.name)
         if (mat.name === "Livery") {
           const own = mat.clone()
           body.current = own
           mesh.material = own
+        } else if (slot) {
+          mesh.material = decals.current[Number(slot[1]) - 1]
+          mesh.renderOrder = 1
         }
       })
       // Stand the car on the ground at the origin.
@@ -144,6 +181,8 @@ export default function LiveryCar3D({ model, texture, colours, className }: { mo
       renderer.dispose()
       body.current?.dispose()
       body.current = null
+      for (const d of decals.current) d.dispose()
+      decals.current = []
       map.current?.dispose()
       map.current = null
       renderer.domElement.remove()
@@ -177,6 +216,28 @@ export default function LiveryCar3D({ model, texture, colours, className }: { mo
     return () => { live = false }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [texture, colourKey, state])
+
+  // Stickers on their decal slots.
+  useEffect(() => {
+    let live = true
+    decals.current.forEach((mat, slot) => {
+      const url = stickers[slot]
+      if (!url) {
+        mat.visible = false
+        mat.map = null
+        mat.needsUpdate = true
+        return
+      }
+      loadSticker(url).then((tex) => {
+        if (!live) return
+        mat.map = tex
+        mat.visible = true
+        mat.needsUpdate = true
+      }, () => {})
+    })
+    return () => { live = false }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stickerKey, state])
 
   return (
     <div className={cn("relative aspect-[16/7] w-full overflow-hidden rounded-lg bg-gradient-to-b from-muted to-muted/40", className)}>

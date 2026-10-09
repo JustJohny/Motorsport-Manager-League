@@ -977,6 +977,8 @@ The user downloaded these into ~/Downloads and asked that they work with the too
 - `mmsave stickers --league league.json --game <MM_Data>` (`src/stickers.ts`): rebuilds `MM_Data/league-stickers` for that series (every member team gets a folder).
 - Site: Sponsors tab → "Deals" (was "On the car") and "Stickers" (6 spots, upload padded to 2:1 in the browser, pending/rejected states, take off); rivals see approved stickers; Organizer page → "Car stickers to approve". Checked in demo mode.
 
+- **Stickers on the site's 3D car (2026-10-09, user request):** `tools/ff20-car-renders.py` now keeps the decal meshes in `ff20-f1-car.glb` (materials `Sponsor01..06` with UVs, slot = NN − 1 like the game hook; still left out of the side renders). `livery-car-3d.tsx` takes `stickers` (URLs by slot) and hides empty slots; the Identity tab passes the approved stickers, and on your own team a pending one as a preview. Checked in demo mode (both sides read correctly, no console errors). **Live needs the new `ff20-f1-car.glb` (in `out/liveries`) uploaded to the `liveries` bucket**, by `mmsave liveries` or that one file.
+
 **To go live:** run migration 024; re-run `mmsave game-patch --game "<MM_Data>"` (adds the two hooks); after approving stickers, `mmsave stickers --league league-f1.json --game "<MM_Data>"` before playing. **To check in game:** a member team's car in the car screen and on track shows its stickers and blank spots; an AI team's car still shows MM's decals; `output_log.txt` has "LeaguePatch: stickers for team N".
 
 ## Real circuit names (2026-10-09)

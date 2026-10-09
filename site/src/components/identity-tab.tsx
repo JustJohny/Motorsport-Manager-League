@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { LiveryPreview } from "@/components/livery-preview"
 import { useLeague } from "@/lib/league"
+import { stickerUrl, useStickers } from "@/lib/stickers"
 import { LOGO_TYPES, lookColours, useTeamLook, type TeamLogoRow } from "@/lib/team-look"
 import { cn } from "@/lib/utils"
 import type { LiveryOption, TeamColours } from "@/lib/types"
@@ -45,6 +46,7 @@ export function IdentityTab({ team, own }: { team: string; own: boolean }) {
     <LookEditor
       key={`${team}:${saved?.updated_at ?? ""}`}
       team={team}
+      own={own}
       editable={own && !isPlayer}
       isPlayer={isPlayer}
       liveries={liveries}
@@ -55,11 +57,18 @@ export function IdentityTab({ team, own }: { team: string; own: boolean }) {
   )
 }
 
-function LookEditor({ team, editable, isPlayer, liveries, initialColours, initialLivery, status }: {
-  team: string; editable: boolean; isPlayer: boolean; liveries: LiveryOption[]
+function LookEditor({ team, own, editable, isPlayer, liveries, initialColours, initialLivery, status }: {
+  team: string; own: boolean; editable: boolean; isPlayer: boolean; liveries: LiveryOption[]
   initialColours: TeamColours; initialLivery: number; status: "game" | "applied" | "waiting"
 }) {
-  const { league } = useLeague()
+  const { league, me } = useLeague()
+  // Approved stickers; on your own car a pending upload shows in their place, as a preview.
+  const stickerRows = useStickers(team, me.team).rows
+  const stickers = Array.from({ length: 6 }, (_, slot) => {
+    const row = (own ? stickerRows.find((r) => r.slot === slot && r.status === "pending") : undefined)
+      ?? stickerRows.find((r) => r.slot === slot && r.status === "approved")
+    return row ? stickerUrl(row.path) : null
+  })
   const tl = useTeamLook()
   const [colours, setColours] = useState(initialColours)
   const [liveryId, setLiveryId] = useState(initialLivery)
@@ -110,14 +119,14 @@ function LookEditor({ team, editable, isPlayer, liveries, initialColours, initia
           </div>
           {livery.model && livery.texture ? (
             <Suspense fallback={<LiveryPreview livery={livery} colours={shownColours} className="rounded-lg" />}>
-              <LiveryCar3D model={livery.model} texture={livery.texture} colours={shownColours} />
+              <LiveryCar3D model={livery.model} texture={livery.texture} colours={shownColours} stickers={stickers} />
             </Suspense>
           ) : (
             <LiveryPreview livery={livery} colours={shownColours} className="rounded-lg" />
           )}
           <p className="text-xs text-muted-foreground">
             {livery.model
-              ? <>{patternName(livery)}{livery.usedBy?.length ? ` (run by ${livery.usedBy.join(", ")})` : ""} on FIRE Fantasy 20's car, painted the way the game paints it. Sponsor decals aren't shown.</>
+              ? <>{patternName(livery)}{livery.usedBy?.length ? ` (run by ${livery.usedBy.join(", ")})` : ""} on FIRE Fantasy 20's car, painted the way the game paints it, with the team's stickers{own ? " (pending ones as a preview)" : ""}.</>
               : <>{patternName(livery)}, seen from the side. MM paints it onto the 3D car, so the race view differs in detail.</>}
           </p>
         </CardContent>

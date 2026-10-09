@@ -7,8 +7,10 @@ team colours as primary -> trim (blue) -> secondary (red) -> tertiary (green). S
 texture can't preview them; this renders them from the real model instead.
 
 For one car model (MM_Data/Modding/Models/Vehicle/<model>, e.g. F1) it writes, into <out>:
-  ff20-<model>-car.glb           the car for the 3D view: the livery body (UVs, normals) and the
-                                 other parts in flat colours (sponsor decals and glass left out)
+  ff20-<model>-car.glb           the car for the 3D view: the livery body (UVs, normals), the
+                                 sponsor decals (UVs, material "SponsorNN" = sticker slot NN - 1, as
+                                 the league game patch maps them) and the other parts in flat colours
+                                 (glass left out)
   ff20-<model>-overlay.png       the side view's shading and non-livery parts, drawn over a mask
   ff20-<model>-<livery>.png      per livery: the side view's colour key (alpha 0 off the body)
   ff20-uv-<livery>.png           per livery: base + detail key at 1024x1024, for the 3D car
@@ -52,6 +54,7 @@ PART_COLOURS = {
 }
 SKIP = {"Mat_rs17_glass"}
 LIVERY_MATERIAL = "Livery"
+SPONSOR_MATERIAL = re.compile(r"^Sponsor0[1-6]$")
 
 
 def slug(name):
@@ -90,16 +93,19 @@ def component(go, class_id):
     return None
 
 
-def car_parts(bundle):
-    """{material: [(positions Nx3, normals Nx3, uvs Nx2 | None, triangles Mx3)]} in world space."""
+def car_parts(bundle, sponsors=None):
+    """{material: [(positions Nx3, normals Nx3, uvs Nx2 | None, triangles Mx3)]} in world space.
+    The sponsor decals go into `sponsors` (same shape) if given, and are left out otherwise."""
     env = UnityPy.load(bundle)
     root = next(o.read() for o in env.objects if o.type.name == "GameObject" and o.peek_name() == ROOT)
     parts = {}
 
-    def walk(t, parent):
+    def walk(t, parent, decal=False):
         go = t.m_GameObject.read()
-        if not go.m_IsActive or go.m_Name.startswith("Sponsor"):
+        decal = decal or go.m_Name.startswith("Sponsor")
+        if not go.m_IsActive or (decal and sponsors is None):
             return
+        into = sponsors if decal else parts
         world = parent @ local_matrix(t)
         mf, mr = component(go, 33), component(go, 23)
         if mf and mr and mf.m_Mesh.path_id:
@@ -120,9 +126,9 @@ def car_parts(bundle):
                     continue
                 first = sub.firstByte // 2 if hasattr(sub, "firstByte") else sub.firstIndex
                 tris = index[first:first + sub.indexCount].reshape(-1, 3)
-                parts.setdefault(mat, []).append((pos, nrm, uv, tris))
+                into.setdefault(mat, []).append((pos, nrm, uv, tris))
         for ch in t.m_Children:
-            walk(ch.read(), world)
+            walk(ch.read(), world, decal)
 
     walk(component(root, 4), np.eye(4))
     return parts
@@ -168,7 +174,7 @@ def write_glb(path, parts):
             "POSITION": add((pos * flip).astype(np.float32), 34962, 5126, "VEC3", True),
             "NORMAL": add((nrm * flip).astype(np.float32), 34962, 5126, "VEC3"),
         }
-        if mat == LIVERY_MATERIAL:
+        if mat == LIVERY_MATERIAL or SPONSOR_MATERIAL.match(mat):
             attrs["TEXCOORD_0"] = add(np.stack([uv[:, 0], 1 - uv[:, 1]], axis=1).astype(np.float32), 34962, 5126, "VEC2")
         idx = add(tris[:, ::-1].reshape(-1).astype(np.uint32), 34963, 5125, "SCALAR")
         colour = PART_COLOURS.get(mat, (0.2, 0.2, 0.2))
@@ -344,10 +350,12 @@ def main(argv):
     os.makedirs(out, exist_ok=True)
     tag = f"ff20-{slug(model)}"
 
-    parts = car_parts(os.path.join(data_dir, "Modding", "Models", "Vehicle", model))
+    sponsors = {}
+    parts = car_parts(os.path.join(data_dir, "Modding", "Models", "Vehicle", model), sponsors)
     if LIVERY_MATERIAL not in parts:
         sys.exit(f"No '{LIVERY_MATERIAL}' material in the {model} model")
-    write_glb(os.path.join(out, f"{tag}-car.glb"), parts)
+    decals = {m: c for m, c in sponsors.items() if SPONSOR_MATERIAL.match(m)}
+    write_glb(os.path.join(out, f"{tag}-car.glb"), {**parts, **decals})
     names, mat_id, uvs, light = side_lookup(parts)
     overlay_image(names, mat_id, light).save(os.path.join(out, f"{tag}-overlay.png"), optimize=True)
 
