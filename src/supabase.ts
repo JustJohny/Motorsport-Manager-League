@@ -98,7 +98,8 @@ async function storage(env: SupabaseEnv, method: string, path: string, body?: Bu
       return await storageOnce(env, method, path, body, contentType);
     } catch (e) {
       const code = (e as NodeJS.ErrnoException).code;
-      if (!code || attempt === 3) throw e;
+      // Some connections corrupt TLS records now and then ("bad record mac"), large bodies more often.
+      if (!code || attempt === 6) throw e;
       console.error(`network error (${code}), retrying…`);
       await new Promise((r) => setTimeout(r, 2000 * attempt));
     }

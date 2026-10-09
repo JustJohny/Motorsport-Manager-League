@@ -138,8 +138,15 @@ export async function uploadLiveryMasks(env: SupabaseEnv, opts: { dataDir: strin
     if (existsSync(join(vehicles, model))) runPython(py, "ff20-car-renders.py", [opts.dataDir, opts.out, model], log);
   }
   const files = readdirSync(opts.out).filter((f) => f.endsWith(".png") || f.endsWith(".glb"));
+  const failed: string[] = [];
   for (const f of files) {
-    await storageUpload(env, "liveries", f, readFileSync(join(opts.out, f)), f.endsWith(".glb") ? "model/gltf-binary" : "image/png");
+    try {
+      await storageUpload(env, "liveries", f, readFileSync(join(opts.out, f)), f.endsWith(".glb") ? "model/gltf-binary" : "image/png");
+    } catch (e) {
+      failed.push(f);
+      log(`upload of ${f} failed: ${(e as Error).message}`);
+    }
   }
-  log(`uploaded ${files.length} livery files`);
+  log(`uploaded ${files.length - failed.length} of ${files.length} livery files`);
+  if (failed.length) throw new Error(`${failed.length} livery files failed to upload (${failed.join(", ")}); run the command again`);
 }

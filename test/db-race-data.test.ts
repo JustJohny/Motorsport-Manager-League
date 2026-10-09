@@ -31,7 +31,7 @@ describe.skipIf(!dir || !existsSync(SAVE))("database: FF20 race data", () => {
     const { data, privateByTeam } = readRaceExport(dir!);
     for (let i = 0; i < 2; i++) { // a second upload replaces the first
       const r = await t.service("select public.publish_race_data(public.current_series(), 1, 'Sydney', '2020-03-19', $1, $2)", [JSON.stringify(data), JSON.stringify(privateByTeam)]);
-      expect(r.error?.message ?? null).toBeNull();
+      expect(r.error).toBeNull();
     }
   }, 120_000);
 

@@ -905,6 +905,8 @@ The user downloaded these into ~/Downloads and asked that they work with the too
     - MM's own patterns are garbled on FF20's model, as in game, and sort last.
   - Checked in demo mode (desktop and 390 px, no console errors). The My team tab bar now scrolls sideways on phones (it overflowed before).
 - **To go live:** run migration 021, then `mmsave liveries --game "<MM_Data>" --python ~/.mm-venv/bin/python` (uploads about 43 MB), then publish.
+  - **2026-10-09:** the user ran migration 021. All 945 livery files (`out/liveries`) are uploaded. Only the publish is left.
+  - The upload failed on "bad record mac" TLS errors (about 1 in 50 requests, more for the 3 MB `.glb`). Storage requests now retry 6 times, and `mmsave liveries` uploads every file it can before naming the failed ones, so running it again is enough.
 
 ## Working notes for the assistant
 - The user plays MM under Wine on Linux (CachyOS). They test in game and report back, so give them concrete things to check.
