@@ -1,5 +1,6 @@
 #!/usr/bin/env -S npx tsx
 import { installFuelSuppliers } from "./fuel-suppliers.ts";
+import { hideRenamedFaces } from "./renamed-faces.ts";
 import { writeTrackNames } from "./track-names.ts";
 import { writeStickers } from "./stickers.ts";
 import { readFileSync, writeFileSync } from "node:fs";
@@ -34,6 +35,7 @@ const USAGE = `mmsave - Motorsport Manager league save toolkit
   mmsave restore  <backup.json> [--as <series id>]               put an archived series back on the site
   mmsave team-mod --league league.json [-o out/team-mod] [--logos-base teamlogos] [--python py]   members' colours and logos as MM mod files
   mmsave fuel-suppliers --game <MM_Data> [--python py]   Orlen and Slovnaft in the staging mod (database rows + logos)
+  mmsave renamed-faces <save.sav> --game <MM_Data> [--python py] [--dry-run]   MM's drawn faces for people renamed in the save (hides their mod photos)
   mmsave track-names --game <MM_Data>                 real circuit names in game (league game patch's text file)
   mmsave stickers --league league.json --game <MM_Data>   approved car stickers for the league game patch (rebuilds MM_Data/league-stickers)
   mmsave liveries --game <MM_Data> [--python py]      upload MM's livery masks for the site's livery previews (once)
@@ -209,6 +211,11 @@ switch (cmd) {
   case "fuel-suppliers": {
     if (!opt.game) fail("fuel-suppliers needs --game <path to MM_Data>");
     installFuelSuppliers(opt.game, { python: opt.python }, console.log);
+    break;
+  }
+  case "renamed-faces": {
+    if (!opt.game) fail("renamed-faces needs --game <path to MM_Data>");
+    hideRenamedFaces(Save.load(savePath(args[0])), opt.game, { python: opt.python, dryRun: opt["dry-run"] }, console.log);
     break;
   }
   case "track-names": {

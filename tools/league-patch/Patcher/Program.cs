@@ -1,6 +1,7 @@
 // Patches MM's Assembly-CSharp.dll so it calls LeaguePatch.Hooks: SessionManager.StartSession ->
 // OnSessionStart, AtlasManager.UpdateAtlasesWithMods -> OnAtlasesUpdated, LocalisationReader.LoadFromFile
-// -> OnTextLoaded (each at the end of the method, with the argument the hook takes).
+// -> OnTextLoaded, TeamManager.ValidateTeamData -> OnTeamsValidating (at its start) and OnTeamsValidated
+// (each at the end of the method unless said otherwise, with the argument the hook takes).
 //
 //   league-patch <MM_Data/Managed> <LeaguePatch.dll>   patch (from the .orig backup if there is one)
 //   league-patch <MM_Data/Managed> --restore           put the original back
@@ -62,14 +63,17 @@ var hookAsm = AssemblyDefinition.ReadAssembly(hookDll);
 MethodDefinition Hook(string name) => hookAsm.MainModule.GetType(HookType)?.Methods.FirstOrDefault(m => m.Name == name)
     ?? throw new Exception($"{HookType}.{name} not found in {hookDll}");
 
-// (game type, method, parameter count, argument passed to the hook: 0 = this or first parameter, hook)
-var targets = new (string Type, string Method, int Params, int Arg, string Hook)[]
+// (game type, method, parameter count, argument passed to the hook: 0 = this or first parameter, hook,
+// whether the call goes at the start of the method instead of before every return)
+var targets = new (string Type, string Method, int Params, int Arg, string Hook, bool AtStart)[]
 {
-    ("SessionManager", "StartSession", 0, 0, HookMethod),
-    ("AtlasManager", "UpdateAtlasesWithMods", 0, 0, "OnAtlasesUpdated"),
-    ("LocalisationReader", "LoadFromFile", 3, 1, "OnTextLoaded"),
-    ("FrontendCar", "SetSponsorTexture", 2, 0, "OnFrontendCarSponsors"),
-    ("UnityVehicle", "OnStart", 1, 0, "OnRaceCarStart"),
+    ("SessionManager", "StartSession", 0, 0, HookMethod, false),
+    ("AtlasManager", "UpdateAtlasesWithMods", 0, 0, "OnAtlasesUpdated", false),
+    ("LocalisationReader", "LoadFromFile", 3, 1, "OnTextLoaded", false),
+    ("FrontendCar", "SetSponsorTexture", 2, 0, "OnFrontendCarSponsors", false),
+    ("UnityVehicle", "OnStart", 1, 0, "OnRaceCarStart", false),
+    ("TeamManager", "ValidateTeamData", 0, 0, "OnTeamsValidating", true),
+    ("TeamManager", "ValidateTeamData", 0, 0, "OnTeamsValidated", false),
 };
 
 using (var asm = AssemblyDefinition.ReadAssembly(orig, new ReaderParameters { AssemblyResolver = resolver }))
@@ -81,6 +85,15 @@ using (var asm = AssemblyDefinition.ReadAssembly(orig, new ReaderParameters { As
             ?? throw new Exception($"{t.Type}.{t.Method} not found; is this MM 1.53?");
         var call = module.ImportReference(Hook(t.Hook));
         var il = method.Body.GetILProcessor();
+        if (t.AtStart)
+        {
+            // Branches to the first instruction (a loop's start) keep skipping the hook.
+            var first = method.Body.Instructions[0];
+            il.InsertBefore(first, il.Create(t.Arg == 0 ? OpCodes.Ldarg_0 : OpCodes.Ldarg_1));
+            il.InsertBefore(first, il.Create(OpCodes.Call, call));
+            Console.WriteLine($"  {t.Type}.{t.Method} (start) -> {HookType}.{t.Hook}");
+            continue;
+        }
         // Before every return, so the hook runs once the method has done its work.
         foreach (var ret in method.Body.Instructions.Where(i => i.OpCode == OpCodes.Ret).ToList())
         {

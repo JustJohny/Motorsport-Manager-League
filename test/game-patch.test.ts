@@ -25,6 +25,9 @@ describe.skipIf(!hasDotnet || !existsSync(join(DATA, "Managed", "Assembly-CSharp
     expect(readFileSync(join(data, "league-patch.ini"), "utf8")).toMatch(/^retirePlayerTeam=false$/m);
     expect(existsSync(join(data, "Managed", "LeaguePatch.dll"))).toBe(true);
     expect(readFileSync(join(data, "Managed", "Assembly-CSharp.dll.orig")).equals(original)).toBe(true);
+    // The save's team names survive the load-time reset from Databases/Teams.txt.
+    expect(log.join("\n")).toMatch(/TeamManager\.ValidateTeamData \(start\) -> LeaguePatch\.Hooks\.OnTeamsValidating/);
+    expect(log.join("\n")).toMatch(/TeamManager\.ValidateTeamData -> LeaguePatch\.Hooks\.OnTeamsValidated/);
     // One hook call in StartSession, however often it's patched.
     const il = spawnSync("monodis", ["--method", join(data, "Managed", "Assembly-CSharp.dll")], { encoding: "utf8" });
     if (il.status === 0) {

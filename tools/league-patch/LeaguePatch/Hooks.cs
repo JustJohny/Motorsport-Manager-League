@@ -11,7 +11,8 @@ namespace LeaguePatch
     /// Called by the patched game: at the end of SessionManager.StartSession (a session goes green),
     /// AtlasManager.UpdateAtlasesWithMods (UI sprites (re)built), LocalisationReader.LoadFromFile
     /// (a text table loaded), FrontendCar.SetSponsorTexture (a car's sponsor decals set) and
-    /// UnityVehicle.OnStart (a car put on track).
+    /// UnityVehicle.OnStart (a car put on track), and at both ends of TeamManager.ValidateTeamData
+    /// (a save loaded).
     /// </summary>
     public static class Hooks
     {
@@ -265,6 +266,54 @@ namespace LeaguePatch
             keys.Sort((a, b) => b.Length.CompareTo(a.Length));
             string[] parts = keys.ConvertAll(k => Regex.Escape(k)).ToArray();
             sRenameRegex = new Regex(@"(?<![\w])(" + string.Join("|", parts) + @")(?![\w])");
+        }
+
+        // Team names from the save, taken just before TeamManager.ValidateTeamData runs on load.
+        private struct TeamIdentity { public string name, shortName; public Nationality nationality; }
+        private static readonly Dictionary<Team, TeamIdentity> sSavedTeams = new Dictionary<Team, TeamIdentity>();
+
+        /// <summary>
+        /// At the start of TeamManager.ValidateTeamData. On every load FF20 resets each team's name,
+        /// short name and nationality from Databases/Teams.txt (Rebirth only the short name), which
+        /// undoes a league's renames; remember what the save says.
+        /// </summary>
+        public static void OnTeamsValidating(TeamManager teams)
+        {
+            try
+            {
+                sSavedTeams.Clear();
+                foreach (Team team in teams.GetEntityList())
+                    sSavedTeams[team] = new TeamIdentity { name = team.name, shortName = team.GetShortName(true), nationality = team.nationality };
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("LeaguePatch: " + e);
+            }
+        }
+
+        /// <summary>At the end of TeamManager.ValidateTeamData: put the save's names back.</summary>
+        public static void OnTeamsValidated(TeamManager teams)
+        {
+            try
+            {
+                int kept = 0;
+                foreach (KeyValuePair<Team, TeamIdentity> saved in sSavedTeams)
+                {
+                    Team team = saved.Key;
+                    TeamIdentity was = saved.Value;
+                    bool changed = false;
+                    if (!string.IsNullOrEmpty(was.name) && team.name != was.name) { team.name = was.name; changed = true; }
+                    if (!string.IsNullOrEmpty(was.shortName) && team.GetShortName(true) != was.shortName) { team.SetShortName(was.shortName); changed = true; }
+                    if (was.nationality != null && team.nationality != was.nationality) team.nationality = was.nationality;
+                    if (changed) kept++;
+                }
+                sSavedTeams.Clear();
+                if (kept > 0) Debug.Log("LeaguePatch: kept the save's names for " + kept + " teams");
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("LeaguePatch: " + e);
+            }
         }
 
         /// <summary>A "key=true" line in MM_Data/league-patch.ini.</summary>
