@@ -76,7 +76,7 @@ export function MyTeamPage() {
 
       <Tabs key={preseasonTab ? "pre" : "season"} defaultValue={preseasonTab ? "preseason" : "staff"}>
         {/* Seven tabs don't fit a phone: the bar scrolls sideways there. */}
-        <TabsList className="max-w-full justify-start overflow-x-auto">
+        <TabsList className="max-w-full justify-start overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {preseasonTab && <TabsTrigger value="preseason">Pre-season</TabsTrigger>}
           <TabsTrigger value="staff">Staff</TabsTrigger>
           <TabsTrigger value="hq">HQ</TabsTrigger>
