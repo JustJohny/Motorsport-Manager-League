@@ -344,6 +344,12 @@ export interface DesignContext {
   isPlayer: boolean;
   /** The player's backstory time reduction, in days (player team only). */
   playerTimeModifierDays?: number;
+  /**
+   * League rule (the user, 2026-10-09): a member's design takes a human-run team's time, without
+   * FF20's 10 days off for AI teams (members' teams are AI in game but pay the human price).
+   * Absent in contexts published before it.
+   */
+  humanDesignTime?: boolean;
 }
 
 /** A new part before its components, as MM's SetBaseStats makes it. */

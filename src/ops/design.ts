@@ -187,6 +187,8 @@ export function designOptions(save: Save, team: Obj, type: PartType): DesignOpti
     // Player.designPartTimeModifier: only the ex-engineer backstory (PlayerBackStoryType 1) has it.
     playerTimeModifierDays: isPlayer && save.data.player?.mPlayerBackStory?.mBackStory === 1
       ? timeSpanDays(save.data.player.mPlayerBackStory.mPartDesignTimeModifier) : 0,
+    // The toolkit only designs for member teams, which take a human-run team's time.
+    humanDesignTime: true,
   };
   const base = designBase(save, team, type, ctx);
   const locked = unlocks.map((r, i) => ({ r: g.deref<Obj>(r), level: i + 1 }))

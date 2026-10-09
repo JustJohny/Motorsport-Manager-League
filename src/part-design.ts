@@ -104,7 +104,7 @@ export function planDesign(ctx: DesignContext, chosen: DesignComponent[]): Desig
     // GetDesignDuration: hours from the fraction, then 10 days off for non-player teams, then the
     // player's backstory modifier.
     const hours = Math.round((days - Math.trunc(days)) * 24);
-    if (!ctx.isPlayer) days -= FF20_AI_DAYS;
+    if (!ctx.isPlayer && !ctx.humanDesignTime) days -= FF20_AI_DAYS;
     days = Math.max(0, Math.trunc(days) + hours / 24 - (ctx.isPlayer ? ctx.playerTimeModifierDays ?? 0 : 0));
   } else {
     if (ctx.isPlayer) days -= ctx.playerTimeModifierDays ?? 0;

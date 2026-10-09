@@ -41,10 +41,13 @@ describe.skipIf(!existsSync(SAVE))("FIRE Fantasy 20 save", () => {
     expect(brakes.ctx.rules).toBe("ff20");
     expect(brakes.base.developmentRate).toBe(1);
     const comp = brakes.components.find((c) => !c.engineer && c.days === 0 && c.level === 1)!;
-    const ai = planDesign(brakes.ctx, [comp]);
+    const ai = planDesign({ ...brakes.ctx, humanDesignTime: false }, [comp]);
     const player = planDesign({ ...brakes.ctx, isPlayer: true }, [comp]);
     expect(player.days - ai.days).toBe(Math.min(10, player.days));
     expect(ai.gameCost).toBeLessThan(player.cost);
+    // League rule: member teams (AI in game) design in a human-run team's time.
+    expect(brakes.ctx.humanDesignTime).toBe(true);
+    expect(planDesign(brakes.ctx, [comp]).days).toBe(player.days);
   });
 
   it("describes components with the game's texts, {Stat} as the part's stat", () => {

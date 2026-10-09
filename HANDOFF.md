@@ -979,6 +979,9 @@ The user downloaded these into ~/Downloads and asked that they work with the too
 
 - **Stickers on the site's 3D car (2026-10-09, user request):** `tools/ff20-car-renders.py` now keeps the decal meshes in `ff20-f1-car.glb` (materials `Sponsor01..06` with UVs, slot = NN − 1 like the game hook; still left out of the side renders). `livery-car-3d.tsx` takes `stickers` (URLs by slot) and hides empty slots; the Identity tab passes the approved stickers, and on your own team a pending one as a preview. Checked in demo mode (both sides read correctly, no console errors). **Live needs the new `ff20-f1-car.glb` (in `out/liveries`) uploaded to the `liveries` bucket**, by `mmsave liveries` or that one file.
 
+- **FF20 spot names and sticker size (2026-10-09, user report: "air intake" showed on the nose in 3D):** the six spot names were stock MM's. On FF20's F1 car each `SponsorNN` slot covers several decals (same layout on the car-screen and race models): 1 side pods (+ front wing centre, front of the cockpit), 2 engine cover fin (+ chassis sides, front of the cockpit), 3 rear wing (+ front wing end plates, nose top), 4 air intake (+ nose), 5 cockpit sides (+ nose), 6 beam wing (+ nose tip, engine cover). `src/sticker-spots.ts` has both games' names; the site lists the "also on" places. The car-screen hook (`OnFrontendCarSponsors`) maps by the FrontendCar material arrays' order, not `SponsorNN`: **unchecked in game whether the menus match the race and the site.**
+- **Size:** migration `027_sticker_scale.sql` (`scale` 0.25..1, `set_sticker_scale`, own approved/pending sticker, no re-approval; `all_team_stickers` returns it). Site: a size slider on each own sticker, previews and the 3D car drawn at that size. `mmsave stickers` writes `<slot>.scale` beside a smaller sticker; the game patch shrinks it around its centre when loading (re-applied to the user's game 2026-10-09). **Needs migration 027 run**, then `mmsave stickers` again.
+
 **To go live:** run migration 024; re-run `mmsave game-patch --game "<MM_Data>"` (adds the two hooks); after approving stickers, `mmsave stickers --league league-f1.json --game "<MM_Data>"` before playing. **To check in game:** a member team's car in the car screen and on track shows its stickers and blank spots; an AI team's car still shows MM's decals; `output_log.txt` has "LeaguePatch: stickers for team N".
 
 ## Real circuit names (2026-10-09)
@@ -1002,6 +1005,14 @@ The user downloaded these into ~/Downloads and asked that they work with the too
 
 ## Part components showed "0" on FF20 (2026-10-09)
 - **The user's report:** every component in the parts tab's "Design new parts" showed "0" and no effect. FF20 components keep "0" as their custom name, and the game's text reader skipped multi-line texts. `toDesignComponent` now uses the game's text for `mNameID` (`{Stat}` and `{ComponentCost}` filled, bold font tags as `<b>`); `loadGameText` reads multi-line `HUDText` rows. All 1350 F1 components in "PreS" have a text. Test in `test/ff20.test.ts`. **Live needs a publish** (the texts are in the snapshot, read from the organizer's game install).
+
+## Member designs take human time (2026-10-09)
+- **The user's report:** the parts tab showed "0 days to design". FF20's `GetDesignDuration` takes 10 days off for every team but the player's, and members' teams are AI in game, so basic designs (e.g. 12 days − 3.5 Design Centre) came out at 0; `startDesign` wrote that end date. Members already paid the human price.
+- **League rule (user's choice):** member designs take a human-run team's time. `DesignContext.humanDesignTime` (set by `teamDesign`) skips the 10 days in `planDesign`; MM's AI teams in game keep their head start. Test in `test/ff20.test.ts`. **Live needs a publish** (the site plans from the published context).
+
+## Hülkenberg made a free agent (2026-10-09)
+- **The user's report:** Nico Hülkenberg wasn't on the site. FF20 contracts him to Porsche LMP Team (World Endurance Series, car 2), and the site only publishes the championship's teams and free agents. **User's choice:** free agent, as in real 2020, with Timo Bernhard (Porsche's real LMP1 driver, free agent, similar stats) signed into his seat (`hire` with `replacing`; car ID stays with the seat).
+- Written to `SaveFF20 F1 League R1 PreS Hulkenberg.sav` ("F1 League R1 PreS Hulkenberg"), from the newest league save "PreS (league) x6" (22:53). Validated; he is in the extract's free agents. Migration 027 was run by the user the same day.
 
 ## Working notes for the assistant
 - The user plays MM under Wine on Linux (CachyOS). They test in game and report back, so give them concrete things to check.
