@@ -17,12 +17,12 @@ const CHECKER = {
   backgroundPosition: "0 0, 8px 8px",
 }
 
-/** A sticker image in MM's 2:1 decal shape at its size, on a checkerboard so transparency shows. */
+/** A sticker image in MM's 2:1 decal shape at its size (cut off at the edges above 100 %), on a checkerboard so transparency shows. */
 function Decal({ row, scale }: { row?: StickerRow; scale?: number }) {
   const size = `${(scale ?? row?.scale ?? 1) * 100}%`
   return (
     <div className="flex aspect-[2/1] w-full items-center justify-center overflow-hidden rounded-md border" style={CHECKER}>
-      {row ? <img src={stickerUrl(row.path)} alt={row.sponsor_name} className="object-contain" style={{ width: size, height: size }} /> : <span className="text-xs text-muted-foreground">Blank</span>}
+      {row ? <img src={stickerUrl(row.path)} alt={row.sponsor_name} className="max-w-none shrink-0 object-contain" style={{ width: size, height: size }} /> : <span className="text-xs text-muted-foreground">Blank</span>}
     </div>
   )
 }
@@ -65,8 +65,8 @@ export function StickersPanel({ team, own }: { team: string; own: boolean }) {
       <p className="text-sm text-muted-foreground">
         What's painted on the car, in game and on the site. Stickers don't earn money or affect the game; your sponsor deals pay but don't show
         on the car. Each upload is fitted to MM's 2:1 decal shape (a PNG with a transparent background works best) and goes on the car once the
-        organizer approves it. An empty spot stays blank. Each spot can cover several places on the car, and the size can be changed any time
-        without a new approval.
+        organizer approves it. An empty spot stays blank. Each spot can cover several places on the car. The size can be changed any time
+        without a new approval; above 100 % the sticker is cut off at the spot's edges.
       </p>
       {error && <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>}
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

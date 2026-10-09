@@ -128,33 +128,41 @@ namespace LeaguePatch
             {
                 tex = new Texture2D(2, 2, TextureFormat.ARGB32, true);
                 tex.LoadImage(File.ReadAllBytes(file));
-                if (scale < 0.999f) tex = Shrunk(tex, scale);
+                if (Mathf.Abs(scale - 1f) > 0.001f) tex = Scaled(tex, scale);
                 tex.name = "LeagueSticker_" + teamID + "_" + slot;
                 sStickers[key] = tex;
             }
             return tex;
         }
 
-        /// <summary>"&lt;slot&gt;.scale" beside a sticker: its size as a share of the spot (0.25..1), 1 without one.</summary>
+        /// <summary>"&lt;slot&gt;.scale" beside a sticker: its size as a share of the spot (0.25..2), 1 without one.</summary>
         private static float StickerScale(string file)
         {
             float scale;
             if (!File.Exists(file) || !float.TryParse(File.ReadAllText(file).Trim(), System.Globalization.NumberStyles.Float,
                 System.Globalization.CultureInfo.InvariantCulture, out scale)) return 1f;
-            return Mathf.Clamp(scale, 0.25f, 1f);
+            return Mathf.Clamp(scale, 0.25f, 2f);
         }
 
-        /// <summary>The sticker shrunk around its centre on a transparent decal of the same size.</summary>
-        private static Texture2D Shrunk(Texture2D src, float scale)
+        /// <summary>
+        /// The sticker scaled around its centre on a decal of the same size: transparent around it when
+        /// smaller, cut off at the edges when bigger.
+        /// </summary>
+        private static Texture2D Scaled(Texture2D src, float scale)
         {
             int w = src.width, h = src.height;
-            int sw = Mathf.Max(1, Mathf.RoundToInt(w * scale)), sh = Mathf.Max(1, Mathf.RoundToInt(h * scale));
-            int x0 = (w - sw) / 2, y0 = (h - sh) / 2;
+            float sw = w * scale, sh = h * scale, x0 = (w - sw) / 2f, y0 = (h - sh) / 2f;
             Color32[] pixels = new Color32[w * h];
-            for (int y = 0; y < sh; y++)
+            for (int y = 0; y < h; y++)
             {
-                for (int x = 0; x < sw; x++)
-                    pixels[(y0 + y) * w + x0 + x] = src.GetPixelBilinear((x + 0.5f) / sw, (y + 0.5f) / sh);
+                float v = (y + 0.5f - y0) / sh;
+                if (v < 0f || v > 1f) continue;
+                for (int x = 0; x < w; x++)
+                {
+                    float u = (x + 0.5f - x0) / sw;
+                    if (u < 0f || u > 1f) continue;
+                    pixels[y * w + x] = src.GetPixelBilinear(u, v);
+                }
             }
             Texture2D dst = new Texture2D(w, h, TextureFormat.ARGB32, true);
             dst.wrapMode = TextureWrapMode.Clamp;

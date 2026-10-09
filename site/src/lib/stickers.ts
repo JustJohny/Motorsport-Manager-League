@@ -28,7 +28,32 @@ export function stickerUrl(path: string): string {
   return supabase!.storage.from("team-stickers").getPublicUrl(path).data.publicUrl
 }
 
-/** Fit the image inside MM's 2:1 decal on a transparent background, as a PNG. */
+/**
+ * The box around the image's visible pixels (alpha above a few percent), so transparent margins in
+ * the upload don't make the logo small. The whole image if it has none.
+ */
+function visibleBox(img: HTMLImageElement): { x: number; y: number; w: number; h: number } {
+  const c = document.createElement("canvas")
+  c.width = img.naturalWidth
+  c.height = img.naturalHeight
+  const ctx = c.getContext("2d", { willReadFrequently: true })!
+  ctx.drawImage(img, 0, 0)
+  const { data, width, height } = ctx.getImageData(0, 0, c.width, c.height)
+  let x0 = width, y0 = height, x1 = -1, y1 = -1
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      if (data[(y * width + x) * 4 + 3] > 8) {
+        if (x < x0) x0 = x
+        if (x > x1) x1 = x
+        if (y < y0) y0 = y
+        if (y > y1) y1 = y
+      }
+    }
+  }
+  return x1 < 0 ? { x: 0, y: 0, w: width, h: height } : { x: x0, y: y0, w: x1 - x0 + 1, h: y1 - y0 + 1 }
+}
+
+/** Fit the image's visible part inside MM's 2:1 decal on a transparent background, as a PNG. */
 async function padToDecal(file: File): Promise<Blob> {
   const url = URL.createObjectURL(file)
   try {
@@ -38,12 +63,13 @@ async function padToDecal(file: File): Promise<Blob> {
       i.onerror = () => bad(new Error("That file isn't an image the browser can read"))
       i.src = url
     })
-    const scale = Math.min(W / img.naturalWidth, H / img.naturalHeight)
-    const w = img.naturalWidth * scale, h = img.naturalHeight * scale
+    const box = visibleBox(img)
+    const scale = Math.min(W / box.w, H / box.h)
+    const w = box.w * scale, h = box.h * scale
     const canvas = document.createElement("canvas")
     canvas.width = W
     canvas.height = H
-    canvas.getContext("2d")!.drawImage(img, (W - w) / 2, (H - h) / 2, w, h)
+    canvas.getContext("2d")!.drawImage(img, box.x, box.y, box.w, box.h, (W - w) / 2, (H - h) / 2, w, h)
     return await new Promise<Blob>((ok, bad) => canvas.toBlob((b) => (b ? ok(b) : bad(new Error("Couldn't convert the image"))), "image/png"))
   } finally {
     URL.revokeObjectURL(url)

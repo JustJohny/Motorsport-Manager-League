@@ -32,5 +32,5 @@ export function stickerSpots(game: GameRules | undefined): StickerSpot[] {
   return SPOTS[game ?? "rebirth"];
 }
 
-/** Sticker sizes: a share of the spot, 1 = fitted to it as uploaded. */
-export const STICKER_SCALE = { min: 0.25, max: 1 } as const;
+/** Sticker sizes: a share of the spot, 1 = fitted to it as uploaded; above 1 it's cut off at the decal's edges. */
+export const STICKER_SCALE = { min: 0.25, max: 2 } as const;
