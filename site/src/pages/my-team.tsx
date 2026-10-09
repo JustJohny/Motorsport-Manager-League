@@ -18,6 +18,8 @@ import { PitCrewTab } from "@/components/pit-crew-tab"
 import { SponsorsTab } from "@/components/sponsors-tab"
 import { ContractsTab } from "@/components/contracts-tab"
 import { IdentityTab } from "@/components/identity-tab"
+import { PreseasonTab } from "@/components/preseason-tab"
+import { usePreseason } from "@/lib/preseason"
 import { PersonCard } from "@/components/person-card"
 import { fmtDate, fmtMoney, fmtMoneyShort, fmtPct } from "@/lib/format"
 import { useHqOrders } from "@/lib/hq"
@@ -38,6 +40,8 @@ export function MyTeamPage() {
   const name = useParams().name ?? me.team
   const team = league.snapshot.teams.find((t) => t.name === name)
   const priv = league.privateTeams[name]
+  const preseason = usePreseason()
+  const preseasonTab = preseason.open || preseason.moves.some((m) => m.team === name)
   if (!team) return <PageHeader title="Team not found" description={<Link to="/" className="underline">Back to my team</Link>} />
 
   const ch = league.snapshot.championship
@@ -70,9 +74,10 @@ export function MyTeamPage() {
         <Stat label="Engine" value={team.engine?.name ?? "—"} hint={team.engine ? engineHint(team.engine.stats) : undefined} />
       </div>
 
-      <Tabs defaultValue="staff">
+      <Tabs key={preseasonTab ? "pre" : "season"} defaultValue={preseasonTab ? "preseason" : "staff"}>
         {/* Seven tabs don't fit a phone: the bar scrolls sideways there. */}
         <TabsList className="max-w-full justify-start overflow-x-auto">
+          {preseasonTab && <TabsTrigger value="preseason">Pre-season</TabsTrigger>}
           <TabsTrigger value="staff">Staff</TabsTrigger>
           <TabsTrigger value="hq">HQ</TabsTrigger>
           <TabsTrigger value="parts">Parts</TabsTrigger>
@@ -84,6 +89,7 @@ export function MyTeamPage() {
         <TabsContent value="staff" className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {people.map((s) => <PersonCard key={s.slotID} person={s.person!} role={s.job} gameDate={league.snapshot.gameDate} />)}
         </TabsContent>
+        {preseasonTab && <TabsContent value="preseason"><PreseasonTab team={name} priv={priv} own={name === me.team} /></TabsContent>}
         <TabsContent value="hq">{priv ? <HqTable hq={priv.hq} own={name === me.team} team={name} /> : <PrivateNote />}</TabsContent>
         <TabsContent value="parts">{priv ? <PartsTab priv={priv} team={name} own={name === me.team} /> : <PrivateNote />}</TabsContent>
         <TabsContent value="crew">{priv ? <PitCrewTab priv={priv} team={name} own={name === me.team} /> : <PrivateNote />}</TabsContent>

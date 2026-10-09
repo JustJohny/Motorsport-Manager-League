@@ -2,7 +2,8 @@ import type { Obj } from "./graph.ts";
 import type {
   Building, CalendarEvent, Championship, LeagueConfig, LeagueState, Part, Person, RaceResults, RulesBreach, SessionResult, TeamDesign, TeamState,
 } from "./league-types.ts";
-import { teamDesign } from "./ops/design.ts";
+import { isSpecPart, teamDesign } from "./ops/design.ts";
+import { DRIVER_STATUS } from "./ops/staff.ts";
 import { gameCrew, pitCrewRules, pitStopLog } from "./ops/pit-crew.ts";
 import { teamSponsors } from "./ops/sponsors.ts";
 import { liveryOptions, teamLook } from "./ops/team.ts";
@@ -159,6 +160,8 @@ export function person(save: Save, p: Obj): Person {
     stats: s,
     potential: numOrNull(p.mPotential ?? null),
     carID: p.mCarID ?? null,
+    ...(kind === "Driver" ? { status: DRIVER_STATUS_NAMES[c.mCurrentStatus] ?? "Reserve" } : {}),
+    ...(kind === "Mechanic" ? { mechanicCar: typeof p.driver === "number" ? p.driver : null } : {}),
     contract: {
       team: employer?.name ?? null,
       job: JOBS[c.job] ?? String(c.job),
@@ -168,6 +171,8 @@ export function person(save: Save, p: Obj): Person {
     },
   };
 }
+
+const DRIVER_STATUS_NAMES = Object.fromEntries(Object.entries(DRIVER_STATUS).map(([k, v]) => [v, k])) as Record<number, "Equal" | "One" | "Two" | "Reserve">;
 
 function calendar(save: Save, ch: Obj): CalendarEvent[] {
   return save.g.list<Obj>(ch.calendar).map((ev, i) => {
@@ -275,6 +280,15 @@ function withRules(save: Save, t: Obj, champ: Obj, design: TeamDesign): TeamDesi
       pending: (nextYearDesignState(save, t) === "designing" ? pendingSuppliers(save, t) : undefined) as Record<string, never> | undefined,
       investment: carInvestment(save, t),
     },
+    // FF20 offers every supplier of the tier (no draw), so this season's car can be re-equipped
+    // in the league's pre-season.
+    ...(save.game === "ff20" ? {
+      currentCar: {
+        current: currentSuppliers(save, t) as Record<string, never>,
+        options: supplierOptions(save, t) as Record<string, never>,
+        specEngine: isSpecPart(save, t, "Engine"),
+      },
+    } : {}),
     rules: {
       brokenThisSeason: t.rulesBrokenThisSeason ?? 0,
       game: save.game,

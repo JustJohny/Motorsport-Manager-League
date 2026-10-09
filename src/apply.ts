@@ -14,7 +14,10 @@ import {
   type CancelBuildingOp, type CancelUnorderedHqOp, type SetBuildingOp, type StartBuildingOp,
 } from "./ops/hq.ts";
 import { addPart, fitPart, removePart, type AddPartOp, type FitPartOp, type RemovePartOp } from "./ops/parts.ts";
-import { hire, type HireOp } from "./ops/staff.ts";
+import {
+  hire, promoteDriver, releasePerson, swapCarDrivers, swapMechanics,
+  type HireOp, type PromoteDriverOp, type ReleasePersonOp, type SwapCarDriversOp, type SwapMechanicsOp,
+} from "./ops/staff.ts";
 import { renamePerson, type RenamePersonOp } from "./ops/people.ts";
 import { renameTeam, setTeamCountry, setTeamLook, type RenameTeamOp, type SetTeamCountryOp, type SetTeamLookOp } from "./ops/team.ts";
 import { syncTeam, type SyncTeamOp } from "./ops/sync.ts";
@@ -30,7 +33,8 @@ export type Change = SetBuildingOp | StartBuildingOp | CancelBuildingOp | Cancel
   | StartDesignOp | CancelDesignOp | CancelUnorderedDesignsOp | RemoveUnorderedPartsOp | SetFittingOp | SetImprovementOp
   | ConcludeVoteOp | SetNextRuleOp | SetSuppliersOp | RenamePersonOp | RenameTeamOp | SetTeamCountryOp | SetTeamLookOp
   | SetCurrentSupplierOp | RenameSupplierOp | SetPitCrewOp | EqualizeOp | SignSponsorOp | DropSponsorOp | SetChassisOp | SetCarInvestmentOp | RenewContractOp
-  | HoldPromotionsOp | ProtectTeamsOp | RepairCircuitsOp | RepairOldFormatOp;
+  | HoldPromotionsOp | ProtectTeamsOp | RepairCircuitsOp | RepairOldFormatOp
+  | PromoteDriverOp | SwapCarDriversOp | SwapMechanicsOp | ReleasePersonOp;
 
 export interface ChangeSet {
   /** Optional note, e.g. "Before round 6 - Munich". */
@@ -64,6 +68,10 @@ function run(save: Save, c: Change): string | string[] {
     case "removePart": return removePart(save, c);
     case "fitPart": return fitPart(save, c);
     case "hire": return hire(save, c);
+    case "promoteDriver": return promoteDriver(save, c);
+    case "swapCarDrivers": return swapCarDrivers(save, c);
+    case "swapMechanics": return swapMechanics(save, c);
+    case "releasePerson": return releasePerson(save, c);
     case "renamePerson": return renamePerson(save, c);
     case "renameTeam": return renameTeam(save, c);
     case "setTeamCountry": return setTeamCountry(save, c);

@@ -52,7 +52,8 @@ export function hire(save: Save, op: HireOp): string {
   const terms = {
     yearlyWages: op.yearlyWages ?? inC.yearlyWages,
     end: op.endDate ?? outC?.mEndDate ?? inC.mEndDate,
-    status: outC?.mCurrentStatus ?? inC.mCurrentStatus,
+    // An empty driver slot past the two race seats is the reserve's.
+    status: outC?.mCurrentStatus ?? (kind === "Driver" && driverSlots(save, team).indexOf(slot) >= 2 ? DRIVER_STATUS.Reserve : inC.mCurrentStatus),
   };
 
   if (fromTeam && fromSlot && outgoing && outC) {
@@ -281,4 +282,137 @@ function ensureStandingsEntry(save: Save, team: Obj, driver: Obj) {
     if (Array.isArray(row[k])) row[k] = row[k].map(() => 0);
   }
   rows.push(row);
+}
+
+/** ContractPerson.Status: a driver's standing in the team. */
+export const DRIVER_STATUS = { Equal: 0, One: 1, Two: 2, Reserve: 3 } as const;
+
+/**
+ * The team's driver slots in MM's order. In single-seater series the first is car 1, the second
+ * car 2 and any further slot the reserve (Team.GetDriversForCar); endurance uses `mCarID`.
+ */
+function driverSlots(save: Save, team: Obj): Obj[] {
+  return save.slots(team).filter((s) => s.jobType === JOB.Driver);
+}
+
+function slotOf(save: Save, team: Obj, guid: string): Obj {
+  const slot = save.slots(team).find((s) => s.personHired && save.g.deref<Obj>(s.personHired).id === guid);
+  if (!slot) throw new Error(`${team.name}: nobody with id ${guid} on the team`);
+  return slot;
+}
+
+/** Swap the people in two of a team's slots, with their status and car (Team.PromoteDriver does the slots and status). */
+function swapSlots(save: Save, a: Obj, b: Obj) {
+  const g = save.g;
+  const pa = g.deref<Obj>(a.personHired), pb = g.deref<Obj>(b.personHired);
+  a.personHired = g.ref(pb);
+  b.personHired = g.ref(pa);
+  const ca = save.contract(pa), cb = save.contract(pb);
+  [ca.mCurrentStatus, cb.mCurrentStatus] = [cb.mCurrentStatus, ca.mCurrentStatus];
+  [ca.mProposedStatus, cb.mProposedStatus] = [cb.mProposedStatus, ca.mProposedStatus];
+  [pa.mCarID, pb.mCarID] = [pb.mCarID, pa.mCarID];
+}
+
+/** MM's Team.ClearSelectedDriversForSession: the game picks the drivers again when the next session starts. */
+function clearSessionDrivers(team: Obj) {
+  for (const e of Array.isArray(team.mSelectedSessionDrivers) ? team.mSelectedSessionDrivers : []) e.Value = [];
+  for (const e of Array.isArray(team.mVehicleSessionDrivers) ? team.mVehicleSessionDrivers : []) e.Value = null;
+}
+
+export interface PromoteDriverOp {
+  op: "promoteDriver";
+  team: string | number;
+  /** GUID of the reserve driver who takes the race seat. */
+  reserve: string;
+  /** GUID of the race driver who becomes the reserve. */
+  driver: string;
+}
+
+/**
+ * The reserve driver takes a race driver's seat and status, and the race driver becomes the
+ * reserve, as MM's ContractManagerTeam.PromoteDriver (without its morale change). A demoted
+ * driver who hasn't raced this season leaves the standings, as in MM.
+ */
+export function promoteDriver(save: Save, op: PromoteDriverOp): string {
+  const g = save.g;
+  const team = save.team(op.team);
+  const slots = driverSlots(save, team);
+  const up = slotOf(save, team, op.reserve), down = slotOf(save, team, op.driver);
+  const upIdx = slots.indexOf(up), downIdx = slots.indexOf(down);
+  if (downIdx < 0 || downIdx > 1) throw new Error(`${team.name}: ${op.driver} isn't a race driver`);
+  if (upIdx < 2) throw new Error(`${team.name}: ${op.reserve} isn't the reserve driver`);
+  const promoted = g.deref<Obj>(up.personHired), demoted = g.deref<Obj>(down.personHired);
+  swapSlots(save, down, up);
+  save.contract(demoted).mCurrentStatus = DRIVER_STATUS.Reserve;
+  save.contract(demoted).mProposedStatus = DRIVER_STATUS.Reserve;
+  clearSessionDrivers(team);
+  const st = g.deref<Obj>(save.championship(team).standings);
+  const rows = g.rawList(st.mDrivers);
+  const i = rows.findIndex((r) => g.deref<Obj>(g.deref<Obj>(r).mEntity) === demoted);
+  if (i >= 0 && !(g.deref<Obj>(rows[i]).races > 0)) rows.splice(i, 1);
+  ensureStandingsEntry(save, team, promoted);
+  ensureMechanicRelationships(save, team);
+  return `${team.name}: ${personName(promoted)} promoted to car ${downIdx + 1}, ${personName(demoted)} now reserve`;
+}
+
+export interface SwapCarDriversOp {
+  op: "swapCarDrivers";
+  team: string | number;
+}
+
+/** The two race drivers swap cars. Mechanics stay with their car. */
+export function swapCarDrivers(save: Save, op: SwapCarDriversOp): string {
+  const team = save.team(op.team);
+  const [a, b] = driverSlots(save, team);
+  if (!a?.personHired || !b?.personHired) throw new Error(`${team.name}: needs two race drivers to swap cars`);
+  swapSlots(save, a, b);
+  clearSessionDrivers(team);
+  const p = (s: Obj) => personName(save.g.deref<Obj>(s.personHired));
+  return `${team.name}: car 1 ${p(a)}, car 2 ${p(b)}`;
+}
+
+export interface SwapMechanicsOp {
+  op: "swapMechanics";
+  team: string | number;
+}
+
+/** The two race mechanics swap drivers (ContractManagerTeam.SwapMechanicForDriver). */
+export function swapMechanics(save: Save, op: SwapMechanicsOp): string {
+  const g = save.g;
+  const team = save.team(op.team);
+  const mechanics = save.slots(team).filter((s) => s.jobType === JOB.Mechanic && s.personHired).map((s) => g.deref<Obj>(s.personHired));
+  if (mechanics.length !== 2) throw new Error(`${team.name}: needs two mechanics to swap (has ${mechanics.length})`);
+  const [a, b] = mechanics;
+  [a.driver, b.driver] = [b.driver, a.driver];
+  ensureMechanicRelationships(save, team);
+  return `${team.name}: ${personName(a)} now on car ${Number(a.driver) + 1}, ${personName(b)} on car ${Number(b.driver) + 1}`;
+}
+
+export interface ReleasePersonOp {
+  op: "releasePerson";
+  team: string | number;
+  person: string;
+}
+
+/**
+ * Release someone to the free-agent market, leaving their slot empty. Only the reserve driver:
+ * MM can't race with an empty race seat, engineer or mechanic, so those are released by signing
+ * a replacement (`hire` with `replacing`).
+ */
+export function releasePerson(save: Save, op: ReleasePersonOp): string {
+  const g = save.g;
+  const team = save.team(op.team);
+  const slot = slotOf(save, team, op.person);
+  const idx = driverSlots(save, team).indexOf(slot);
+  const p = g.deref<Obj>(slot.personHired);
+  if (idx < 2) throw new Error(`${team.name}: only the reserve driver can leave without a replacement (${personName(p)} is ${idx < 0 ? personKind(p).toLowerCase() : "a race driver"})`);
+  release(save, p);
+  slot.personHired = null;
+  const cached = g.rawList(save.contractManager(team).mCachedPeople);
+  const i = cached.findIndex((x) => g.deref(x) === p);
+  if (i >= 0) cached.splice(i, 1);
+  for (const s of g.list<Obj>(save.contractManager(team).mNextYearEmployeeSlots)) {
+    if (s.personHired && g.deref(s.personHired) === p) s.personHired = null;
+  }
+  return `${team.name}: released reserve driver ${personName(p)}`;
 }

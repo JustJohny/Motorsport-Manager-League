@@ -1,6 +1,6 @@
 import {
-  BatteryCharging, CalendarClock, Check, ChevronsUp, Circle, Coins, Disc3, Fan, Flame, Fuel, Gauge, Layers, Loader2, Lock,
-  RotateCcw, Settings2, Thermometer, Zap, type LucideIcon,
+  BatteryCharging, CalendarClock, Check, ChevronsUp, Circle, Coins, Flame, Fuel, Gauge, Loader2, Lock,
+  RotateCcw, Settings2, Thermometer, type LucideIcon,
 } from "lucide-react"
 import { useCallback, useEffect, useState } from "react"
 import { SUPPLIER_STATS, supplierWindow } from "../../../src/supplier-rules.ts"
@@ -12,13 +12,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { fmtMoneyShort, humanize } from "@/lib/format"
 import { useLeague } from "@/lib/league"
 import { demoMode, supabase, watchTable } from "@/lib/supabase"
+import { dealNames, TYPE_ICONS, TYPE_LABELS } from "@/lib/suppliers"
 import { cn } from "@/lib/utils"
 import type { SupplierOffer, TeamPrivate } from "@/lib/types"
 
-const TYPE_ICONS: Record<string, LucideIcon> = {
-  Engine: Fan, Brakes: Disc3, Fuel: Fuel, Materials: Layers, Battery: BatteryCharging, ERSAdvanced: Zap,
-}
-const TYPE_LABELS: Record<string, string> = { ERSAdvanced: "ERS" }
 const STAT_ICONS: Record<number, LucideIcon> = { 0: Circle, 1: Thermometer, 2: Fuel, 3: ChevronsUp, 4: BatteryCharging, 5: Flame }
 
 interface Choice { team: string; season: number; supplier_type: string; supplier_id: number }
@@ -154,37 +151,34 @@ function SupplierChoices({ priv, team, own, calendar }: { priv: TeamPrivate; tea
   )
 }
 
-/** MM has several deals per supplier (Micronix Racing makes every brake): number repeated names, cheapest first. */
-function dealNames(options: SupplierOffer[]) {
-  const sorted = [...options].sort((a, b) => a.price - b.price || a.id - b.id)
-  const count = new Map<string, number>(), seen = new Map<string, number>()
-  for (const o of sorted) count.set(o.name, (count.get(o.name) ?? 0) + 1)
-  return sorted.map((o) => {
-    const n = (seen.get(o.name) ?? 0) + 1
-    seen.set(o.name, n)
-    return { o, name: count.get(o.name)! > 1 ? `${o.name} · deal ${n}` : o.name }
-  })
-}
-
-function SupplierOption({ o, name, current, selected, isCurrent, disabled, busy, onChoose }: {
+/** `free`: no price (the league's pre-season); `current` is what the comparison is against. */
+export function SupplierOption({ o, name, current, selected, isCurrent, disabled, busy, onChoose, free, currentLabel = "This season" }: {
   o: SupplierOffer; name: string; current?: SupplierOffer; selected: boolean; isCurrent: boolean; disabled: boolean; busy: boolean; onChoose: () => void
+  free?: boolean; currentLabel?: string
 }) {
   // Energy stats (4, 5) are zero outside hybrid series.
   const keys = [...new Set([...Object.keys(o.stats), ...Object.keys(current?.stats ?? {})].map(Number))].sort()
     .filter((k) => k < 4 || o.stats[k] || current?.stats[k])
   const level = (l: [number, number]) => (l[0] === l[1] ? `+${l[0]}` : `+${l[0]}–${l[1]}`)
-  const signed = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : "±"}${Math.abs(v)}`
+  // Battery stats are fractions with float noise (0.10464660000000003).
+  const round = (v: number) => Math.round(v * 100) / 100
+  const signed = (v: number) => `${v > 0 ? "+" : v < 0 ? "−" : "±"}${round(Math.abs(v))}`
   return (
     <div className={cn("flex flex-col gap-2 rounded-lg border p-3", selected && "border-primary bg-primary/5")}>
       <div className="flex items-start gap-2">
         <span className="flex-1 text-sm font-medium">{name}</span>
-        {isCurrent && <Badge variant="outline">This season</Badge>}
+        {isCurrent && <Badge variant="outline">{currentLabel}</Badge>}
         {selected && <Badge><Check /> {isCurrent ? "Kept" : "Chosen"}</Badge>}
       </div>
       <div className="flex flex-col gap-1 text-xs tabular-nums">
-        <span className="flex items-center gap-1.5"><Coins className="size-3.5 text-muted-foreground" /> {fmtMoneyShort(o.price)}
-          {current && !isCurrent && <Delta v={current.price - o.price} fmt={(v) => fmtMoneyShort(Math.abs(v))} />}</span>
-        {o.engineLevel && (
+        {!free && (
+          <span className="flex items-center gap-1.5"><Coins className="size-3.5 text-muted-foreground" /> {fmtMoneyShort(o.price)}
+            {current && !isCurrent && <Delta v={current.price - o.price} fmt={(v) => fmtMoneyShort(Math.abs(v))} />}</span>
+        )}
+        {o.level != null && current?.level != null ? (
+          <span className="flex items-center gap-1.5"><Gauge className="size-3.5 text-muted-foreground" /> Engine level +{o.level}
+            {!isCurrent && <Delta v={o.level - current.level} fmt={(d) => String(Math.abs(d))} />}</span>
+        ) : o.engineLevel && (
           <span className="flex items-center gap-1.5"><Gauge className="size-3.5 text-muted-foreground" /> Engine level {level(o.engineLevel)}
             {current?.engineLevel && !isCurrent && <Delta v={o.engineLevel[0] - current.engineLevel[0]} fmt={(d) => String(Math.abs(d))} />}</span>
         )}
@@ -194,7 +188,7 @@ function SupplierOption({ o, name, current, selected, isCurrent, disabled, busy,
           return (
             <span key={k} className="flex items-center gap-1.5">
               <StatIcon className="size-3.5 text-muted-foreground" /> {SUPPLIER_STATS[k] ?? `Stat ${k}`} {signed(v)}
-              {current && !isCurrent && <Delta v={v - (current.stats[k] ?? 0)} fmt={(d) => String(Math.abs(d))} />}
+              {current && !isCurrent && <Delta v={round(v - (current.stats[k] ?? 0))} fmt={(d) => String(round(Math.abs(d)))} />}
             </span>
           )
         })}

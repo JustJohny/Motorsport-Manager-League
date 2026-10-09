@@ -54,6 +54,8 @@ See `examples/changes.example.json`. Operations:
 - `addPart {team, type, stat, reliability, performance?, maxPerformance?, level?, name?, fitToCar?}`
 - `fitPart {team, type, part, car}` and `removePart {team, type, part}`
 - `hire {team, person, replacing | slotID, yearlyWages?, endDate?}`: works for drivers, lead engineers and mechanics. A free agent replaces someone, who is then released. Someone at another team **swaps** with the person they replace.
+- `promoteDriver {team, reserve, driver}`: the reserve takes the race driver's seat and status, as MM's own promote. `swapCarDrivers {team}` swaps the two race drivers' cars; `swapMechanics {team}` swaps which car each mechanic works on. `releasePerson {team, person}` releases the reserve driver (race seats, engineer and mechanics are released by signing a replacement).
+- `setCurrentSupplier {team, type, id}`: a supplier on this season's cars, free. The chassis stats are rebuilt (floored at 0, as MM does); a new engine moves every engine part by the difference in engine level, unless engines are spec.
 - `syncTeam {team, hq, parts, fitted, staff, budget}`: **site is the source of truth.** It forces a member team to match the site and undoes whatever the in-game AI did for that team between races.
 
 People and parts are identified by the GUIDs in the `extract` output. Those GUIDs stay the same from one save to the next.
@@ -98,6 +100,10 @@ Each series is one MM save (e.g. an open-wheel and an endurance league at the sa
 - Database (migration 013): the league tables live in the `league` schema with a `series` column. The `public` views of the same names show the series in the request's `x-series` header (the site and the toolkit send it), so every database function is scoped to one series. Row-level security checks each row's own series, which keeps realtime (no headers) per series too.
 - Ending a series: `mmsave archive --league <file>` writes a JSON backup of every row of the series; with `--end` it then deletes the series from the site (nothing of other series). `mmsave restore <backup.json>` puts it back while no series has its id.
 - The league from before series existed is the series `main`: add `"series": { "id": "main", "name": "…" }` to its league file.
+
+## Pre-season
+
+Before round 1 the organizer opens the league's pre-season on the Organizer page (migration 022). Members then sign free agents straight away (first come wins, no sign-on fee, the market's opening wage, 1–3 seasons), promote their reserve, swap the drivers' cars or the mechanics, release people, and pick this season's suppliers for free, all from My team → Pre-season and the Staff market. Moves are kept in order; `pull` replays each team's moves (`src/preseason.ts`) into `hire`, `promoteDriver`, `swapCarDrivers`, `swapMechanics`, `releasePerson` and `setCurrentSupplier`. A released race driver, engineer or mechanic stays unless someone is signed into the seat. Close the pre-season once it's applied.
 
 ## Organizer workflow
 Each race has two checkpoints (after the race, and just before the next one). The site's **Organizer page** walks through them step by step: it detects the current checkpoint from the published game date, fills in the save names, and has copyable commands, the rules that keep the cycle working, and what to do when something fails.

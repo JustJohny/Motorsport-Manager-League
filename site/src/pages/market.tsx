@@ -1,4 +1,4 @@
-import { Gavel, Search } from "lucide-react"
+import { Gavel, Search, UserCheck, UserPlus } from "lucide-react"
 import { useMemo, useState } from "react"
 import { useNavigate } from "react-router"
 import { Button } from "@/components/ui/button"
@@ -9,6 +9,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { PageHeader } from "@/components/page-header"
 import { BidDialog } from "@/components/bid-dialog"
+import { SignDialog } from "@/components/sign-dialog"
+import { usePreseason } from "@/lib/preseason"
 import { PersonCard } from "@/components/person-card"
 import { ageAt, fmtCountry, fmtMoneyShort, fmtNum, statAverage } from "@/lib/format"
 import { useLeague } from "@/lib/league"
@@ -29,8 +31,10 @@ const SORTS: Record<Sort, { label: string; fn: (a: Person, b: Person, date: stri
 }
 
 export function MarketPage() {
-  const { league } = useLeague()
+  const { me, league } = useLeague()
   const t = useTransfers()
+  const pre = usePreseason()
+  const career = league.snapshot.teams.find((x) => x.name === me.team)?.isPlayerTeam
   const navigate = useNavigate()
   const date = league.snapshot.gameDate
   const [source, setSource] = useState<Source>("free")
@@ -60,7 +64,7 @@ export function MarketPage() {
     <>
       <PageHeader
         title="Staff market"
-        description={t.isOpen ? "The transfer window is open: nominate someone with your opening bid to start an auction." : "Free agents and AI teams' staff. Auctions run during transfer windows."}
+        description={pre.open ? "Pre-season: sign free agents straight away, no fees, first come wins." : t.isOpen ? "The transfer window is open: nominate someone with your opening bid to start an auction." : "Free agents and AI teams' staff. Auctions run during transfer windows."}
       />
       <div className="flex flex-wrap items-center gap-3">
         <Tabs value={source} onValueChange={(v) => { setSource(v as Source); setSelected(null) }}>
@@ -114,7 +118,10 @@ export function MarketPage() {
                     onClick={() => setSelected(p.guid)}
                     className={cn("cursor-pointer", p === current && "bg-primary/10 hover:bg-primary/15")}
                   >
-                    <TableCell className="font-medium">{p.name}</TableCell>
+                    <TableCell className="font-medium">
+                      {p.name}
+                      {pre.signedBy(p.guid) && <span className="ml-1.5 text-xs text-muted-foreground">signed by {pre.signedBy(p.guid)}</span>}
+                    </TableCell>
                     <TableCell className="text-right tabular-nums">{ageAt(p.dateOfBirth, date)}</TableCell>
                     {source === "free" && <TableCell className="hidden sm:table-cell">{fmtCountry(p.nationality)}</TableCell>}
                     <TableCell className="text-right tabular-nums">{fmtNum(statAverage(p.stats))}</TableCell>
@@ -137,6 +144,11 @@ export function MarketPage() {
         </Card>
         <div className="flex flex-col gap-3 lg:sticky lg:top-16">
           {current && <PersonCard person={current} gameDate={date} />}
+          {current && source === "free" && pre.open && !career && (
+            pre.signedBy(current.guid)
+              ? <Button variant="outline" disabled><UserCheck /> Signed by {pre.signedBy(current.guid)}</Button>
+              : <SignDialog person={current} trigger={<Button><UserPlus /> Sign now for {fmtMoneyShort(minWage(current, t.settings))}/yr, no fee</Button>} />
+          )}
           {current && (
             auctionFor(current.guid)
               ? <Button variant="outline" onClick={() => navigate("/transfers")}><Gavel /> In auction: go to transfer window</Button>

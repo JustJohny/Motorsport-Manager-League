@@ -6,6 +6,7 @@ import { Archive, Flag, Plus } from "lucide-react"
 import { CopyCommand, RaceCycle } from "@/components/race-cycle"
 import { seriesFiles } from "../../../src/race-cycle.ts"
 import { WindowControls } from "@/components/window-controls"
+import { PreseasonControls } from "@/components/preseason-controls"
 import { EqualizeCard } from "@/components/equalize-card"
 import { LogoReviewCard } from "@/components/logo-review-card"
 import { fmtDate } from "@/lib/format"
@@ -24,6 +25,7 @@ export function OrganizerPage() {
       <RaceCycle />
       <div className="grid gap-4 lg:grid-cols-3">
         <WindowControls />
+        <PreseasonControls />
         <Card size="sm">
           <CardHeader>
             <CardTitle>Published snapshot #{league.snapshotId}</CardTitle>

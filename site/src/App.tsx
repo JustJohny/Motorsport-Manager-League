@@ -1,3 +1,4 @@
+import { CalendarClock } from "lucide-react"
 import { HashRouter, Navigate, Route, Routes } from "react-router"
 import { AppSidebar } from "@/components/app-sidebar"
 import { Gate } from "@/components/gate"
@@ -6,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip"
 import { LeagueProvider, useLeague } from "@/lib/league"
 import { demoMode } from "@/lib/supabase"
 import { fmtDate } from "@/lib/format"
+import { cn } from "@/lib/utils"
 import { MarketPage } from "@/pages/market"
 import { MyTeamPage } from "@/pages/my-team"
 import { OrganizerPage } from "@/pages/organizer"
@@ -21,10 +23,12 @@ import { PartsProvider } from "@/lib/parts"
 import { PitCrewProvider } from "@/lib/pit-crew"
 import { SponsorsProvider } from "@/lib/sponsors"
 import { ContractsProvider } from "@/lib/contracts"
+import { PreseasonProvider, usePreseason } from "@/lib/preseason"
 import { TeamLookProvider } from "@/lib/team-look"
 
 function Shell() {
   const { me, league } = useLeague()
+  const preseason = usePreseason().open
   return (
     <SidebarProvider>
       <AppSidebar />
@@ -35,7 +39,8 @@ function Shell() {
             Game date {fmtDate(league.snapshot.gameDate)}
             <span className="hidden sm:inline"> · published {new Date(league.publishedAt).toLocaleString()}</span>
           </span>
-          {demoMode && <span className="ml-auto rounded bg-primary/15 px-2 py-0.5 text-xs text-primary">Demo data</span>}
+          {preseason && <span className="ml-auto flex items-center gap-1 rounded bg-primary/15 px-2 py-0.5 text-xs text-primary"><CalendarClock className="size-3" /> Pre-season</span>}
+          {demoMode && <span className={cn("rounded bg-primary/15 px-2 py-0.5 text-xs text-primary", !preseason && "ml-auto")}>Demo data</span>}
         </header>
         <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-4 md:p-6">
           <Routes>
@@ -69,9 +74,11 @@ export default function App() {
                   <PitCrewProvider>
                     <SponsorsProvider>
                       <ContractsProvider>
-                        <TeamLookProvider>
-                          <Shell />
-                        </TeamLookProvider>
+                        <PreseasonProvider>
+                          <TeamLookProvider>
+                            <Shell />
+                          </TeamLookProvider>
+                        </PreseasonProvider>
                       </ContractsProvider>
                     </SponsorsProvider>
                   </PitCrewProvider>

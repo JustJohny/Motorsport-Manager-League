@@ -1,6 +1,6 @@
 # Handoff: MM League Toolkit
 
-_Last updated 2026-10-08 (third-party mods: Enzoli 2016 liveries, sponsor decals, track movies and facepack ported into the staging mod, AI teams' real 2016 looks, Enhanced Graphics checked; promotions: member teams protected, AI teams move; game patch: player team retires at the start, verified in game; team identity: colours, livery and logo on the site, migration 019; pre-season saves checked; sponsors built; pit crews built; auction, HQ orders, part development, organizer race guide and grey-area parts live; regulations, engine programmes and illegal engines designed, not built). Read this first in a new session, then `README.md` and `docs/save-schema.md`._
+_Last updated 2026-10-09 (league pre-season built: free signings, line-up moves, this season's suppliers, migration 022 run; third-party mods: Enzoli 2016 liveries, sponsor decals, track movies and facepack ported into the staging mod, AI teams' real 2016 looks, Enhanced Graphics checked; promotions: member teams protected, AI teams move; game patch: player team retires at the start, verified in game; team identity: colours, livery and logo on the site, migration 019; pre-season saves checked; sponsors built; pit crews built; auction, HQ orders, part development, organizer race guide and grey-area parts live; regulations, engine programmes and illegal engines designed, not built). Read this first in a new session, then `README.md` and `docs/save-schema.md`._
 
 ## The goal
 Run a **Motorsport Manager 1 (v1.53)** online league the way F1 Manager 24 community leagues run:
@@ -907,6 +907,27 @@ The user downloaded these into ~/Downloads and asked that they work with the too
 - **To go live:** run migration 021, then `mmsave liveries --game "<MM_Data>" --python ~/.mm-venv/bin/python` (uploads about 43 MB), then publish.
   - **2026-10-09:** the user ran migration 021. All 945 livery files (`out/liveries`) are uploaded. Only the publish is left.
   - The upload failed on "bad record mac" TLS errors (about 1 in 50 requests, more for the 3 MB `.glb`). Storage requests now retry 6 times, and `mmsave liveries` uploads every file it can before naming the failed ones, so running it again is enough.
+
+## League pre-season (built 2026-10-09; migration 022 run by the user the same day; needs a publish and an in-game check)
+**The user's rules (2026-10-09):** on a save a few days before round 1 the organizer opens a pre-season on the site (Organizer page switch, not automatic). While open:
+- **Free-agent signings, instant:** first come wins (no auction), no sign-on fee, at the market's opening wage (`min_wage`), 1..`max_contract_years` seasons. Free agents only (no AI or member staff). The replaced person becomes a free agent. Only free agents of the latest publish can be signed: people released now reach the market at the next publish.
+- **Own-team moves:** promote the reserve (to car 1 or 2), swap the drivers' cars, swap the mechanics, release anyone.
+- **This season's suppliers, free:** any supplier of the tier (FF20 has no draw). The chassis is rebuilt with MM's floor-at-0 formula; **a new engine shifts every engine part by the engine-level difference** (`mRandomEngineLevelModifier`: Mercedes A 128, Renault A 93, Mercedes B 17), which MM otherwise only adds when next year's car is built (`NextYearCarDesign.DesignCompleted`). Not with spec engines.
+- **Release rule (my default, told to the user):** a released race driver, engineer or mechanic stays unless someone is signed into the seat before the pull (MM can't race with an empty seat); the pull warns. Only a released reserve actually leaves.
+- The career team is managed in game.
+
+**Built:**
+- Ops (`src/ops/staff.ts`): `promoteDriver` (port of `ContractManagerTeam.PromoteDriver` without morale: slots, status, standings row removed if the demoted driver hasn't raced, session driver lists cleared like `ClearSelectedDriversForSession`), `swapCarDrivers`, `swapMechanics` (`SwapMechanicForDriver`), `releasePerson` (reserve only). `hire` into an empty reserve slot now sets status Reserve. `setCurrentSupplier` (`src/ops/suppliers.ts`) reworked as above; returns lines.
+- MM facts: single-seater cars = the first two driver slots (`Team.GetDriversForCar`), the third is the reserve; FF20 teams have spare driver slots 3–5 that aren't seats. `ContractPerson.Status` 0 Equal / 1 One / 2 Two / 3 Reserve. Session lists `mSelectedSessionDrivers` (car → [driver]) and `mVehicleSessionDrivers` (car → driver) are empty before the first session.
+- Extract: `Person.status` (drivers), `Person.mechanicCar`, `SupplierOffer.level` (exact engine level), `design.currentCar {current, options, specEngine}` (FF20 only).
+- `src/preseason.ts`: `replay()` turns a team's moves (oldest first) into the line-up and the save changes; shared by the site and the pull. A release + later signing into that seat becomes one `hire` replacing the released person.
+- Migration `022_preseason.sql`: `league_settings.preseason`, `preseason_moves` (public in the series; unique queued signing per person = first come wins), `preseason_suppliers` (private). RPCs `set_preseason`, `preseason_sign`, `preseason_move`, `preseason_undo` (latest move), `preseason_supplier`, `clear_preseason_supplier`.
+- Pull: section "Pre-season" after contract renewals (`src/preseason-orders.ts`); `--mark-applied` marks moves and picks applied.
+- Site: My team → **Pre-season** tab (first tab while open: line-up with promote/swap/release, moves waiting with Undo last, this season's suppliers); Staff market "Sign now" dialog and "signed by"; header badge; Organizer card to open/close. Checked in demo mode with headless Chromium (desktop and 390 px, no console errors).
+- Tests: `test/lineup.test.ts` (ops on "SaveFF20 F1 Test"), `test/db-preseason.test.ts` (RPC rules, then pull → apply on the save).
+
+**To go live:** publish the pre-race save (the extract adds the new fields); open the pre-season on the Organizer page; members act; `pull --mark-applied` + apply; close it.
+**To check in game:** a promoted reserve races in the right car; swapped mechanics show on the right drivers; a pre-season signing's wage and contract end; the engine switch shows in the car's stats (chassis and engine).
 
 ## Working notes for the assistant
 - The user plays MM under Wine on Linux (CachyOS). They test in game and report back, so give them concrete things to check.

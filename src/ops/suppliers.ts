@@ -3,6 +3,7 @@ import { float, num } from "../codec/sav.ts";
 import { gameScale } from "../game-rules.ts";
 import type { Obj } from "../graph.ts";
 import type { Save } from "../model.ts";
+import { isSpecPart } from "./design.ts";
 import { adjustBudget } from "./finance.ts";
 
 /** Supplier.SupplierType, and the chassis field that holds each. */
@@ -26,6 +27,8 @@ export interface SupplierOption {
   /** CarChassisStats.Stats index → value. */
   stats: Record<number, number>;
   engineLevel?: [number, number];
+  /** Engines: the level MM adds to engine parts when a car with it is built. */
+  level?: number;
   /** Supplier.CarAspect (0 rear package, 1 nose height) → how far it narrows MM's design sliders from each end. */
   minBound?: Record<number, number>;
   maxBound?: Record<number, number>;
@@ -73,7 +76,7 @@ function toOption(save: Save, s: Obj, team: Obj): SupplierOption {
     stats: Object.fromEntries(dictEntries(s.supplierStats)),
     minBound: Object.fromEntries(dictEntries(s.carAspectMinBoundary)),
     maxBound: Object.fromEntries(dictEntries(s.carAspectMaxBoundary)),
-    ...(s.supplierType === 0 ? { engineLevel: [s.minEngineLevelModifier, s.maxEngineLevelModifier] as [number, number] } : {}),
+    ...(s.supplierType === 0 ? { engineLevel: [s.minEngineLevelModifier, s.maxEngineLevelModifier] as [number, number], level: engineLevel(s) } : {}),
   };
 }
 
@@ -246,22 +249,48 @@ export interface SetCurrentSupplierOp {
 }
 
 /**
- * Swap a supplier on this season's cars. The chassis stats move by the supplier stat difference.
- * Engine parts keep their stats: MM adds the engine level modifier to them only when next year's
- * design completes. No money moves; MM charges suppliers when next year's car design starts.
+ * Swap a supplier on this season's cars (the league's pre-season pick). The four chassis stats are
+ * rebuilt with MM's formula (floored at 0 after each supplier), keeping whatever the car had on
+ * top of its suppliers. A new engine also moves every engine part by the difference in the
+ * suppliers' engine level, which MM otherwise adds only when next year's car is built
+ * (NextYearCarDesign.DesignCompleted); not with spec engines. No money moves.
  */
-export function setCurrentSupplier(save: Save, op: SetCurrentSupplierOp): string {
+export function setCurrentSupplier(save: Save, op: SetCurrentSupplierOp): string[] {
+  const g = save.g;
   const team = save.team(op.team);
   const chosen = findSupplier(save, op.type, op.id);
-  let old = "none";
+  if (!canBuy(chosen, team)) throw new Error(`${team.name} can't buy ${chosen.name}`);
+  const max = gameScale(save.game).chassisStatMax;
+  const log: string[] = [];
+  let oldEngine: Obj | null = null;
   for (const car of save.cars(team)) {
-    const cs = save.g.deref<Obj>(car.chassisStats);
-    const cur = cs[CHASSIS_FIELD[op.type]];
-    if (cur) old = save.g.deref<Obj>(cur).name;
+    const cs = g.deref<Obj>(car.chassisStats);
+    const old = cs[CHASSIS_FIELD[op.type]] ? g.deref<Obj>(cs[CHASSIS_FIELD[op.type]]) : null;
+    if (old === chosen) continue;
+    if (op.type === "Engine") oldEngine = old;
+    const supplied = () => SUPPLIER_TYPES.flatMap((t) => (cs[CHASSIS_FIELD[t]] ? [toOption(save, g.deref<Obj>(cs[CHASSIS_FIELD[t]]), team)] : []));
+    const before = chassisStats(supplied(), 0.5, 0.5, max);
+    const was = Object.fromEntries(Object.entries(CHASSIS_STAT_FIELD).map(([k, f]) => [k, num(cs[f])])) as Record<keyof typeof before, number>;
     putSupplier(save, cs, op.type, chosen);
+    const after = chassisStats(supplied(), 0.5, 0.5, max);
+    for (const key of Object.keys(after) as (keyof typeof after)[]) {
+      cs[CHASSIS_STAT_FIELD[key]] = float(Math.min(max, Math.max(0, after[key] + was[key] - before[key])));
+    }
+    if (!log.length) log.push(`${team.name}: ${op.type.toLowerCase()} ${old?.name ?? "none"} → ${chosen.name}`);
   }
-  return `${team.name}: ${op.type.toLowerCase()} ${old} → ${chosen.name}`;
+  if (!log.length) return [`${team.name}: already on ${chosen.name} ${op.type.toLowerCase()}`];
+  if (op.type === "Engine" && !isSpecPart(save, team, "Engine")) {
+    const shift = engineLevel(chosen) - (oldEngine ? engineLevel(oldEngine) : 0);
+    if (shift) {
+      for (const part of save.parts(team, "Engine")) part.mStats.mStat = float(num(part.mStats.mStat) + shift);
+      log.push(`${team.name}: engine parts ${shift > 0 ? "+" : ""}${shift} (engine level ${oldEngine ? engineLevel(oldEngine) : 0} → ${engineLevel(chosen)})`);
+    }
+  }
+  return log;
 }
+
+/** The level MM adds to engine parts when a car with this engine is built (Supplier.randomEngineLevelModifier). */
+export const engineLevel = (s: Obj): number => Number(s.mRandomEngineLevelModifier ?? 0);
 
 export interface RenameSupplierOp {
   op: "renameSupplier";

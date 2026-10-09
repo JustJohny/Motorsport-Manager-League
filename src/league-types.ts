@@ -363,6 +363,8 @@ export interface SupplierOffer {
   /** CarChassisStats.Stats index (0 tyre wear, 1 tyre heating, 2 fuel efficiency, 3 improvability…) → value. */
   stats: Record<number, number>;
   engineLevel?: [number, number];
+  /** Engines: the level MM adds to engine parts when a car with it is built. Missing before 2026-10-09. */
+  level?: number;
   /** Supplier.CarAspect (0 rear package, 1 nose height) → how far it narrows MM's design sliders from each end. */
   minBound?: Record<number, number>;
   maxBound?: Record<number, number>;
@@ -413,6 +415,16 @@ export interface TeamDesign {
      */
     investment?: { level: number; monthly: number[]; per?: "month" | "race"; fund: number };
   };
+  /**
+   * This season's car (FF20 only): its suppliers and every supplier the team may switch to in the
+   * league's pre-season. Missing before 2026-10-09.
+   */
+  currentCar?: {
+    current: Record<string, SupplierOffer>;
+    options: Record<string, SupplierOffer[]>;
+    /** Engines are spec: a new engine changes the chassis stats only. */
+    specEngine: boolean;
+  };
   /** MM's scrutineering for this team (missing in snapshots published before 2026-10-01). */
   rules?: {
     /** Offences this season: the next bust's fine (and on Rebirth its places) scale with this + 1. */
@@ -451,6 +463,10 @@ export interface Person {
   stats: Record<string, number | null>;
   potential: number | null;
   carID: number | null;
+  /** Drivers: MM's contract status (ContractPerson.Status). Missing before 2026-10-09. */
+  status?: "Equal" | "One" | "Two" | "Reserve";
+  /** Mechanics: the car they work on (0 or 1). Missing before 2026-10-09. */
+  mechanicCar?: number | null;
   contract: {
     team: string | null;
     job: string;

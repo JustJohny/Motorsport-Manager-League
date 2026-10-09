@@ -9,6 +9,7 @@ import { choiceChanges, designChanges, fetchPartsContext, markDesignsApplied, un
 import { fetchRegulationContext, recordVoteResults, regulationChanges } from "../rule-votes.ts";
 import { fetchSponsorOrders, markSponsorOrders, sponsorChanges } from "../sponsor-orders.ts";
 import { fetchRenewals, markRenewalsApplied, renewalChanges } from "../renewal-orders.ts";
+import { fetchPreseason, markPreseasonApplied, preseasonChanges } from "../preseason-orders.ts";
 import { aiLiveryChanges, aiOnly, type AiLook } from "../ai-looks.ts";
 import { fetchTeamLooks, teamLookChanges } from "../team-look-orders.ts";
 import { rest, type SupabaseEnv } from "../supabase.ts";
@@ -182,6 +183,24 @@ export async function pullDecisions(env: SupabaseEnv, opts: { force?: boolean; a
   changes.push(...renewalChanges(renewals.rows));
   if (renewals.rows.length) notes.push(`${renewals.rows.length} contract renewal${renewals.rows.length > 1 ? "s" : ""}`);
 
+  // The league's pre-season: free-agent signings and line-up moves, replayed in order per team,
+  // then this season's suppliers (free).
+  const pre = await fetchPreseason(env);
+  const pc = preseasonChanges(pre.moves, pre.suppliers, pre.snapshot);
+  section("Pre-season", pre.moves.length + pre.suppliers.length);
+  if (pre.missing) say("  WARNING: no preseason_moves table on the site yet (run migration 022_preseason.sql); skipped");
+  for (const m of pre.moves) {
+    say(`  ${m.team}: ${m.kind === "sign" ? `signs ${m.person_name} at $${Number(m.yearly_wage).toLocaleString()}/yr until ${m.new_end?.slice(0, 4)}${m.other_name ? `, replacing ${m.other_name}` : ""}`
+      : m.kind === "promote" ? `promotes ${m.person_name} in place of ${m.other_name}`
+      : m.kind === "release" ? `releases ${m.person_name}`
+      : m.kind === "swapCars" ? "swaps the drivers' cars" : "swaps the mechanics"}`);
+  }
+  for (const s of pre.suppliers) say(`  ${s.team}: ${s.supplier_type.toLowerCase()} ${s.supplier_name} on this season's cars`);
+  for (const w of pc.warnings) say(`  WARNING: ${w}`);
+  changes.push(...pc.changes);
+  if (pre.moves.length) notes.push(`pre-season moves for ${pc.teams.length} team${pc.teams.length === 1 ? "" : "s"}`);
+  if (pre.suppliers.length) notes.push(`${pre.suppliers.length} pre-season supplier${pre.suppliers.length > 1 ? "s" : ""}`);
+
   // Team colours and livery: a standing choice, re-applied every time (MM re-rolls AI liveries
   // each season). The colours only show with the team mod installed (mmsave team-mod).
   const looks = await fetchTeamLooks(env);
@@ -229,6 +248,7 @@ export async function pullDecisions(env: SupabaseEnv, opts: { force?: boolean; a
       await markCrewSpendApplied(env, crewSpend.map((r) => r.id));
       await markSponsorOrders(env, sponsors.applied.map((o) => o.id), sponsors.expired.map((o) => o.id));
       await markRenewalsApplied(env, renewals.rows.map((r) => r.id));
+      if (!pre.missing) await markPreseasonApplied(env, pre.moves.map((m) => m.id), pre.suppliers);
       if (eq.row) {
         await saveCrewUpdates(env, crewReset);
         await markEqualizeApplied(env, eq.row.id);

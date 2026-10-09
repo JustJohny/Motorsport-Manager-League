@@ -558,7 +558,8 @@ describe.skipIf(!existsSync(SAVE))("operations on a real save", () => {
       expect(e.name).toBe("Mercedes");
       expect(e.teamDiscounts.some((d: any) => d.Key === t.teamID && num(d.Value) === 50)).toBe(true);
     }
-    expect(num(reloaded.g.deref<any>(reloaded.cars(t)[0].chassisStats).mImprovability)).toBe(before + diff(3));
+    // MM floors chassis stats at 0 after each supplier (a raw shift went to −4 here).
+    expect(num(reloaded.g.deref<any>(reloaded.cars(t)[0].chassisStats).mImprovability)).toBe(Math.max(0, before + diff(3)));
   }, 120_000);
 
   it("signs a sponsor offer and drops a deal the way MM's SponsorController does", () => {

@@ -15,6 +15,8 @@ export interface LeagueSettings {
   hq_speed: number;
   /** MM's buyout: yearly wage / this per month left (GameScale.buyoutWageDivisor: FF20 8, Rebirth 12). */
   buyout_wage_divisor: number;
+  /** The league's pre-season is open (migration 022): free signings, line-up moves, this season's suppliers. */
+  preseason?: boolean;
 }
 
 export const DEFAULT_SETTINGS: LeagueSettings = {
