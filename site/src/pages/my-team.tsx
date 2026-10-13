@@ -177,11 +177,13 @@ function HqTable({ hq, own, team }: { hq: TeamPrivate["hq"]; own: boolean; team:
   const appliedHere = h.applied.filter((o) => o.team === team)
   const budget = league.privateTeams[me.team]?.budget ?? 0
   const hqCommitted = h.committed(me.team)
-  const designCommitted = useParts().committed(me.team)
+  const partsState = useParts()
+  const designCommitted = partsState.designCommitted(me.team)
+  const purchaseCommitted = partsState.purchaseCommitted(me.team)
   const crewCommitted = usePitCrew().committed(me.team)
   const sponsorCommitted = useSponsors().committed(me.team)
   const renewalCommitted = useContracts().committed(me.team)
-  const available = budget - hqCommitted - designCommitted - crewCommitted - sponsorCommitted - renewalCommitted - t.committed
+  const available = budget - hqCommitted - designCommitted - purchaseCommitted - crewCommitted - sponsorCommitted - renewalCommitted - t.committed
   const speed = Number(t.settings.hq_speed ?? 1)
   const days = (weeks: number) => weeks * 7 * speed
   // Races are about four weeks apart.
@@ -198,6 +200,7 @@ function HqTable({ hq, own, team }: { hq: TeamPrivate["hq"]; own: boolean; team:
           <span><span className="text-muted-foreground">Budget </span>{fmtMoneyShort(budget)}</span>
           <span><span className="text-muted-foreground">Queued HQ orders </span>−{fmtMoneyShort(hqCommitted)}</span>
           {designCommitted > 0 && <span><span className="text-muted-foreground">Queued design </span>−{fmtMoneyShort(designCommitted)}</span>}
+          {purchaseCommitted > 0 && <span><span className="text-muted-foreground">Part purchases </span>−{fmtMoneyShort(purchaseCommitted)}</span>}
           {crewCommitted > 0 && <span><span className="text-muted-foreground">Crew costs </span>−{fmtMoneyShort(crewCommitted)}</span>}
           {sponsorCommitted > 0 && <span><span className="text-muted-foreground">Sponsor pay-backs </span>−{fmtMoneyShort(sponsorCommitted)}</span>}
           {renewalCommitted > 0 && <span><span className="text-muted-foreground">Renewal fees </span>−{fmtMoneyShort(renewalCommitted)}</span>}

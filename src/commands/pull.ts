@@ -6,6 +6,7 @@ import { equalizeChanges, fetchEqualize, markEqualizeApplied, resetCrews } from 
 import { cancelUnorderedChange, fetchHqContext, fetchQueuedOrders, hqChanges, markOrdersApplied } from "../hq-orders.ts";
 import type { LeagueSettings } from "../league-rules.ts";
 import { choiceChanges, designChanges, fetchPartsContext, markDesignsApplied, undoAiParts } from "../part-orders.ts";
+import { fetchPurchases, markPurchases, purchaseChanges } from "../part-market-orders.ts";
 import { fetchRegulationContext, recordVoteResults, regulationChanges } from "../rule-votes.ts";
 import { fetchSponsorOrders, markSponsorOrders, sponsorChanges } from "../sponsor-orders.ts";
 import { fetchRenewals, markRenewalsApplied, renewalChanges } from "../renewal-orders.ts";
@@ -69,6 +70,8 @@ export async function pullDecisions(env: SupabaseEnv, opts: { force?: boolean; a
   // Member teams (and the career team) are never promoted or relegated; AI teams still are. Takes
   // effect on a save from between season end and pre-season start.
   if (ctx.memberTeams.length) changes.push({ op: "protectTeams", teams: ctx.memberTeams });
+  // Customer parts from the part market go back once the season's last race is run (a no-op before).
+  changes.push({ op: "removeCustomerParts" });
 
   // Real circuit countries (src/circuit-names.ts): does nothing once a save has them.
   changes.push({ op: "realCircuitCountries" });
@@ -100,6 +103,20 @@ export async function pullDecisions(env: SupabaseEnv, opts: { force?: boolean; a
   // Fitting and improvement are standing choices: re-applied every time, after the designs.
   say(`Fitting choices: ${parts.fitting.length}, improvement choices: ${parts.improvement.length}`);
   changes.push(...choiceChanges(parts.fitting, parts.improvement));
+
+  // The part market: customer copies delivered after the standing fitting, so a copy bought for
+  // a car goes on it.
+  const market = await fetchPurchases(env);
+  const sales = purchaseChanges(market.rows, market.sellerParts);
+  section("Part market", market.rows.length);
+  if (market.missing) say("  WARNING: no part_purchases table on the site yet (run migration 029_part_market.sql); skipped");
+  for (const r of sales.delivered) {
+    say(`  ${r.buyer} buys ${r.copies > 1 ? `${r.copies} copies of ` : ""}${r.seller}'s ${r.part_type} for $${(Number(r.price_each) * r.copies).toLocaleString()}`
+      + `${r.fit_cars.length ? `, fitted to car ${r.fit_cars.map((c) => c + 1).join(" and ")}` : ""}`);
+  }
+  for (const r of sales.dropped) say(`  WARNING: ${r.seller}'s ${r.part_type} for ${r.buyer} is gone or banned; purchase cancelled`);
+  changes.push(...sales.changes);
+  if (sales.delivered.length) notes.push(`${sales.delivered.length} part sale${sales.delivered.length > 1 ? "s" : ""}`);
 
   // Engine programme spending (founding, development, research, engines bought from members).
   const engineSpend = await fetchEngineSpend(env);
@@ -262,6 +279,7 @@ export async function pullDecisions(env: SupabaseEnv, opts: { force?: boolean; a
     markApplied: async (out: Log) => {
       await markOrdersApplied(env, orders.map((o) => o.id));
       await markDesignsApplied(env, parts.queued.map((o) => o.id));
+      await markPurchases(env, sales.delivered, sales.dropped);
       await recordVoteResults(env, voteResults);
       await markEngineSpendApplied(env, engineSpend.map((r) => r.id));
       await markCrewSpendApplied(env, crewSpend.map((r) => r.id));

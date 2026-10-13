@@ -132,6 +132,13 @@ Decompile a class to C# with `dotnet tool install --tool-path <dir> ilspycmd`, t
 
 - **Component texts (FF20):** `CarPartComponent.GetName` returns `mCustomComponentName` unless it's empty or "0", else `Localisation.LocaliseID(mNameID)` with `{Stat}` = the part's stat (`CarPart.GetStatForPartType`: Brakes Braking, Engine Top Speed, Front wing Low Speed Corners, Gearbox Acceleration, Rear wing High Speed Corners, Suspension Medium Speed Corners) and `{ComponentCost}` = the cost as money. Rebirth saves keep the rich text in `mCustomComponentName`; FF20's is "0". The texts are multi-line `HUDText` rows in `resources.assets`, with `<font="CooperHewitt-Bold">` for bold.
 
+### Season start: starting stats and carried parts (FF20 decompile, 2026-10-13)
+- `CarPartDesign.OnNewSeasonStart` → `ChooseComponentsForSeason` + `SetSeasonStartingStats`: `seasonPartStartingStat[type]` = (int) the `statWithPerformance` of the team's highest-stat part of that type in inventory. Every design that season starts from it.
+- `CarManager.AdaptPartsForNewSeason(inStats)`: per car and type, the highest-stat part is kept and every other part destroyed. Kept parts get basic stats and main stat = their `statWithPerformance` (or `inStats`' stat, when given) + the lead engineer's contribution.
+- `GetNumberOfSlots` = `partInventory.GetHighestLevel(type).stats.level` + 1 (+1 after the levelled-up dilemma): any part in the inventory opens slots.
+- So a part bought from another team would raise the buyer's design slots and next season's starting stat. The league's part market therefore marks customer copies by GUID (`c0c0c0c0-` prefix, `src/part-market.ts`), leaves them out of the slot count (`designOptions`), and takes them back once the season's last race is run (`removeCustomerParts`).
+- A part's fields are simple (`buildDate`, `fittedCar`, `isFitted`, `isBanned`, `components` refs, `mStats` with `partCondition.mPart` pointing back at the part, `mModelId`, `name`, GUID `id`), so `copyPart` clones one with `g.clone` and points `components` at the seller's component objects. New parts also go in `entityManager.mEntities`.
+
 ## Post-race scrutineering (`PenaltyDirector.ScrutinizePartRules`, checked with a Cecil IL dump 2026-10-08)
 Each fitted part with `rulesRisk > 0` is caught when `Random(0..99) < (risk + investor partRiskBonus) x scrutineeringChance`. The team's `rulesBrokenThisSeason` goes up by one and the race result gets a `PenaltyPartRulesBroken{mPart, mPenaltyCashAmount, mPlacesLost}`.
 - **Rebirth:** chance x5, the car drops 2 x offences places, fine $100K x offences.

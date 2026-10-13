@@ -10,6 +10,8 @@ import { teamSponsors } from "./ops/sponsors.ts";
 import { liveryOptions, teamLook } from "./ops/team.ts";
 import { potentialTraits, teamRenewals } from "./ops/contracts.ts";
 import { extractRegulations } from "./regulations.ts";
+import { partFloor } from "./ops/part-market.ts";
+import { isCustomerPart } from "./part-market.ts";
 import { carInvestment, currentSuppliers, hasChassisDesign, nextCarSeason, nextYearDesignState, pendingSuppliers, seasonOver, supplierOptions } from "./ops/suppliers.ts";
 import { BUILDING_STATES, JOBS, PART_TYPES, Save, numOrNull, personKind, personName, type PartType } from "./model.ts";
 
@@ -43,6 +45,8 @@ export function extractLeague(save: Save, cfg: LeagueConfig): LeagueState {
       eventNumber: champ.mEventNumber,
       calendar: calendar(save, champ),
       preSeason: { start: champ.currentPreSeasonStartDate, end: champ.currentPreSeasonEndDate },
+      seasonEnd: champ.currentSeasonEndDate,
+      partFloor: Object.fromEntries(PART_TYPES.map((type) => [type, partFloor(save, champ, type)])),
       standings: standings(save, champ),
       lastRace: raceResults(save, champ).at(-1) ?? null,
       races: raceResults(save, champ),
@@ -134,6 +138,7 @@ export function part(save: Save, p: Obj): Part {
     condition: numOrNull(s.partCondition?.mCondition),
     rulesRisk: numOrNull(s.rulesRisk),
     ...(p.isBanned ? { banned: true } : {}),
+    ...(isCustomerPart(String(p.id)) ? { customer: true } : {}),
     fittedToCar: fittedCar ? fittedCar.identifier : null,
     buildDate: p.buildDate,
     components: (p.components ?? []).length,

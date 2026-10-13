@@ -1,4 +1,4 @@
-import { ArrowRight, Check, ChevronDown, Copy, Download, Flag, Gamepad2, Gavel, Hammer, Handshake, LifeBuoy, PencilRuler, Settings2, ShieldAlert, Signature, Trophy, type LucideIcon, Upload, Users, Wrench } from "lucide-react"
+import { ArrowRight, Check, ChevronDown, Copy, Download, Flag, Gamepad2, Gavel, Hammer, Handshake, LifeBuoy, PackageCheck, PencilRuler, Settings2, ShieldAlert, Signature, Trophy, type LucideIcon, Upload, Users, Wrench } from "lucide-react"
 import { useState, type ReactNode } from "react"
 import { cycleOf, seriesFiles, type Checkpoint } from "../../../src/race-cycle.ts"
 import { Badge } from "@/components/ui/badge"
@@ -68,7 +68,9 @@ export function RaceCycle() {
   const { last, next, current } = useCycle()
   const [tab, setTab] = useState<Checkpoint>(current)
   const hq = useHqOrders().orders
-  const designs = useParts().orders.filter((o) => o.status === "queued")
+  const partsState = useParts()
+  const designs = partsState.orders.filter((o) => o.status === "queued")
+  const sales = partsState.purchases.filter((o) => o.status === "queued")
   const sponsorChoices = useSponsors().orders.filter((o) => o.status === "queued")
   const renewals = useContracts().orders.filter((o) => o.status === "queued")
   const t = useTransfers()
@@ -94,6 +96,7 @@ export function RaceCycle() {
     <div className="flex flex-wrap gap-2">
       <Badge variant="outline" className="gap-1"><PencilRuler className="size-3" /> {designs.length} part design{designs.length === 1 ? "" : "s"}</Badge>
       <Badge variant="outline" className="gap-1"><Hammer className="size-3" /> {hq.length} HQ order{hq.length === 1 ? "" : "s"}</Badge>
+      <Badge variant="outline" className="gap-1"><PackageCheck className="size-3" /> {sales.length} part sale{sales.length === 1 ? "" : "s"}</Badge>
       <Badge variant="outline" className="gap-1"><Handshake className="size-3" /> {sponsorChoices.length} sponsor choice{sponsorChoices.length === 1 ? "" : "s"}</Badge>
       <Badge variant="outline" className="gap-1"><Signature className="size-3" /> {renewals.length} contract renewal{renewals.length === 1 ? "" : "s"}</Badge>
       <Badge variant="outline" className="gap-1"><Gavel className="size-3" /> {w && w.status !== "applied" ? `window #${w.id} ${t.isOpen ? "open" : "closed"}` : "no window"}</Badge>
@@ -157,7 +160,7 @@ export function RaceCycle() {
                 Open one with the controls on this page. Give it a deadline before step 5: bids are only pulled once it has passed.
               </Step>
               <Step n={4} icon={Users} title="Tell the members they can act">
-                Part designs, HQ orders, bids, fitting and improvement, their pit crews, sponsors and contract renewals.
+                Part designs, part sales, HQ orders, bids, fitting and improvement, their pit crews, sponsors and contract renewals.
               </Step>
               <Step n={5} icon={Download} title="Pull their decisions">
                 <CopyCommand command={cmd.pull} />

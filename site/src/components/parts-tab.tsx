@@ -1,5 +1,5 @@
 import {
-  Ban, Bot, CalendarClock, Car, ChevronsUp, Gavel, Clock, Coins, Cog, Disc3, Eye, Fan, Fuel, Gauge, Hammer, HeartPulse, Layers, Loader2, Lock,
+  Ban, Bot, CalendarClock, Handshake, Car, ChevronsUp, Gavel, Clock, Coins, Cog, Disc3, Eye, Fan, Fuel, Gauge, Hammer, HeartPulse, Layers, Loader2, Lock,
   Package, PencilRuler, Settings2, ShieldCheck, ShieldPlus, Siren, Sparkles, Star, Timer, TriangleAlert, User, Waves, Wind,
   WindArrowDown, Wrench, type LucideIcon,
 } from "lucide-react"
@@ -33,8 +33,8 @@ export const PART_ICONS: Record<string, LucideIcon> = {
   Brakes: Disc3, Engine: Fan, FrontWing: Wind, Gearbox: Cog, RearWing: WindArrowDown, Suspension: Waves,
 }
 /** MM's part order. */
-const PART_ORDER = ["Brakes", "Engine", "FrontWing", "Gearbox", "RearWing", "Suspension"]
-const partIcon = (type: string) => PART_ICONS[type.replace(/(GT|GET)$/, "")] ?? Settings2
+export const PART_ORDER = ["Brakes", "Engine", "FrontWing", "Gearbox", "RearWing", "Suspension"]
+export const partIcon = (type: string) => PART_ICONS[type.replace(/(GT|GET)$/, "")] ?? Settings2
 
 const TIERS = [
   { name: "Basic", color: "text-zinc-400", border: "border-zinc-400/40" },
@@ -44,7 +44,7 @@ const TIERS = [
   { name: "Legendary", color: "text-amber-500", border: "border-amber-500/60" },
 ]
 
-function Tier({ level, label = false }: { level: number; label?: boolean }) {
+export function Tier({ level, label = false }: { level: number; label?: boolean }) {
   const tier = TIERS[level - 1]
   if (!tier) return <span className="text-xs text-muted-foreground">L{level}</span>
   return (
@@ -166,7 +166,9 @@ function NoDesignData() {
 function BudgetStrip({ budget }: { budget: number }) {
   const { me } = useLeague()
   const hq = useHqOrders().committed(me.team)
-  const parts = useParts().committed(me.team)
+  const partsState = useParts()
+  const parts = partsState.committed(me.team)
+  const bought = partsState.purchaseCommitted(me.team)
   const crew = usePitCrew().committed(me.team)
   const sponsors = useSponsors().committed(me.team)
   const renewals = useContracts().committed(me.team)
@@ -174,7 +176,8 @@ function BudgetStrip({ budget }: { budget: number }) {
   return (
     <div className="flex flex-wrap items-center gap-x-6 gap-y-1 rounded-lg bg-muted/50 px-4 py-2 text-sm tabular-nums">
       <span className="flex items-center gap-1.5"><Coins className="size-4 text-muted-foreground" /><span className="text-muted-foreground">Budget</span> {fmtMoneyShort(budget)}</span>
-      {parts > 0 && <span><span className="text-muted-foreground">Queued design </span>−{fmtMoneyShort(parts)}</span>}
+      {parts - bought > 0 && <span><span className="text-muted-foreground">Queued design </span>−{fmtMoneyShort(parts - bought)}</span>}
+      {bought > 0 && <span><span className="text-muted-foreground">Part purchases </span>−{fmtMoneyShort(bought)}</span>}
       {hq > 0 && <span><span className="text-muted-foreground">HQ orders </span>−{fmtMoneyShort(hq)}</span>}
       {crew > 0 && <span><span className="text-muted-foreground">Crew costs </span>−{fmtMoneyShort(crew)}</span>}
       {sponsors > 0 && <span><span className="text-muted-foreground">Sponsor pay-backs </span>−{fmtMoneyShort(sponsors)}</span>}
@@ -673,6 +676,11 @@ function PartCard({ type, parts, priv, team, own }: { type: string; parts: Part[
                     </div>
                     {ai && <div className="flex items-center gap-1 text-[11px] text-amber-600 dark:text-amber-400"><Bot className="size-3" /> AI-built · removed at next apply</div>}
                     {banned && <div className="flex items-center gap-1 text-[11px] text-destructive"><Ban className="size-3" /> Banned by the scrutineers · can't be fitted or improved</div>}
+                    {part.customer && (
+                      <div className="flex items-center gap-1 text-[11px] text-sky-600 dark:text-sky-400">
+                        <Handshake className="size-3" /> Customer part{(() => { const from = p.purchases.find((x) => x.guids.includes(part.guid))?.seller; return from ? ` from ${from}` : "" })()} · returned at the season's end
+                      </div>
+                    )}
                   </TableCell>
                   <TableCell className={cn("text-right tabular-nums", part.stat === best && "font-semibold text-primary")}>{fmtNum(part.stat)}</TableCell>
                   <TableCell className="text-right tabular-nums">{fmtNum(part.performance)}/{fmtNum(part.maxPerformance)}</TableCell>
@@ -739,7 +747,7 @@ const RISK_NAMES = ["None", "Low", "Medium", "High"]
 const dropText = (places: number) => places >= TO_THE_BACK ? "the car is sent to the back" : `the car drops ${places} places`
 const riskName = (r: number) => RISK_NAMES[Math.min(3, Math.max(0, Math.round(r)))]
 
-function RiskBadge({ risk, bonus, game }: { risk: number; bonus: number; game?: GameRules }) {
+export function RiskBadge({ risk, bonus, game }: { risk: number; bonus: number; game?: GameRules }) {
   return (
     <span
       className={cn("inline-flex items-center gap-0.5 rounded px-1 text-[10px] font-medium", risk >= 2 ? "bg-destructive/15 text-destructive" : "bg-amber-500/15 text-amber-600 dark:text-amber-400")}

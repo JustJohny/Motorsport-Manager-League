@@ -14,6 +14,7 @@ import {
   type CancelBuildingOp, type CancelUnorderedHqOp, type SetBuildingOp, type StartBuildingOp,
 } from "./ops/hq.ts";
 import { addPart, fitPart, removePart, type AddPartOp, type FitPartOp, type RemovePartOp } from "./ops/parts.ts";
+import { copyPart, removeCustomerParts, type CopyPartOp, type RemoveCustomerPartsOp } from "./ops/part-market.ts";
 import {
   hire, promoteDriver, releasePerson, swapCarDrivers, swapMechanics,
   type HireOp, type PromoteDriverOp, type ReleasePersonOp, type SwapCarDriversOp, type SwapMechanicsOp,
@@ -37,7 +38,8 @@ export type Change = SetBuildingOp | StartBuildingOp | CancelBuildingOp | Cancel
   | ConcludeVoteOp | SetNextRuleOp | SetSuppliersOp | RenamePersonOp | RenameTeamOp | SetTeamCountryOp | SetTeamLookOp
   | SetCurrentSupplierOp | RenameSupplierOp | SetPitCrewOp | EqualizeOp | SignSponsorOp | DropSponsorOp | SetChassisOp | SetCarInvestmentOp | RenewContractOp
   | HoldPromotionsOp | ProtectTeamsOp | RepairCircuitsOp | RepairOldFormatOp
-  | PromoteDriverOp | SwapCarDriversOp | SwapMechanicsOp | ReleasePersonOp | GrantTraitOp | RealCircuitCountriesOp | AddFuelSuppliersOp;
+  | PromoteDriverOp | SwapCarDriversOp | SwapMechanicsOp | ReleasePersonOp | GrantTraitOp | RealCircuitCountriesOp | AddFuelSuppliersOp
+  | CopyPartOp | RemoveCustomerPartsOp;
 
 export interface ChangeSet {
   /** Optional note, e.g. "Before round 6 - Munich". */
@@ -70,6 +72,8 @@ function run(save: Save, c: Change): string | string[] {
     case "addPart": return addPart(save, c);
     case "removePart": return removePart(save, c);
     case "fitPart": return fitPart(save, c);
+    case "copyPart": return copyPart(save, c);
+    case "removeCustomerParts": return removeCustomerParts(save, c);
     case "hire": return hire(save, c);
     case "promoteDriver": return promoteDriver(save, c);
     case "swapCarDrivers": return swapCarDrivers(save, c);

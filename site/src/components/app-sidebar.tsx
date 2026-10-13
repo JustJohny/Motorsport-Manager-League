@@ -1,4 +1,4 @@
-import { CalendarDays, Check, ChevronsUpDown, Flag, Fan, Gavel, Scale, Moon, Shield, ShoppingBag, Sun, Trophy, Users, Wrench } from "lucide-react"
+import { CalendarDays, Check, ChevronsUpDown, Flag, Fan, Gavel, Handshake, Scale, Moon, Shield, ShoppingBag, Sun, Trophy, Users, Wrench } from "lucide-react"
 import { NavLink, useLocation } from "react-router"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
@@ -22,6 +22,7 @@ const NAV = [
   { to: "/transfers", label: "Transfer window", icon: Gavel },
   { to: "/regulations", label: "Regulations", icon: Scale },
   { to: "/engine", label: "Engine programme", icon: Fan },
+  { to: "/parts-market", label: "Part market", icon: Handshake },
 ]
 
 export function AppSidebar() {

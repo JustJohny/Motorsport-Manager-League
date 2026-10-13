@@ -134,6 +134,13 @@ export interface Championship {
    * starts next year's car, and the calendar is reset to the new season. Missing before 2026-10-03.
    */
   preSeason?: { start: string; end: string };
+  /** The end of this season's racing (Championship.currentSeasonEndDate). Missing before 2026-10-13. */
+  seasonEnd?: string;
+  /**
+   * The series' floor stat per part type (rules.partStatSeasonMinValue): a customer copy keeps 90 %
+   * of a part's gain over it. Missing before 2026-10-13.
+   */
+  partFloor?: Record<string, number>;
   standings: { drivers: DriverStanding[]; teams: TeamStanding[] };
   lastRace: RaceResults | null;
   /** Every finished round this season, in calendar order. Missing in snapshots published before 2026-10-01. */
@@ -292,6 +299,8 @@ export interface Part {
   rulesRisk: number | null;
   /** Banned (FF20: caught by the scrutineers): MM won't fit or improve it. */
   banned?: boolean;
+  /** A customer copy bought on the league's part market (src/part-market.ts). Missing before 2026-10-13. */
+  customer?: boolean;
   /** 0 or 1, or null when in storage. */
   fittedToCar: number | null;
   buildDate: string;

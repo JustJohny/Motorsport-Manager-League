@@ -9,6 +9,7 @@ import { findBuilding } from "./hq.ts";
 import { adjustBudget } from "./finance.ts";
 import { fitPart } from "./parts.ts";
 import { gameTextName } from "../regulations.ts";
+import { isCustomerPart } from "../part-market.ts";
 
 /** Single-seater part types that can be designed, with the carPartDesign field of their components. */
 const COMPONENT_LISTS: Partial<Record<PartType, string>> = {
@@ -168,7 +169,8 @@ export function designOptions(save: Save, team: Obj, type: PartType): DesignOpti
   }
 
   // GetNumberOfSlots: highest part level of this type + 1 (+1 after a "levelled up" dilemma).
-  const highest = Math.max(0, ...save.parts(team, type).map((p) => Number(p.mStats?.level ?? 0)));
+  // League rule: customer parts bought from another team don't count, only the team's own.
+  const highest = Math.max(0, ...save.parts(team, type).filter((p) => !isCustomerPart(String(p.id))).map((p) => Number(p.mStats?.level ?? 0)));
   const levelledUp: Json[] = save.data.dilemmaSystem?.carPartsLeveledUp ?? [];
   const slots = Math.min(5, Math.max(1, highest + 1 + (levelledUp.includes(PART_TYPES.indexOf(type)) ? 1 : 0)));
   const dc = findBuilding(save, team, BUILDING.DesignCentre);
@@ -504,6 +506,8 @@ export function removeUnorderedParts(save: Save, op: RemoveUnorderedPartsOp): st
     for (const type of Object.keys(COMPONENT_LISTS) as PartType[]) {
       const unordered = save.parts(team, type).filter((p) => {
         if (String(p.buildDate) <= op.since) return false;
+        // Customer copies come from the league's part market, not the AI.
+        if (isCustomerPart(String(p.id))) return false;
         const ids = componentIds(save, p);
         // MM's pre-season rebuilds every part with no components (build date = pre-season start);
         // designed parts always have some, so these aren't the AI's designs.
