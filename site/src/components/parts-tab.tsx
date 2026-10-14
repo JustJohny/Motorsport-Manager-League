@@ -6,7 +6,7 @@ import {
 import { Fragment, useMemo, useState, type ReactNode } from "react"
 import { hqName } from "../../../src/hq-info.ts"
 import { daysBetween, improvementEstimate, type ListEstimate } from "../../../src/part-improvement.ts"
-import { bustChance, carBustChance, nextBustPenalty, planDesign, TO_THE_BACK, predictPart, type DesignPlan } from "../../../src/part-design.ts"
+import { bustChance, carBustChance, LEAGUE_DESIGN_COPIES, nextBustPenalty, planDesign, TO_THE_BACK, predictPart, type DesignPlan } from "../../../src/part-design.ts"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -220,8 +220,8 @@ function DesignCard({ priv, team, own }: { priv: TeamPrivate; team: string; own:
       <CardHeader>
         <CardTitle className="flex items-center gap-2"><PencilRuler className="size-4" /> Design a new part</CardTitle>
         <CardDescription>
-          MM designs one part at a time. Pick components from your team's list; MM builds the part in game with its own stats,
-          paid at MM's player price when the organizer applies it.
+          MM designs one part at a time. Pick components from your team's list; MM builds it in game with its own stats,
+          {" "}{LEAGUE_DESIGN_COPIES} parts per design, one for each car, paid once at MM's player price when the organizer applies it.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -443,7 +443,7 @@ function Designer({ priv, busy, onOrder }: { priv: TeamPrivate; busy: boolean; o
         {problem ? <span className="text-destructive">{problem}</span> : plan ? (
           <>
             <span className="flex items-center gap-1.5"><Clock className="size-4 text-muted-foreground" /> {fmtDays(plan.days)} to design</span>
-            {plan.extraCopies > 0 && <span className="flex items-center gap-1.5"><Package className="size-4 text-muted-foreground" /> {1 + plan.extraCopies} parts</span>}
+            <span className="flex items-center gap-1.5"><Package className="size-4 text-muted-foreground" /> {LEAGUE_DESIGN_COPIES} parts</span>
             <span className="flex items-center gap-1.5 font-medium"><Coins className="size-4 text-muted-foreground" /> {fmtMoney(plan.cost)}</span>
           </>
         ) : (
@@ -471,6 +471,9 @@ function ComponentTags({ c, price, locked }: { c: DesignComponent; price: number
         </span>
       )}
       {c.engineer && <Badge variant="secondary" className="text-[10px]">Engineer</Badge>}
+      {c.bonuses.some((b) => b.type === "BonusCreateTwoParts") && (
+        <span className="text-[10px] text-muted-foreground" title={`Every league design already builds ${LEAGUE_DESIGN_COPIES} parts; this adds no extra one`}>No extra part in the league</span>
+      )}
       <span className="flex items-center gap-1 text-xs tabular-nums text-muted-foreground"><Coins className="size-3" />{fmtMoneyShort(price)}</span>
     </div>
   )

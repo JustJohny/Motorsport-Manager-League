@@ -3,7 +3,7 @@ import { float, num } from "../codec/sav.ts";
 import type { Obj } from "../graph.ts";
 import { NULL_DATE, PART_TYPES, type PartType, type Save } from "../model.ts";
 import type { DesignBase, TeamDesign } from "../league-types.ts";
-import { planDesign, type DesignComponent, type DesignContext, type DesignPlan } from "../part-design.ts";
+import { LEAGUE_DESIGN_COPIES, planDesign, type DesignComponent, type DesignContext, type DesignPlan } from "../part-design.ts";
 import { addDays, delayedEvents, insertByDate } from "./calendar.ts";
 import { findBuilding } from "./hq.ts";
 import { adjustBudget } from "./finance.ts";
@@ -362,7 +362,8 @@ export function startDesign(save: Save, op: StartDesignOp): string {
   cpd.componentBonusSlotsLevel = plan.bonusSlots.map((b) => b.level);
   cpd.mCarPart = g.ref(part);
   cpd.mStage = STAGE.Designing;
-  cpd.mExtraCopies = plan.extraCopies;
+  // PartComplete builds 1 + mExtraCopies parts.
+  cpd.mExtraCopies = LEAGUE_DESIGN_COPIES - 1;
   cpd.mComponentTimeDaysBonus = float(0);
   cpd.mRandomComponent = null;
   cpd.mImidiateFinish = false;
@@ -370,8 +371,7 @@ export function startDesign(save: Save, op: StartDesignOp): string {
   cpd.endDate = end;
   cpd.mCalendarEvent = g.ref(addDesignEvent(save, team, cpd, type, end));
 
-  const copies = plan.extraCopies ? ` x${1 + plan.extraCopies}` : "";
-  return `${team.name}: designing ${type}${copies} (level ${plan.level}, components ${op.components.join(",")}), done ${end.slice(0, 10)} (${plan.days.toFixed(1)} days)`;
+  return `${team.name}: designing ${type} x${LEAGUE_DESIGN_COPIES} (level ${plan.level}, components ${op.components.join(",")}), done ${end.slice(0, 10)} (${plan.days.toFixed(1)} days)`;
 }
 
 function seasonStartStat(save: Save, team: Obj, type: PartType): number {

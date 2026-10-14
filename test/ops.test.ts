@@ -245,7 +245,8 @@ describe.skipIf(!existsSync(SAVE))("operations on a real save", () => {
     const budget = Number(save.finance(tatra).currentBudget);
     const entities = g.list(save.data.entityManager.mEntities).length;
     const log = applyChanges(save, { changes: [{ op: "startDesign", team: "Tatra Racing", type: "FrontWing", components: pick }] });
-    expect(log[0]).toMatch(/designing FrontWing/);
+    expect(log[0]).toMatch(/designing FrontWing x2/);
+    expect(carPartDesign(save, tatra).mExtraCopies).toBe(1); // league designs build two parts
     expect(Number(save.finance(tatra).currentBudget)).toBe(budget); // charged separately (adjustBudget)
     expect(g.list(save.data.entityManager.mEntities)).toHaveLength(entities + 1);
     expect(() => applyChanges(save, { changes: [{ op: "startDesign", team: "Tatra Racing", type: "Brakes", components: pick }] }))

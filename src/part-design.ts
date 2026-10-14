@@ -11,6 +11,7 @@ export interface DesignPlan {
   slots: (number | null)[];
   /** Extra slots opened by engineer components, with the level each one takes. */
   bonusSlots: { level: number; component: number | null }[];
+  /** Copies MM's own rules would add (BonusCreateTwoParts); league designs use LEAGUE_DESIGN_COPIES. */
   extraCopies: number;
   /** What the league charges: MM's player price (full materials + components). */
   cost: number;
@@ -20,6 +21,12 @@ export interface DesignPlan {
   /** Sum of component levels → part level (1..5). */
   level: number;
 }
+
+/**
+ * Parts a league design builds: MM's single part plus one copy, so both cars get it. MM's
+ * BonusCreateTwoParts adds nothing on top (its slot still opens). Same price as one part.
+ */
+export const LEAGUE_DESIGN_COPIES = 2;
 
 /** HQsBuilding_v1.designCentrePartDaysPerLevel. */
 export const DESIGN_CENTRE_DAYS: Record<GameRules, number[]> = { ff20: [0, -2, -3.5, -5], rebirth: [0, -1, -2, -3] };
