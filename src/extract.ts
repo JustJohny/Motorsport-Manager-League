@@ -1,6 +1,6 @@
 import type { Obj } from "./graph.ts";
 import type {
-  Building, CalendarEvent, Championship, DriverGrowth, LeagueConfig, LeagueState, Part, Person, RaceResults, RulesBreach, SessionResult, TeamDesign, TeamState,
+  BudgetTransaction, Building, CalendarEvent, Championship, DriverGrowth, LeagueConfig, LeagueState, Part, Person, RaceResults, RulesBreach, SessionResult, TeamDesign, TeamState,
 } from "./league-types.ts";
 import { num } from "./codec/sav.ts";
 import { isSpecPart, teamDesign } from "./ops/design.ts";
@@ -89,11 +89,25 @@ export function team(save: Save, t: Obj, champ: Obj, member: string | null): Tea
     look: teamLook(t, save.game),
     sponsorship: sponsors?.sponsorship ?? null,
     contracts: { deadline: champ.currentPreSeasonStartDate, renewals: teamRenewals(save, t) },
+    transactions: transactions(save, fin),
     staff: save.slots(t).map((s) => {
       const p = s.personHired ? save.g.deref<Obj>(s.personHired) : null;
       return { slotID: s.slotID, job: JOBS[s.jobType] ?? String(s.jobType), person: p ? person(save, p) : null };
     }).filter((s) => ["Driver", "EngineerLead", "Mechanic"].includes(s.job as string)),
   };
+}
+
+/** MM's finance history as its finance screen lists it. */
+function transactions(save: Save, fin: Obj): BudgetTransaction[] {
+  if (!fin.transactionHistory) return [];
+  const history = save.g.deref<Obj>(fin.transactionHistory);
+  return save.g.list<Obj>(history.transactions).map((x) => ({
+    date: x.transactionDate,
+    name: x.name,
+    amount: x.transactionType === 0 ? Number(x.amount) : -Number(x.amount),
+    after: Number(x.fundsAfterTransaction),
+    group: x.group,
+  }));
 }
 
 function engineOf(save: Save, t: Obj): TeamState["engine"] {

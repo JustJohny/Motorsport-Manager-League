@@ -545,7 +545,21 @@ export interface TeamState {
   sponsorship?: TeamSponsorship | null;
   /** Expiring contracts with MM's renewal terms. Private. Missing before 2026-10-03. */
   contracts?: TeamContracts | null;
+  /** MM's finance history, oldest first. Private. Missing before 2026-10-22. */
+  transactions?: BudgetTransaction[] | null;
   staff: StaffSlot[];
+}
+
+/** One line of MM's finance history (TransactionHistory.transactions). */
+export interface BudgetTransaction {
+  date: string;
+  name: string;
+  /** Income positive, costs negative. */
+  amount: number;
+  /** The budget after it. */
+  after: number;
+  /** MM's Transaction.Group: 0 parts, 2 driver wages, 5 HQ upkeep, 9 race costs, 12 sponsors… (see the site's budget history). */
+  group: number;
 }
 
 /** Staff whose contracts end within 12 months, and the renewal deadline. */
@@ -669,8 +683,8 @@ export interface LeagueState {
  * What every league member may see about a team. Budget, HQ and parts stay private to the
  * team's member (and the organizer), as MM itself hides them for rival teams.
  */
-export type TeamPublic = Omit<TeamState, "budget" | "hq" | "parts" | "design" | "gameCrew" | "sponsorship" | "contracts">;
-export type TeamPrivate = Pick<TeamState, "budget" | "hq" | "parts" | "design" | "gameCrew" | "sponsorship" | "contracts">;
+export type TeamPublic = Omit<TeamState, "budget" | "hq" | "parts" | "design" | "gameCrew" | "sponsorship" | "contracts" | "transactions">;
+export type TeamPrivate = Pick<TeamState, "budget" | "hq" | "parts" | "design" | "gameCrew" | "sponsorship" | "contracts" | "transactions">;
 
 export interface PublicSnapshot {
   extractedAt: string;

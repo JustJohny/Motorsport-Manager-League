@@ -19,9 +19,10 @@ import { SponsorsTab } from "@/components/sponsors-tab"
 import { ContractsTab } from "@/components/contracts-tab"
 import { IdentityTab } from "@/components/identity-tab"
 import { PreseasonTab } from "@/components/preseason-tab"
+import { BudgetStat } from "@/components/budget-history"
 import { usePreseason } from "@/lib/preseason"
 import { PersonCard } from "@/components/person-card"
-import { fmtDate, fmtMoney, fmtMoneyShort, fmtPct } from "@/lib/format"
+import { fmtDate, fmtMoneyShort, fmtPct } from "@/lib/format"
 import { useHqOrders } from "@/lib/hq"
 import { useParts } from "@/lib/parts"
 import { usePitCrew } from "@/lib/pit-crew"
@@ -33,6 +34,7 @@ import { cn } from "@/lib/utils"
 import { useLeague } from "@/lib/league"
 import type { Building, TeamPrivate } from "@/lib/types"
 import { useNavigate } from "react-router"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 export function MyTeamPage() {
   const { me, league } = useLeague()
@@ -67,7 +69,7 @@ export function MyTeamPage() {
       />
 
       <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
-        <Stat label="Budget" value={priv ? fmtMoneyShort(priv.budget) : "Private"} hint={priv ? fmtMoney(priv.budget) : undefined} />
+        {priv ? <BudgetStat budget={priv.budget} transactions={priv.transactions} calendar={ch.calendar} /> : <Stat label="Budget" value="Private" />}
         <Stat label="Championship" value={standing ? `P${standing.position}` : "—"} hint={standing ? `${standing.points} pts` : undefined} />
         <Stat label="Wins · podiums" value={standing ? `${standing.wins} · ${standing.podiums}` : "—"} hint={standing ? `${standing.dnfs} DNFs` : undefined} />
         <Stat label="HQ buildings" value={priv ? String(built) : "Private"} hint={priv ? `of ${priv.hq.length}` : undefined} />
@@ -144,6 +146,8 @@ function weeksLeft(now: string, end: string) {
 /** An info icon that shows what the building does, in MM's own words. */
 function BuildingInfo({ type }: { type: number }) {
   const info = HQ_INFO[type]
+  // Beside the name there's no room on a phone: below it instead.
+  const mobile = useIsMobile()
   if (!info) return null
   return (
     <Tooltip>
@@ -152,7 +156,7 @@ function BuildingInfo({ type }: { type: number }) {
           <Info className="size-3.5" />
         </button>
       </TooltipTrigger>
-      <TooltipContent side="right" className="flex-col items-start gap-1.5 py-2 font-normal">
+      <TooltipContent side={mobile ? "bottom" : "right"} collisionPadding={16} className="flex-col items-start gap-1.5 py-2 font-normal">
         <span className="font-medium">{info.name}</span>
         <span>{info.description}</span>
         <ul className="list-disc pl-4">
@@ -226,7 +230,7 @@ function HqTable({ hq, own, team }: { hq: TeamPrivate["hq"]; own: boolean; team:
             <TableBody>
               {hq.map((b) => {
                 const level = ownedLevel(b)
-                const aiProject = unorderedProject(b, appliedHere, h.leagueStart)
+                const aiProject = unorderedProject(b, appliedHere, h.teamStart(team))
                 const step = nextHqStep(b, aiProject)
                 const order = queued.get(b.type)
                 const missing = b.dependencies.filter((d) => {
