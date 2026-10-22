@@ -17,16 +17,48 @@ function TooltipProvider({
   )
 }
 
+// Radix opens tooltips on hover and focus only, never on touch: a tap toggles them here, and a tap
+// elsewhere closes them.
+const TapContext = React.createContext<{ open: boolean; setOpen: (o: boolean) => void } | null>(null)
+
 function Tooltip({
+  open: openProp,
+  defaultOpen = false,
+  onOpenChange,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Root>) {
-  return <TooltipPrimitive.Root data-slot="tooltip" {...props} />
+  const [openState, setOpenState] = React.useState(defaultOpen)
+  const open = openProp ?? openState
+  const setOpen = React.useCallback((o: boolean) => { setOpenState(o); onOpenChange?.(o) }, [onOpenChange])
+  return (
+    <TapContext.Provider value={{ open, setOpen }}>
+      <TooltipPrimitive.Root data-slot="tooltip" open={open} onOpenChange={setOpen} {...props} />
+    </TapContext.Provider>
+  )
 }
 
 function TooltipTrigger({
+  onPointerDown,
+  onClick,
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
-  return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />
+  const tap = React.useContext(TapContext)
+  // Radix closes an open tooltip on pointer down, so remember whether it was open before that.
+  const touch = React.useRef<{ wasOpen: boolean } | null>(null)
+  return (
+    <TooltipPrimitive.Trigger
+      data-slot="tooltip-trigger"
+      onPointerDown={(e) => { touch.current = e.pointerType !== "mouse" ? { wasOpen: !!tap?.open } : null; onPointerDown?.(e) }}
+      onClick={(e) => {
+        onClick?.(e)
+        if (!touch.current || !tap) return
+        // Radix closes the tooltip on click; skip that and toggle instead.
+        e.preventDefault()
+        tap.setOpen(!touch.current.wasOpen)
+      }}
+      {...props}
+    />
+  )
 }
 
 function TooltipContent({
