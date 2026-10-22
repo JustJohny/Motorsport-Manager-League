@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { planDesign } from "../../../src/part-design.ts"
 import { customerStat, DEFAULT_LISTED, isCustomerPart } from "../../../src/part-market.ts"
 import { useLeague } from "./league"
-import { demoMode, supabase, watchTable } from "./supabase"
+import { demoMode, fetchTeamStarts, supabase, watchTable } from "./supabase"
 import type { Part, TeamDesign, TeamPrivate } from "./types"
 
 export interface DesignOrder {
@@ -30,8 +30,8 @@ interface PartsState {
   orders: DesignOrder[]
   fitting: Fitting[]
   improvement: Improvement[]
-  /** First published game date: AI designs and parts after it are undone at the next apply. */
-  leagueStart: string | null
+  /** When a member took the team over: AI designs and parts after it are undone at the next apply. */
+  teamStart: (team: string) => string | null
   /** What a team's queued design and part purchases commit. */
   committed: (team: string) => number
   designCommitted: (team: string) => number
@@ -69,15 +69,15 @@ async function check<T>(p: PromiseLike<{ data: T; error: { message: string } | n
 
 const sameSet = (a: number[], b: number[]) => a.length === b.length && [...a].sort().join() === [...b].sort().join()
 
-/** A design the in-game AI started after the league began (cancelled at the next apply). */
-export function isAiDesign(current: TeamDesign["current"], team: string, orders: DesignOrder[], leagueStart: string | null) {
-  if (!current || !leagueStart || current.start <= leagueStart) return false
+/** A design the in-game AI started after a member took the team over (cancelled at the next apply). */
+export function isAiDesign(current: TeamDesign["current"], team: string, orders: DesignOrder[], since: string | null) {
+  if (!current || !since || current.start <= since) return false
   return !orders.some((o) => o.team === team && o.status === "applied" && o.part_type === current.type && sameSet(o.components, current.components))
 }
 
-/** A part the AI designed and built after the league began (removed at the next apply). */
-export function isAiPart(part: Part, type: string, team: string, orders: DesignOrder[], leagueStart: string | null) {
-  if (!leagueStart || part.buildDate <= leagueStart || isCustomerPart(part.guid)) return false
+/** A part the AI designed and built after a member took the team over (removed at the next apply). */
+export function isAiPart(part: Part, type: string, team: string, orders: DesignOrder[], since: string | null) {
+  if (!since || part.buildDate <= since || isCustomerPart(part.guid)) return false
   return !orders.some((o) => o.team === team && o.status !== "cancelled" && o.part_type === type && sameSet(o.components, part.componentIds ?? []))
 }
 
@@ -99,7 +99,7 @@ export function PartsProvider({ children }: { children: ReactNode }) {
   const [orders, setOrders] = useState<DesignOrder[]>([])
   const [fitting, setFittingRows] = useState<Fitting[]>([])
   const [improvement, setImprovementRows] = useState<Improvement[]>([])
-  const [leagueStart, setLeagueStart] = useState<string | null>(demoMode ? league.snapshot.gameDate : null)
+  const [starts, setStarts] = useState<Record<string, string>>({})
   const [listings, setListings] = useState<Listing[]>([])
   const [purchases, setPurchases] = useState<Purchase[]>([])
   const [marketRules, setMarketRules] = useState<MarketRule[]>([])
@@ -110,12 +110,12 @@ export function PartsProvider({ children }: { children: ReactNode }) {
       check(supabase!.from("design_orders").select("*").in("status", ["queued", "applied"]).order("created_at")),
       check(supabase!.from("part_fitting").select("*")),
       check(supabase!.from("part_improvement").select("*")),
-      check(supabase!.rpc("league_start")),
+      fetchTeamStarts(),
     ])
     setOrders(((o ?? []) as DesignOrder[]).map((x) => ({ ...x, cost: Number(x.cost) })))
     setFittingRows((f ?? []) as Fitting[])
     setImprovementRows(((i ?? []) as Improvement[]).map((x) => ({ ...x, split: Number(x.split) })))
-    setLeagueStart((start as string | null) ?? null)
+    setStarts(start)
     // The part market (migration 029): left empty until it's run.
     const [l, pu, r] = await Promise.all([
       supabase!.from("part_listings").select("*").eq("status", "active").order("created_at"),
@@ -147,7 +147,7 @@ export function PartsProvider({ children }: { children: ReactNode }) {
     orders,
     fitting,
     improvement,
-    leagueStart,
+    teamStart: (team) => (demoMode ? league.snapshot.gameDate : starts[team] ?? null),
     committed: (team) => designCommitted(team) + purchaseCommitted(team),
     designCommitted,
     purchaseCommitted,

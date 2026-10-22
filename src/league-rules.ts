@@ -110,11 +110,11 @@ export const targetLevel = (b: Pick<HqBuilding, "state" | "level">) => (b.state 
 
 /**
  * A construction on a member team that the league didn't order: the in-game AI started it
- * after the league began. `pull` cancels and refunds these, so the member may order it anew.
+ * after a member took the team over. `pull` cancels and refunds these, so the member may order it anew.
  */
-export function unorderedProject(b: HqBuilding, applied: { building_type: number; to_level: number }[], leagueStart: string | null) {
+export function unorderedProject(b: HqBuilding, applied: { building_type: number; to_level: number }[], since: string | null) {
   if (b.state !== "BuildingInProgress" && b.state !== "Upgrading") return false;
-  if (!leagueStart || b.progressStart <= leagueStart) return false;
+  if (!since || b.progressStart <= since) return false;
   return !applied.some((o) => o.building_type === b.type && o.to_level === targetLevel(b));
 }
 

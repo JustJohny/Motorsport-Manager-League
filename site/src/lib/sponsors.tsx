@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react"
 import { useLeague } from "./league"
-import { demoMode, supabase, watchTable } from "./supabase"
+import { demoMode, fetchTeamStarts, supabase, watchTable } from "./supabase"
 import type { SponsorDeal } from "./types"
 
 export interface SponsorOrder {
@@ -19,7 +19,8 @@ export interface SponsorOrder {
 interface SponsorsState {
   /** The member's team's open and applied choices (the organizer sees every team's). */
   orders: SponsorOrder[]
-  leagueStart: string | null
+  /** When a member took the team over: deals MM's AI signed since are the member's to keep or drop. */
+  teamStart: (team: string) => string | null
   /** Upfront money that queued drops pay back. */
   committed: (team: string) => number
   /** A deal MM's AI signed since the league began that no league order signed. */
@@ -47,16 +48,16 @@ async function check<T>(p: PromiseLike<{ data: T; error: { message: string } | n
 export function SponsorsProvider({ children }: { children: ReactNode }) {
   const { me, league } = useLeague()
   const [orders, setOrders] = useState<SponsorOrder[]>([])
-  const [leagueStart, setLeagueStart] = useState<string | null>(demoMode ? league.snapshot.gameDate : null)
+  const [starts, setStarts] = useState<Record<string, string>>({})
 
   const reload = useCallback(async () => {
     if (demoMode) return
     const [o, start] = await Promise.all([
       check(supabase!.from("sponsor_orders").select("*").in("status", ["queued", "applied", "kept"]).order("created_at")),
-      check(supabase!.rpc("league_start")),
+      fetchTeamStarts(),
     ])
     setOrders(((o ?? []) as SponsorOrder[]).map((x) => ({ ...x, amount: Number(x.amount) })))
-    setLeagueStart((start as string | null) ?? null)
+    setStarts(start)
   }, [])
 
   useEffect(() => {
@@ -68,16 +69,17 @@ export function SponsorsProvider({ children }: { children: ReactNode }) {
     return () => void supabase!.removeChannel(channel)
   }, [reload])
 
+  const teamStart = (team: string) => (demoMode ? league.snapshot.gameDate : starts[team] ?? null)
   const priv = league.privateTeams[me.team]?.sponsorship
   const add = (o: Omit<SponsorOrder, "id" | "team" | "created_at">) =>
     setOrders((os) => [...os, { ...o, id: Date.now(), team: me.team, created_at: new Date().toISOString() }])
 
   const value: SponsorsState = {
     orders,
-    leagueStart,
+    teamStart,
     committed: (team) => orders.filter((o) => o.team === team && o.kind === "drop" && o.status === "queued").reduce((s, o) => s + o.amount, 0),
     isAiDeal: (deal, team) =>
-      !!leagueStart && deal.offerDate >= leagueStart
+      !!teamStart(team) && deal.offerDate >= teamStart(team)!
       && !orders.some((o) => o.team === team && o.kind === "sign" && o.status === "applied" && o.slot === deal.slot && o.sponsor_id === deal.sponsorId),
     sign: async (slot, sponsorId) => {
       if (demoMode) {

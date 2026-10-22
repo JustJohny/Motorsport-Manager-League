@@ -45,3 +45,13 @@ export function assetUrl(bucket: string, path: string) {
   if (demoMode) return `${import.meta.env.BASE_URL}${bucket}/${path}`
   return `${url!.replace(/\/$/, "")}/storage/v1/object/public/${bucket}/${path.split("/").map(encodeURIComponent).join("/")}`
 }
+
+/**
+ * When each member team was taken over (team_starts(), migration 030): what MM's AI built for a
+ * team before then stays; only what it did since is undone at the next apply.
+ */
+export async function fetchTeamStarts(): Promise<Record<string, string>> {
+  const { data, error } = await supabase!.rpc("team_starts")
+  if (error) throw new Error(error.message)
+  return Object.fromEntries(((data ?? []) as { team: string; start: string | null }[]).filter((r) => r.start).map((r) => [r.team, r.start!]))
+}

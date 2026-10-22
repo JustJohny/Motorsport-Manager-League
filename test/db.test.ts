@@ -268,7 +268,7 @@ describe.skipIf(!existsSync(SAVE))("database: snapshots and staff auction", () =
     const changes = windowChanges(w.id, state.gameDate, auctions, bids, DEFAULT_SETTINGS);
     changes.changes.unshift(
       // As pull does: first undo unordered HQ projects on member teams (none in the base save).
-      cancelUnorderedChange(["Tatra Racing", "Garuda Racing", "Octane Racing"], orders, state.gameDate),
+      ...cancelUnorderedChange(Object.fromEntries(["Tatra Racing", "Garuda Racing", "Octane Racing"].map((t) => [t, state.gameDate])), orders),
       ...hqChanges(orders, 1),
     );
     const won = winners(auctions, bids, DEFAULT_SETTINGS);

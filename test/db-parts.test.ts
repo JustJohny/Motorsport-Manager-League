@@ -137,7 +137,7 @@ describe.skipIf(!existsSync(SAVE))("database: part design, fitting and improveme
     const fitting = (await t.service<FittingRow>("select * from part_fitting")).rows;
     const improvement = (await t.service<ImprovementRow>("select * from part_improvement")).rows;
     const changes = [
-      ...undoAiParts(["Tatra Racing", "Garuda Racing", "Octane Racing"], orders, state.gameDate),
+      ...undoAiParts(Object.fromEntries(["Tatra Racing", "Garuda Racing", "Octane Racing"].map((t) => [t, state.gameDate])), orders),
       ...designChanges(orders),
       ...choiceChanges(fitting, improvement),
     ];

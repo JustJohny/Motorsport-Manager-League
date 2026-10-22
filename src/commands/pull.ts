@@ -61,12 +61,13 @@ export async function pullDecisions(env: SupabaseEnv, opts: { force?: boolean; a
   const changes: ChangeSet["changes"] = [];
   const notes: string[] = [];
 
-  // First undo what the in-game AI did to member teams' HQ since the last apply.
+  // First undo what the in-game AI did to member teams' HQ since each was taken over (what the AI
+  // built before a member joined stays theirs).
   const ctx = await fetchHqContext(env);
-  if (ctx.leagueStart && ctx.memberTeams.length) changes.push(cancelUnorderedChange(ctx.memberTeams, ctx.orders, ctx.leagueStart));
+  changes.push(...cancelUnorderedChange(ctx.teamStarts, ctx.orders));
   // ...and to their parts: AI designs and AI-built parts go, refunded.
   const parts = await fetchPartsContext(env);
-  if (ctx.leagueStart && ctx.memberTeams.length) changes.push(...undoAiParts(ctx.memberTeams, parts.orders, ctx.leagueStart));
+  changes.push(...undoAiParts(ctx.teamStarts, parts.orders));
   // Member teams (and the career team) are never promoted or relegated; AI teams still are. Takes
   // effect on a save from between season end and pre-season start.
   if (ctx.memberTeams.length) changes.push({ op: "protectTeams", teams: ctx.memberTeams });

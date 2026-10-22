@@ -30,24 +30,29 @@ export async function markOrdersApplied(env: SupabaseEnv, ids: number[]) {
 }
 
 /**
- * The change that cancels and refunds HQ projects the in-game AI started on member teams:
- * everything under construction after the league began that no applied or queued order covers.
+ * The changes that cancel and refund HQ projects the in-game AI started on member teams:
+ * everything under construction since a member took the team over (`starts`, team -> game date,
+ * from `team_starts()`) that no applied or queued order covers. Teams without a start are left alone.
  */
-export function cancelUnorderedChange(memberTeams: string[], orders: HqOrderRow[], leagueStart: string) {
-  return {
+export function cancelUnorderedChange(starts: Record<string, string>, orders: HqOrderRow[]) {
+  return Object.entries(starts).map(([team, since]) => ({
     op: "cancelUnorderedHq" as const,
-    teams: memberTeams,
-    keep: orders.map((o) => ({ team: o.team, building: o.building_type, toLevel: o.to_level })),
-    since: leagueStart,
-  };
+    teams: [team],
+    keep: orders.filter((o) => o.team === team).map((o) => ({ team: o.team, building: o.building_type, toLevel: o.to_level })),
+    since,
+  }));
 }
 
-/** Member teams, orders the league has applied or queued, and the first published game date. */
+/** Member teams, orders the league has applied or queued, and when each member team was taken over. */
 export async function fetchHqContext(env: SupabaseEnv) {
-  const [members, orders, [first]] = await Promise.all([
+  const [members, orders, starts] = await Promise.all([
     rest<{ team: string }[]>(env, "GET", "league_members?select=team"),
     rest<HqOrderRow[]>(env, "GET", "hq_orders?status=in.(queued,applied)&select=*"),
-    rest<{ game_date: string }[]>(env, "GET", "snapshots?select=game_date&order=game_date.asc&limit=1"),
+    rest<{ team: string; start: string | null }[]>(env, "POST", "rpc/team_starts", {}),
   ]);
-  return { memberTeams: [...new Set(members.map((m) => m.team))], orders, leagueStart: first?.game_date ?? null };
+  return {
+    memberTeams: [...new Set(members.map((m) => m.team))],
+    orders,
+    teamStarts: Object.fromEntries(starts.filter((s) => s.start).map((s) => [s.team, s.start!])) as Record<string, string>,
+  };
 }

@@ -14,12 +14,14 @@ const ENGLISH: Record<string, string> = { FrontWing: "Front Wing", RearWing: "Re
  * What the in-game AI did to member teams' parts since the last apply, undone: designs it
  * started and parts it finished that no league order covers are cancelled / removed and refunded.
  */
-export function undoAiParts(memberTeams: string[], orders: DesignOrderRow[], leagueStart: string): ChangeSet["changes"] {
-  const keep = orders.map((o) => ({ team: o.team, type: o.part_type as PartType, components: o.components }));
-  return [
-    { op: "cancelUnorderedDesigns", teams: memberTeams, keep, since: leagueStart },
-    { op: "removeUnorderedParts", teams: memberTeams, keep, since: leagueStart },
-  ];
+export function undoAiParts(starts: Record<string, string>, orders: DesignOrderRow[]): ChangeSet["changes"] {
+  return Object.entries(starts).flatMap(([team, since]) => {
+    const keep = orders.filter((o) => o.team === team).map((o) => ({ team: o.team, type: o.part_type as PartType, components: o.components }));
+    return [
+      { op: "cancelUnorderedDesigns" as const, teams: [team], keep, since },
+      { op: "removeUnorderedParts" as const, teams: [team], keep, since },
+    ];
+  });
 }
 
 /** Queued designs: start them in game and take MM's player price from the budget. */

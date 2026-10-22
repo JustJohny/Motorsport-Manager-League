@@ -2,7 +2,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { hqName } from "../../../src/hq-info.ts"
 import { useLeague } from "./league"
 import { nextHqStep, unorderedProject } from "./rules"
-import { demoMode, supabase, watchTable } from "./supabase"
+import { demoMode, fetchTeamStarts, supabase, watchTable } from "./supabase"
 
 export interface HqOrder {
   id: number
@@ -21,8 +21,8 @@ interface HqOrders {
   orders: HqOrder[]
   /** Applied orders: constructions the league started (tells them apart from AI projects). */
   applied: HqOrder[]
-  /** First published game date; AI projects are those started after it. */
-  leagueStart: string | null
+  /** When a member took the team over; AI projects are those started after it. */
+  teamStart: (team: string) => string | null
   committed: (team: string) => number
   order: (buildingType: number) => Promise<void>
   cancel: (orderId: number) => Promise<void>
@@ -46,18 +46,18 @@ export function HqOrdersProvider({ children }: { children: ReactNode }) {
   const { me, league } = useLeague()
   const [orders, setOrders] = useState<HqOrder[]>([])
   const [applied, setApplied] = useState<HqOrder[]>([])
-  const [leagueStart, setLeagueStart] = useState<string | null>(null)
+  const [starts, setStarts] = useState<Record<string, string>>({})
 
   const reload = useCallback(async () => {
     if (demoMode) return
     const [all, start] = await Promise.all([
       check(supabase!.from("hq_orders").select("*").in("status", ["queued", "applied"]).order("created_at")),
-      check(supabase!.rpc("league_start")),
+      fetchTeamStarts(),
     ])
     const list = (all ?? []) as HqOrder[]
     setOrders(list.filter((o) => o.status === "queued"))
     setApplied(list.filter((o) => o.status === "applied"))
-    setLeagueStart((start as string | null) ?? null)
+    setStarts(start)
   }, [])
 
   useEffect(() => {
@@ -70,13 +70,13 @@ export function HqOrdersProvider({ children }: { children: ReactNode }) {
   const value: HqOrders = {
     orders,
     applied,
-    leagueStart,
+    teamStart: (team) => starts[team] ?? null,
     committed: (team) => orders.filter((o) => o.team === team).reduce((s, o) => s + Number(o.cost), 0),
     order: async (buildingType) => {
       if (demoMode) {
         // Demo: same price and time rules, no budget or prerequisite checks.
         const b = league.privateTeams[me.team]?.hq.find((x) => x.type === buildingType)
-        const step = b && nextHqStep(b, unorderedProject(b, [], leagueStart))
+        const step = b && nextHqStep(b, unorderedProject(b, [], starts[me.team] ?? null))
         if (!b || !step) throw new Error("Can't order that")
         if (orders.some((o) => o.building_type === buildingType)) throw new Error(`${hqName(b.type, b.name)} already has a queued order`)
         setOrders((os) => [...os, { id: Date.now(), team: me.team, building_type: buildingType, building_name: hqName(b.type, b.name), to_level: step.toLevel, cost: step.cost, weeks: step.weeks, status: "queued", created_at: new Date().toISOString() }])

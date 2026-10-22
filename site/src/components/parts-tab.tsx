@@ -196,7 +196,7 @@ function DesignCard({ priv, team, own }: { priv: TeamPrivate; team: string; own:
   const design = priv.design!
   const queued = p.orders.find((o) => o.team === team && o.status === "queued")
   const current = design.current
-  const aiCurrent = isAiDesign(current, team, p.orders, p.leagueStart)
+  const aiCurrent = isAiDesign(current, team, p.orders, p.teamStart(team))
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const run = async (fn: () => Promise<void>) => {
@@ -665,7 +665,7 @@ function PartCard({ type, parts, priv, team, own }: { type: string; parts: Part[
           </TableHeader>
           <TableBody>
             {sorted.map((part) => {
-              const ai = isAiPart(part, type, team, p.orders, p.leagueStart)
+              const ai = isAiPart(part, type, team, p.orders, p.teamStart(team))
               const banned = !!part.banned
               const perfDone = (part.performance ?? 0) >= (part.maxPerformance ?? 0)
               const relDone = (part.reliability ?? 0) >= (part.maxReliability ?? 0)

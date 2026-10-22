@@ -205,7 +205,7 @@ function SellCard({ open, listed, spec, busy, run }: { open: boolean; listed: st
   const materials = current ? priv.design?.types[current]?.ctx.settings.materialsCost ?? 0 : 0
   const onMarket = new Set(p.listings.map((l) => l.part_guid))
   const parts = (current ? priv.parts[current] ?? [] : [])
-    .filter((x) => !x.banned && !isCustomerPart(x.guid) && !isAiPart(x, current!, me.team, p.orders, p.leagueStart))
+    .filter((x) => !x.banned && !isCustomerPart(x.guid) && !isAiPart(x, current!, me.team, p.orders, p.teamStart(me.team)))
     .sort((a, b) => (b.stat ?? 0) + (b.performance ?? 0) - (a.stat ?? 0) - (a.performance ?? 0))
   const chosen = parts.find((x) => x.guid === guid)
   const amount = Number(price.replace(/[^\d]/g, "")) || 0
