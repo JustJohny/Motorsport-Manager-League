@@ -52,7 +52,8 @@ describe.skipIf(!existsSync(SAVE))("rule votes on a real save and in the databas
     // Alice votes yes with 1 extra power; the rule is forced through by the organizer's yes too.
     const rows: RuleVoteRow[] = [{ team: "Garuda Racing", season: regs.season, rule_id: next.ruleId, choice: "yes", extra_power: Math.min(1, before.power) }];
     const otherGroup = Object.values(regs.rules).find((r) => r.group === "PointsSystem" && !regs.next.includes(r.id))!;
-    const { changes, results } = regulationChanges(regs, ch.championshipID, next.date, null, rows, [{ season: regs.season, rule_group: "PointsSystem", rule_id: otherGroup.id }], []);
+    // A race on the vote's date: only this vote closes, the later ones stay upcoming.
+    const { changes, results } = regulationChanges(regs, ch.championshipID, next.date, next.date, rows, [{ season: regs.season, rule_group: "PointsSystem", rule_id: otherGroup.id }], []);
     expect(results.length).toBeGreaterThan(0);
     expect(castVotes(regs, next.ruleId, rows).length).toBe(regs.teams.length);
     const log = applyChanges(save, { changes });
@@ -68,6 +69,11 @@ describe.skipIf(!existsSync(SAVE))("rule votes on a real save and in the databas
     const first = results[0];
     expect(after.votes.find((v) => v.ruleId === first.rule_id)).toMatchObject({ status: "held", result: { accepted: first.accepted } });
     if (first.accepted) expect(after.next).toContain(first.rule_id);
+    // The votes still to come keep their dates (their events moved up in mCalendarEvents).
+    const upcoming = (rg: typeof regs) => rg.votes.filter((v) => v.status === "upcoming").map((v) => [v.ruleId, v.date]);
+    expect(upcoming(after)).toEqual(upcoming(regs).filter(([id]) => !results.some((x) => x.rule_id === id)));
+    expect(upcoming(after).length).toBeGreaterThan(0);
+    expect(after.votes.filter((v) => v.status === "upcoming").every((v) => v.date)).toBe(true);
     expect(after.next).toContain(otherGroup.id);
     expect(new Set(after.next.map((id) => after.rules[id].group)).size).toBe(after.next.length);
   }, 120_000);

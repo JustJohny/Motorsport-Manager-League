@@ -110,7 +110,8 @@ export function voteCutoff(gameDate: string, nextRaceDate: string | null): strin
 /** Upcoming votes this checkpoint's pull settles. */
 export function votesClosingNow(votes: RuleVote[], gameDate: string, nextRaceDate: string | null): RuleVote[] {
   const cutoff = voteCutoff(gameDate, nextRaceDate);
-  return votes.filter((v) => v.status === "upcoming" && v.date < cutoff);
+  // A vote without a date is never settled early.
+  return votes.filter((v) => v.status === "upcoming" && v.date !== "" && v.date < cutoff);
 }
 
 export interface RuleVoteRow { team: string; season: number; rule_id: number; choice: VoteChoice; extra_power: number }

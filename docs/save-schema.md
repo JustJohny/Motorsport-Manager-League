@@ -256,6 +256,11 @@ Each fitted part with `rulesRisk > 0` is caught when `Random(0..99) < (risk + in
 - **Enhanced Graphics** (newman55, Unity Mod Manager 0.20 + Harmony): TAA, AO, depth of field, shadows, wheel rotation and a 3D driver; Harmony patches `CameraManager.Start`, `EnvironmentManager.PrepareForSession`, `UnityVehicle.*`, `FreeRoamCamera.LateUpdate`. It reads colours through `Team`/`TeamColor`, so league colour rows apply. No overlap with `tools/league-patch` (`SessionManager.StartSession`), but UMM's "Assembly" install edits `Assembly-CSharp.dll`, which `game-patch` rebuilds from `.orig`: the patcher now refuses (patch and restore) while `Assembly-CSharp.dll` references `UnityModManager`. Use UMM's **DoorstopProxy** method (`winhttp.dll` in the game folder; under Wine `WINEDLLOVERRIDES="winhttp=n,b"`).
 - **AI teams' looks** (`league.json` `"aiLooks"`, `src/ai-looks.ts`, `examples/f1-2016-looks.json`): colours written over the AI team's own MM row in the Team Colours mod, liveries pinned at every pull (`setTeamLook` with `ifAvailable`, by teamID). Entries for member teams (by name or teamID) are skipped, so members always keep their own look.
 
+## Rule vote dates (seen in saves, 2026-10-30)
+
+- `politicalSystem.mCalendarEvents` holds one event per vote of `mVotesForSeason`. Once MM holds a vote, it keeps that event in the list with `OnEventTrigger` cleared (no `methodNames`). The toolkit's `concludeVote` removes the event from the list.
+- So vote *i*'s date is not `mCalendarEvents[i]`. Take the events whose trigger is still "Vote", sorted by date, and pair them with the last votes of the season. Pairing by index shifted every date after a league-settled vote, gave the last vote an empty date, and `pull` settled it early ("The next vote is rule 6, not 117").
+
 ## Verified in game (2026-09-30, save "League Test 2", player team)
 - `setBuilding`: Wind Tunnel shown at level 1.
 - `setBudget`: new budget shown, with our transaction note in the finance history.

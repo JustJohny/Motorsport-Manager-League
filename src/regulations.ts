@@ -133,11 +133,17 @@ export function extractRegulations(save: Save, champ: Obj, memberTeams: Set<stri
   // The season's votes: held ones carry MM's result, upcoming ones the AI teams' votes.
   const season = Number(String(save.now).slice(0, 4));
   const results = g.list<Obj>(ps?.mVoteResultsForSeason ?? []);
-  const voteEvents = g.list<Obj>(ps?.mCalendarEvents ?? []).map((e) => e.triggerDate as string);
-  const votes: RuleVote[] = g.list<Obj>(ps?.mVotesForSeason ?? []).map((v, i) => {
+  // Held votes may have lost their event (concludeVote removes it), so the remaining Vote events
+  // are the last votes': pair them from the end.
+  const voteEvents = g.list<Obj>(ps?.mCalendarEvents ?? [])
+    .filter((e) => e?.OnEventTrigger?.methodNames?.[0] === "Vote")
+    .map((e) => e.triggerDate as string).sort();
+  const seasonVotes = g.list<Obj>(ps?.mVotesForSeason ?? []);
+  const offset = seasonVotes.length - voteEvents.length;
+  const votes: RuleVote[] = seasonVotes.map((v, i) => {
     addRule(v);
     const r = results.find((x) => g.deref<Obj>(x.votedSubject)?.ID === v.ID);
-    const date = voteEvents[i] ?? "";
+    const date = voteEvents[i - offset] ?? "";
     if (r || i < (ps.mNextVoteIndex ?? 0)) {
       return {
         ruleId: v.ID, date, status: "held",
